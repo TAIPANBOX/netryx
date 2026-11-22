@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "preact/hooks";
 import { createPoller } from "./poll";
+import { isPaused, onPause } from "./pause";
 import { setZone } from "./zone";
 
 export class ApiError extends Error {
@@ -195,8 +196,12 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
   const loadRef = useRef(load);
   loadRef.current = load;
 
+  // Pause holds the figures still: no poll asks again while it is on, except
+  // a screen's first load, so a screen opened while paused still shows data.
+  const hasData = useRef(false);
+  hasData.current = state.data !== undefined;
   useEffect(() => {
-    const hidden = () => document.visibilityState === "hidden";
+    const hidden = () => document.visibilityState === "hidden" || (isPaused() && hasData.current);
     const poller = createPoller<T>({
       load: (signal) => loadRef.current(signal),
       everyMs,
@@ -212,9 +217,11 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
     const onVisibility = () => (hidden() ? poller.pause() : poller.resume());
     poller.start();
     document.addEventListener("visibilitychange", onVisibility);
+    const offPause = onPause(onVisibility);
     return () => {
       poller.dispose();
       document.removeEventListener("visibilitychange", onVisibility);
+      offPause();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [everyMs, ...deps]);

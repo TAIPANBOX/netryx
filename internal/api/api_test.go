@@ -67,6 +67,16 @@ type fakeHistory struct {
 	points []rollup.Point
 	top    map[string][]rollup.Row
 	series []seriesCall
+	// recent answers Recent by topKey; covered is the span it says it read,
+	// spans the spans it was asked for.
+	recent  map[string][]rollup.Row
+	covered time.Duration
+	spans   []time.Duration
+}
+
+func (h *fakeHistory) Recent(f rollup.Filter, dim string, span time.Duration) ([]rollup.Row, time.Duration) {
+	h.spans = append(h.spans, span)
+	return h.recent[topKey(dim, f)], h.covered
 }
 
 type seriesCall struct {

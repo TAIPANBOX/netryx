@@ -5,10 +5,12 @@
 
 import { h, type ComponentChildren } from "preact";
 import { useContext, useRef } from "preact/hooks";
-import type { App, Device, Live, LiveApp, LiveConn, LivePlace } from "../types";
+import type { App, AppUsage, Device, Live, LiveApp, LiveConn, LivePlace } from "../types";
+import { windowLabel, type Win } from "../query";
+import { useFlip, useSteadyRows } from "./table";
 import { getJSON, mac as enc, usePoll } from "../api";
 import { StackedArea, Legend, type Layer } from "../charts";
-import { Header, Card, CC, Status, Loading, Empty, AppIcon, IconContext } from "../ui";
+import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon, IconContext } from "../ui";
 import { appName, category, clock, countryName, duration, nameSource, num, plural, rate, ratePair } from "../format";
 import { LAYER_COLORS, OTHER_COLOR, UP_COLOR } from "../view";
 import { layerColor } from "../icons";
@@ -22,9 +24,12 @@ const EVERY_MS = 2_000;
 /** Connections listed; the API sends the busiest 50. */
 const CONNS_SHOWN = 12;
 
-export function ClientLive({ mac, modes }: { mac: string; modes: ComponentChildren }) {
+export function ClientLive({ mac, modes, win, onWin }: { mac: string; modes: ComponentChildren; win: Win; onWin: (w: Win) => void }) {
   const base = `/api/devices/${enc(mac)}`;
-  const dev = usePoll((s) => getJSON<Device>(base, s), 10_000, [mac]);
+  const dev = usePoll((s) => getJSON<Device>(`${base}?window=${win}`, s), 10_000, [mac, win]);
+  // Each app's average over the window, from the router's minutes: the order
+  // of the active apps follows it, not the last two seconds.
+  const recent = usePoll((s) => getJSON<AppUsage[]>(`${base}/apps?range=1h&window=${win}`, s), 10_000, [mac, win]);
   const polled = usePoll((s) => getJSON<Live>(`${base}/live`, s), EVERY_MS, [mac]);
   // Apps seen in this view, so a chart layer keeps its name after the app
   // stops and leaves the apps list.
@@ -37,7 +42,7 @@ export function ClientLive({ mac, modes }: { mac: string; modes: ComponentChildr
 
   return (
     <div class="page">
-      <Header section="clients" pills={modes} />
+      <Header section="clients" pills={modes} win={win} onWin={onWin} />
       <main class="main">
         <div class="crumbs">
           <a href="#/clients">Clients</a> / {name}
@@ -50,7 +55,7 @@ export function ClientLive({ mac, modes }: { mac: string; modes: ComponentChildr
             <LiveDevice d={dev.data} name={name} at={polled.at} stale={!!polled.error} />
             <LiveTiles l={l} />
             <LiveTraffic l={l} seen={seen.current} />
-            <LiveApps apps={l.apps ?? []} mac={mac} />
+            <LiveApps apps={l.apps ?? []} mac={mac} recent={recent.data ?? []} win={win} />
             <div class="grid-2">
               <LiveConns mac={mac} conns={l.conns ?? []} flows={l.flows} />
               <LivePlaces places={l.places ?? []} />
@@ -155,25 +160,51 @@ function LiveTraffic({ l, seen }: { l: Live; seen: Map<string, App> }) {
   );
 }
 
-function LiveApps({ apps, mac }: { apps: LiveApp[]; mac: string }) {
+function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: string; recent: AppUsage[]; win: Win }) {
   const manifest = useContext(IconContext);
+  const avg = new Map(recent.map((r) => [r.app.id, r.recent ?? { up: 0, down: 0 }]));
+  const avgOf = (a: LiveApp) => avg.get(a.app.id) ?? { up: a.up, down: a.down };
+  const { rows, sort, pick } = useSteadyRows(
+    "client-live-apps",
+    apps,
+    (a) => a.app.id,
+    { avg: (a) => avgOf(a).down + avgOf(a).up, now: (a) => a.down + a.up, name: (a) => appName(a.app.name) },
+    { col: "avg", dir: "desc" },
+  );
+  const list = useRef<HTMLDivElement>(null);
+  useFlip(list);
   return (
-    <Card label="Active apps" title="Active apps now" aside={<span class="muted small">speed now · connections · main domain · where</span>}>
+    <Card
+      label="Active apps"
+      title="Active apps now"
+      aside={
+        <Pills
+          label="Order the apps by"
+          inset
+          value={sort.col}
+          onPick={(c) => pick(c, c === "name" ? "asc" : "desc")}
+          items={[{ id: "avg", label: `${windowLabel(win)} average` }, { id: "now", label: "speed now" }, { id: "name", label: "name" }]}
+        />
+      }
+    >
       {apps.length === 0 && <Empty>The device is not sending anything now.</Empty>}
-      {apps.map((a) => {
+      <div class="col-tight" ref={list}>
+      {rows.map((a) => {
         const name = appName(a.app.name);
         const d = sparkPath(a.spark);
+        const m = avgOf(a);
         return (
-          <div key={a.app.id} class="live-app">
+          <div key={a.app.id} data-key={a.app.id} class="live-app">
             <AppIcon id={a.app.id} name={name} size={40} />
             <div class="col-tight">
               <span class="strong ellipsis">{name}</span>
               <span class="muted small">{name.includes(" · ") ? "by organisation" : category(a.app.category) || "-"}</span>
               <BlockApp appId={a.app.id} name={name} mac={mac} />
             </div>
-            <div class="col-tight live-rate">
-              <span class="strong nowrap">↓ {rate(a.down)}</span>
-              <span class="soft small nowrap">↑ {rate(a.up)}</span>
+            <div class="col-tight live-rate" title={`average over the last ${windowLabel(win)}; right now ↓ ${rate(a.down)} · ↑ ${rate(a.up)}`}>
+              <span class="strong nowrap">↓ {rate(m.down)}</span>
+              <span class="soft small nowrap">↑ {rate(m.up)}</span>
+              <span class="muted small nowrap">now ↓ {rate(a.down)}</span>
             </div>
             <svg viewBox="0 0 120 28" preserveAspectRatio="none" role="img" aria-label={`trend of ${name}`} class="spark">
               {d && <path d={d} fill="none" stroke={layerColor(a.app.id, manifest, new Set(), LAYER_COLORS[0])} stroke-width="2" />}
@@ -187,6 +218,7 @@ function LiveApps({ apps, mac }: { apps: LiveApp[]; mac: string }) {
           </div>
         );
       })}
+      </div>
     </Card>
   );
 }

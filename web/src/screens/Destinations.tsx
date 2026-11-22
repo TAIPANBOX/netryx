@@ -2,26 +2,44 @@
 // period, who went there and which rules close them; and one country: its
 // clients, apps and networks over the period.
 
-import { h } from "preact";
+import { h, type ComponentChildren } from "preact";
+import { useRef } from "preact/hooks";
+import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { CountryDetail, HouseDestinations, Range } from "../types";
 import { getJSON, mac, usePoll } from "../api";
-import { RANGES } from "../query";
+import { RANGES, windowLabel, type Win } from "../query";
 import { Bars } from "../charts";
 import { Header, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
-import { bytes, share, num, appName, countryName, clientName, plural } from "../format";
+import { bytes, rate, share, num, appName, countryName, clientName, plural } from "../format";
 import { clientsLine, closesHouse, countryHref, domainText, rulesForCountry } from "../house";
-import { BlockCountry, CDN_NOTE, RuleTags, useRules } from "./controls";
+import { BlockCountry, CDN_NOTE, RuleTags, useRuleNames, useRules } from "./controls";
 import { HouseTraffic } from "./Apps";
 
 const periodOf = (r: Range) => RANGES.find((x) => x.id === r)?.label ?? r;
 
-export function Destinations({ range, onRange }: { range: Range; onRange: (r: Range) => void }) {
-  const polled = usePoll((s) => getJSON<HouseDestinations>(`/api/destinations?range=${range}`, s), 15_000, [range]);
+export function Destinations({ range, onRange, win, onWin }: { range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
+  const polled = usePoll((s) => getJSON<HouseDestinations>(`/api/destinations?range=${range}&window=${win}`, s), 15_000, [range, win]);
   const { rules } = useRules();
+  const names = useRuleNames();
   const d = polled.data;
+  const { rows: countries, sort, pick } = useSteadyRows(
+    "destinations",
+    d?.countries ?? [],
+    (c) => c.cc,
+    {
+      name: (c) => countryName(c.cc),
+      clients: (c) => c.clients,
+      bytes: (c) => c.down + c.up,
+      now: (c) => (c.recent ? c.recent.down + c.recent.up : 0),
+    },
+    { col: "bytes", dir: "desc" },
+  );
+  const body = useRef<HTMLTableSectionElement>(null);
+  useFlip(body);
+  const th = (label: ComponentChildren, col: string, first: "asc" | "desc" = "desc", num = false) => <SortTh label={label} col={col} sort={sort} pick={pick} first={first} num={num} />;
   return (
     <div class="page">
-      <Header section="destinations" range={range} onRange={onRange} />
+      <Header section="destinations" range={range} onRange={onRange} win={win} onWin={onWin} />
       <main class="main">
         <Status polled={polled} />
         <div class="toolbar">
@@ -41,20 +59,21 @@ export function Destinations({ range, onRange }: { range: Range; onRange: (r: Ra
                 <table class="table house-table">
                   <thead>
                     <tr>
-                      <th>Country</th>
-                      <th>Clients</th>
-                      <th>Share</th>
-                      <th class="num">↓ · ↑</th>
+                      {th("Country", "name", "asc")}
+                      {th("Clients", "clients")}
+                      {th("Share", "bytes")}
+                      {th(`${periodOf(range)} ↓ · ↑`, "bytes", "desc", true)}
+                      {th(`Now, ${windowLabel(win)} avg`, "now", "desc", true)}
                       <th>Rules</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {d.countries.map((c) => {
+                  <tbody ref={body}>
+                    {countries.map((c) => {
                       const href = countryHref(c.cc);
                       const name = c.other || c.cc === "--" ? "unknown or others" : countryName(c.cc);
                       const closing = rulesForCountry(rules, c.cc);
                       return (
-                        <tr key={c.cc}>
+                        <tr key={c.cc} data-key={c.cc}>
                           <td>
                             <span class="app-cell">
                               <CC cc={c.cc} />
@@ -72,8 +91,12 @@ export function Destinations({ range, onRange }: { range: Range; onRange: (r: Ra
                             ↓ {bytes(c.down)}
                             <br />{" "}↑ {bytes(c.up)}
                           </td>
+                          <td class="num small">
+                            ↓ {rate(c.recent?.down ?? 0)}
+                            <br />{" "}↑ {rate(c.recent?.up ?? 0)}
+                          </td>
                           <td class="small">
-                            <RuleTags rules={closing} />
+                            <RuleTags rules={closing} names={names} />
                             {href && !closesHouse(closing, Date.now()) && <BlockCountry cc={c.cc} />}
                           </td>
                         </tr>
@@ -122,6 +145,7 @@ export function Destinations({ range, onRange }: { range: Range; onRange: (r: Ra
 export function Destination({ cc, range, onRange }: { cc: string; range: Range; onRange: (r: Range) => void }) {
   const polled = usePoll((s) => getJSON<CountryDetail>(`/api/destinations/${cc}?range=${range}`, s), 15_000, [cc, range]);
   const { rules } = useRules();
+  const names = useRuleNames();
   const d = polled.data;
   const closing = rulesForCountry(rules, cc);
   return (
@@ -142,7 +166,7 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
                   <span class="soft small">
                     {plural(d.clientCount, "client", "clients")} · {share(d.share)} of what left the house · {plural(d.networks.length, "network", "networks")}
                   </span>
-                  <RuleTags rules={closing} />
+                  <RuleTags rules={closing} names={names} />
                 </div>
                 <span class="soft small right">
                   ↓ {bytes(d.down)}

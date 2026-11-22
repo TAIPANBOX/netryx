@@ -5,14 +5,14 @@
 // right to write.
 
 import { h, Fragment } from "preact";
-import { useRef, useState } from "preact/hooks";
+import { useContext, useRef, useState } from "preact/hooks";
 import { once } from "../guard";
-import type { Device, LiveConn } from "../types";
+import type { Device, Group, LiveConn } from "../types";
 import { getJSON, mac as enc, sendJSON, usePoll } from "../api";
-import { useSession } from "../ui";
+import { IconContext, useSession } from "../ui";
 import { cutNote, type CutAnswer } from "../live";
 import { countryName, time } from "../format";
-import { ruleTagText } from "../house";
+import { ruleNames, ruleTagText } from "../house";
 import { activePause, appliesTo, describeRule, pauseBody, stateOf, untilText, type Names, type PauseKind, type Rule, type RuleBody } from "../rules";
 
 export const CDN_NOTE = "a service of this country reached through a CDN in another country is not blocked this way";
@@ -163,6 +163,13 @@ export function RuleTags({ rules, names }: { rules: Rule[]; names?: Names }) {
       })}
     </span>
   );
+}
+
+/** The names rule tags use, read once a minute. */
+export function useRuleNames(): Names {
+  const devices = usePoll((s) => getJSON<Device[]>("/api/devices", s), 60_000, []).data ?? [];
+  const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
+  return ruleNames(devices, groups, useContext(IconContext));
 }
 
 /** The rules, polled; `refresh` asks again at once after a change. */

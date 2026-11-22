@@ -51,6 +51,7 @@ type houseAppJSON struct {
 	Clients int             `json:"clients"`
 	Top     []clientRefJSON `json:"top"`
 	Other   bool            `json:"other"`
+	Recent  rateJSON        `json:"recent"`
 }
 
 type networkJSON struct {
@@ -84,6 +85,7 @@ type houseCountryJSON struct {
 	Clients int             `json:"clients"`
 	Top     []clientRefJSON `json:"top"`
 	Other   bool            `json:"other"`
+	Recent  rateJSON        `json:"recent"`
 }
 
 type houseDestinationsJSON struct {
@@ -196,6 +198,10 @@ func (s *server) houseApps(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	recent, _, err := s.recent(r, rollup.Filter{}, "app")
+	if err != nil {
+		return nil, err
+	}
 	cat, names := s.catalog(), s.names()
 	all := s.h.Top(rollup.Filter{}, "app", p.from, p.now, 0)
 	total := sumBytes(all)
@@ -206,7 +212,7 @@ func (s *server) houseApps(r *http.Request) (any, error) {
 		out = append(out, houseAppJSON{
 			App: cat.value(ar.Key), Down: ar.Bytes.Down, Up: ar.Bytes.Up, Flows: ar.Bytes.Flows,
 			Share: share(rowBytes(ar), total), Clients: clientCount(cl),
-			Top: topRefs(cl, names), Other: ar.Key == serviceKey,
+			Top: topRefs(cl, names), Other: ar.Key == serviceKey, Recent: recent[ar.Key],
 		})
 	}
 	return out, nil
@@ -265,6 +271,10 @@ func (s *server) houseDestinations(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	recent, _, err := s.recent(r, rollup.Filter{NotCC: lanCC}, "cc")
+	if err != nil {
+		return nil, err
+	}
 	cat, names := s.catalog(), s.names()
 	ccs := wanOnly(s.h.Top(rollup.Filter{}, "cc", p.from, p.now, 0), func(r rollup.Row) string { return r.Key })
 	total := sumBytes(ccs)
@@ -274,7 +284,7 @@ func (s *server) houseDestinations(r *http.Request) (any, error) {
 		cl := clients[cr.Key]
 		out.Countries = append(out.Countries, houseCountryJSON{
 			CC: cr.Key, Down: cr.Bytes.Down, Up: cr.Bytes.Up, Share: share(rowBytes(cr), total),
-			Clients: clientCount(cl), Top: topRefs(cl, names), Other: cr.Key == serviceCC,
+			Clients: clientCount(cl), Top: topRefs(cl, names), Other: cr.Key == serviceCC, Recent: recent[cr.Key],
 		})
 	}
 	places := wanOnly(s.h.Top(rollup.Filter{}, "place", p.from, p.now, 0), func(r rollup.Row) string { return r.Extra["cc"] })

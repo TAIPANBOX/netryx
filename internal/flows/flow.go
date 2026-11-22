@@ -45,6 +45,9 @@ type Flow struct {
 	// Evicted says the table pushed this flow out to make room while it
 	// was still open: End is when that happened, not when it ended.
 	Evicted bool
+	// WinUp and WinDown are the bytes this flow moved over the window a live
+	// query asked for; zero otherwise.
+	WinUp, WinDown uint64
 }
 
 // Delta is the bytes one flow moved since its last delta, stamped with what

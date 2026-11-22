@@ -44,6 +44,8 @@ export interface Device {
   random: boolean; ipv4: string[] | null; ipv6: string[] | null; link: Link;
   first: string; last: string; online: boolean;
   rate: { up: number; down: number };
+  /** The average over the window asked for (bytes per second), and the seconds it covers. */
+  recent?: { up: number; down: number }; recentSec?: number;
   last24h: { down: number; up: number };
   topApp: App | null; countryCount: number;
   /** Isolation (spec 6.7) and quarantine (6.8): set by the router when the rules run. */
@@ -56,6 +58,8 @@ export interface Place extends Row { cc: string; org: string; down: number; up: 
 export interface AppUsage extends Row {
   app: App; down: number; up: number; flows: number; share: number;
   domains: Domain[] | null; places: Place[] | null;
+  /** The average over the window asked for, bytes per second. */
+  recent?: { up: number; down: number };
 }
 
 export interface Destinations {
@@ -68,6 +72,8 @@ export interface FlowRow {
   end: string; start: string; mac: string; client: string; dir: string;
   local: string; remote: string; proto: number; name: string; nameSrc: string;
   app: App; cc: string; asn: number; org: string; up: number; down: number; evicted: boolean;
+  /** What a live flow moved over the window asked for. */
+  winUp?: number; winDown?: number;
 }
 export interface FlowsPage { rows: FlowRow[]; next: string }
 
@@ -108,6 +114,7 @@ export interface HouseApp extends Row {
   app: App; down: number; up: number; flows: number; share: number;
   /** How many clients used it; top names the busiest few. */
   clients: number; top: ClientRef[];
+  recent?: { up: number; down: number };
 }
 export interface Network extends Row { cc: string; asn: string; org: string; down: number; up: number }
 export interface AppDetail {
@@ -115,7 +122,7 @@ export interface AppDetail {
   /** Every client of the app; clients lists the busiest 50. */
   clientCount: number; clients: ClientRef[]; places: Network[]; domains: Domain[]; series: SeriesPoint[];
 }
-export interface HouseCountry extends Row { cc: string; down: number; up: number; share: number; clients: number; top: ClientRef[] }
+export interface HouseCountry extends Row { cc: string; down: number; up: number; share: number; clients: number; top: ClientRef[]; recent?: { up: number; down: number } }
 export interface HouseDestinations {
   countries: HouseCountry[];
   networks: Network[];

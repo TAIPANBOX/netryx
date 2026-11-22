@@ -6,8 +6,9 @@ import { h, Fragment, createContext, type ComponentChildren } from "preact";
 import { useContext, useEffect, useState } from "preact/hooks";
 import type { Range } from "./types";
 import type { Polled } from "./api";
-import { RANGES } from "./query";
+import { RANGES, WINDOWS, type Win } from "./query";
 import { logout, onNewBuild } from "./api";
+import { isPaused, onPause, setPaused } from "./pause";
 import { time } from "./format";
 import { appIcon, type IconManifest } from "./icons";
 
@@ -58,7 +59,22 @@ function NewBuild() {
   );
 }
 
-export function Header(p: { section: Section; range?: Range; onRange?: (r: Range) => void; note?: string; pills?: ComponentChildren }) {
+/** Pause: holds every figure on the page still until it is pressed again. */
+function PauseButton() {
+  const [paused, set] = useState(isPaused());
+  useEffect(() => onPause(set), []);
+  return (
+    <button type="button" class={paused ? "btn-mini btn-paused" : "btn-mini"} aria-pressed={paused} title={paused ? "Figures held still: press to resume" : "Hold the figures still while you read"} onClick={() => setPaused(!paused)}>
+      {paused ? "Paused · Resume" : "Pause"}
+    </button>
+  );
+}
+
+export function Header(p: {
+  section: Section; range?: Range; onRange?: (r: Range) => void; note?: string; pills?: ComponentChildren;
+  /** The window the Now columns average over, where the screen has them. */
+  win?: Win; onWin?: (w: Win) => void;
+}) {
   const s = useSession();
   return (
     <Fragment>
@@ -87,6 +103,10 @@ export function Header(p: { section: Section; range?: Range; onRange?: (r: Range
       ) : p.note ? (
         <span class="muted small">{p.note}</span>
       ) : null}
+      {p.win && p.onWin && (
+        <Pills label="Now averaged over" items={WINDOWS.map((w) => ({ id: w.id, label: w.label }))} value={p.win} onPick={(v) => p.onWin!(v as Win)} />
+      )}
+      <PauseButton />
       {s.user && (
         <span class="who small">
           <span class="muted">{s.user}</span>

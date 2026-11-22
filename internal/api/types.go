@@ -103,22 +103,26 @@ type linkJSON struct {
 }
 
 type deviceJSON struct {
-	MAC      string    `json:"mac"`
-	Name     string    `json:"name"`
-	Hostname string    `json:"hostname"`
-	Vendor   string    `json:"vendor"`
-	Label    string    `json:"label"`
-	Group    string    `json:"group"`
-	Random   bool      `json:"random"`
-	IPv4     []string  `json:"ipv4"`
-	IPv6     []string  `json:"ipv6"`
-	Link     linkJSON  `json:"link"`
-	First    string    `json:"first"`
-	Last     string    `json:"last"`
-	Online   bool      `json:"online"`
-	Rate     rateJSON  `json:"rate"`
-	Last24h  bytesJSON `json:"last24h"`
-	TopApp   *appJSON  `json:"topApp"`
+	MAC      string   `json:"mac"`
+	Name     string   `json:"name"`
+	Hostname string   `json:"hostname"`
+	Vendor   string   `json:"vendor"`
+	Label    string   `json:"label"`
+	Group    string   `json:"group"`
+	Random   bool     `json:"random"`
+	IPv4     []string `json:"ipv4"`
+	IPv6     []string `json:"ipv6"`
+	Link     linkJSON `json:"link"`
+	First    string   `json:"first"`
+	Last     string   `json:"last"`
+	Online   bool     `json:"online"`
+	Rate     rateJSON `json:"rate"`
+	// Recent is the average over the window asked for (bytes per second) and
+	// RecentSec the seconds that window covers.
+	Recent    rateJSON  `json:"recent"`
+	RecentSec float64   `json:"recentSec"`
+	Last24h   bytesJSON `json:"last24h"`
+	TopApp    *appJSON  `json:"topApp"`
 	// CountryCount is how many countries the device talked to in 24 h.
 	CountryCount int `json:"countryCount"`
 	// Isolate and Quarantined are the device's isolation (spec 6.7) and
@@ -167,6 +171,7 @@ type appUsageJSON struct {
 	Domains []domainJSON `json:"domains"`
 	Places  []placeJSON  `json:"places"`
 	Other   bool         `json:"other"`
+	Recent  rateJSON     `json:"recent"`
 }
 
 type destCountryJSON struct {
@@ -216,6 +221,9 @@ type flowRow struct {
 	Up      uint64  `json:"up"`
 	Down    uint64  `json:"down"`
 	Evicted bool    `json:"evicted"`
+	// WinUp and WinDown are what a live flow moved over the window asked for.
+	WinUp   uint64 `json:"winUp"`
+	WinDown uint64 `json:"winDown"`
 }
 
 type flowsPage struct {
