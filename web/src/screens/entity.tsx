@@ -94,11 +94,11 @@ export function ClientCard({ mac }: { mac: string }) {
  * Any name as a link to its screen (a client's opens its card): no underline
  * until hovered or focused. A name that leads nowhere stays text.
  */
-export function EntityLink({ e, children, from = "", class: cls }: { e: Entity; children: ComponentChildren; from?: string; class?: string }) {
-  if (e.kind === "client") return <ClientLink mac={e.mac} name={String(children)} from={from} class={cls} />;
+export function EntityLink({ e, children, from = "", class: cls, title }: { e: Entity; children: ComponentChildren; from?: string; class?: string; title?: string }) {
+  if (e.kind === "client") return <ClientLink mac={e.mac} name={String(children)} from={from} class={cls} title={title} />;
   const href = entityHref(e);
-  if (!href) return <span class={cls}>{children}</span>;
-  return <a class={cls ? `entity-link ${cls}` : "entity-link"} href={withFrom(href, from)}>{children}</a>;
+  if (!href) return <span class={cls} title={title}>{children}</span>;
+  return <a class={cls ? `entity-link ${cls}` : "entity-link"} href={withFrom(href, from)} title={title}>{children}</a>;
 }
 
 /** The first clients of a row by name, each opening its card, and how many more. */

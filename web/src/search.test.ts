@@ -22,6 +22,11 @@ const index = buildIndex({
   groups: [{ id: "kids", name: "Kids", members: [] }] as Group[],
   rules: [{ id: "r_1", what: "app", targets: ["tiktok"], who: "group", group: "kids", members: [], days: [], from: "", to: "", until: null, action: "limit", minutes: 60 } as unknown as Rule],
   appName: (id) => (id === "tiktok" ? "TikTok" : id),
+  people: [{ id: "alex", name: "Alex", macs: ["aa:bb:cc:dd:ee:02"] }],
+});
+
+test("a person is found by name", () => {
+  assert.equal(searchHits("alex", index)[0].href, "#/person/alex");
 });
 
 test("typing a name finds the thing, best match first", () => {

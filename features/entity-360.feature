@@ -53,3 +53,28 @@ Feature: every thing in the console can be found and seen in place
     # (the comparison: "two or three clients are compared side by side, from a shareable address",
     #  "picking clients to compare stops at three and a second pick takes one back",
     #  "the comparison lines up what tells devices apart" in web/src/compare.test.ts)
+
+  Scenario: a person and the devices that are theirs
+    Given the owner adds a person and ticks the devices that are theirs
+    When the owner opens one of those devices, searches the person's name or rests the mouse on it
+    Then the device says whose it is, and the person's page lists their devices and their traffic
+    And a device is one person's at most: giving it to a second person is refused and names the first
+    And deleting a person leaves the devices, their groups and every rule as they were
+    And the person is kept in the router's config, so a restart reads it back
+    # -> TestAPersonIsWrittenAndReadBack
+    # -> TestADeviceBelongsToOnePerson
+    # -> TestDeletingAPersonLeavesDevicesAndRules
+    # -> TestAPersonSurvivesARestart
+    # -> TestAWriteRouteIsReachableOnlyThroughTheGate
+    # (the page: "a person is a thing of its own: its page, its devices' chip, its route" in web/src/entity.test.ts,
+    #  "a new person gets an id from the name, or a free one", "a device names its person, if it has one" in web/src/people.test.ts)
+
+  Scenario: the last hour goes on across a restart of netryx
+    Given netryx has counted the house for a while
+    When netryx is restarted or upgraded, but the router is not rebooted
+    Then the rows' last hour and the Now columns go on from where they were
+    And only a reboot of the router starts them afresh, and then they say since when they count
+    # -> TestTheMinutesSurviveARestart
+    # -> TestLoadedMinutesKeepToTheRingAndTheClock
+    # -> TestALoadedMinuteIsHeldToTheKeyCap
+    # -> TestTheMinutesAreKeptInRAMAcrossARestart

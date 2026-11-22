@@ -83,6 +83,7 @@ export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: W
         <Status polled={polled} />
         <div class="toolbar">
           <h1>Clients</h1>
+          <a class="small" href="#/people">People</a>
           {polled.data && (
             <span class="muted small">
               {num(online)} online of {num(all.length)}

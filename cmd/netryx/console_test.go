@@ -1882,3 +1882,41 @@ func TestNoUploadAlertIsRaisedBeforeTheSettingsAreRead(t *testing.T) {
 		t.Fatalf("read, uploads off: %d raised; want still 1", raised)
 	}
 }
+
+// The minutes are kept in RAM across a restart of netryx: the stop writes
+// them to the minutes file, the next start reads them and takes the file
+// away, so a crash later leaves nothing stale behind.
+func TestTheMinutesAreKeptInRAMAcrossARestart(t *testing.T) {
+	o := testOptions(t)
+	o.Minutes = filepath.Join(t.TempDir(), "netryx", "minutes.json")
+	clk := &clock{t: time.Date(2026, 11, 20, 10, 30, 0, 0, time.UTC)}
+	o.Now = clk.Now
+	c, err := buildConsole(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addDelta(c.store, clk.Now())
+	if err := c.shutdown(); err != nil {
+		t.Fatalf("shutdown: %v", err)
+	}
+	fi, err := os.Stat(o.Minutes)
+	if err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("the minutes file: %v %v", fi, err)
+	}
+	clk.Set(clk.Now().Add(time.Minute))
+	again, err := buildConsole(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := again.store.Recent(rollup.Filter{}, "mac", 10*time.Minute)
+	var sum uint64
+	for _, r := range rows {
+		sum += r.Bytes.Down + r.Bytes.Up
+	}
+	if sum != 1000 {
+		t.Errorf("the last minutes after a restart hold %d bytes, want 1000", sum)
+	}
+	if _, err := os.Stat(o.Minutes); !os.IsNotExist(err) {
+		t.Errorf("the file read at the start is still there: %v", err)
+	}
+}

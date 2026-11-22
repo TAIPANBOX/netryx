@@ -17,7 +17,10 @@ const (
 	MaxRules   = 200
 	MaxMembers = 256
 	MaxGroups  = 32
-	MaxAllows  = 512
+	// MaxPeople bounds the house's people, and MaxPersonMACs one person's devices.
+	MaxPeople     = 32
+	MaxPersonMACs = 32
+	MaxAllows     = 512
 )
 
 // Rule is one validated (or rejected) rule.
@@ -48,6 +51,14 @@ type Allow struct {
 type Group struct {
 	ID, Name    string
 	FilteredDNS bool
+}
+
+// Person is someone in the house and the devices that are theirs. A device
+// is at most one person's: a config that names it twice gives it to the
+// first. A person changes no rule; it only says whose a device is.
+type Person struct {
+	ID, Name string
+	MACs     []string
 }
 
 // Filters is the house's DNS settings (spec 5, section filters 'filters').
@@ -89,6 +100,7 @@ type Config struct {
 	Rules      []Rule
 	Allows     []Allow
 	Groups     []Group
+	People     []Person
 	Devices    []Device
 	Filters    Filters
 	Alerts     Alerts
@@ -130,6 +142,20 @@ func FromSections(secs []uciconf.Section, k Known, now time.Time) Config {
 		}
 		c.Groups = append(c.Groups, Group{ID: s.Name, Name: first(s, "name"), FilteredDNS: enabledOff(first(s, "filtered_dns"))})
 		groups[s.Name] = true
+	}
+	owned := map[string]bool{}
+	for _, s := range secs {
+		if s.Type != "person" || len(c.People) >= MaxPeople || AgentOwned(s.Name) {
+			continue
+		}
+		p := Person{ID: s.Name, Name: first(s, "name"), MACs: []string{}}
+		for _, v := range words(s, "mac") {
+			if mac, ok := normMAC(v); ok && !owned[mac] && len(p.MACs) < MaxPersonMACs {
+				owned[mac] = true
+				p.MACs = append(p.MACs, mac)
+			}
+		}
+		c.People = append(c.People, p)
 	}
 	for _, s := range secs {
 		if s.Type != "device" || AgentOwned(s.Name) {
@@ -464,6 +490,9 @@ func parseUntil(s string) (time.Time, bool) {
 }
 
 // normMAC returns a lower-case, colon-separated hardware address.
+// NormMAC reads a MAC as the model does: lower case, colons, six octets.
+func NormMAC(s string) (string, bool) { return normMAC(s) }
+
 func normMAC(s string) (string, bool) {
 	s = strings.ToLower(strings.TrimSpace(strings.ReplaceAll(s, "-", ":")))
 	if len(s) != 17 {

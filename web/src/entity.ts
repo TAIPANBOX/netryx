@@ -13,7 +13,8 @@ export type Entity =
   | { kind: "domain"; name: string }
   | { kind: "category"; id: string }
   | { kind: "group"; id: string }
-  | { kind: "rule"; id: string };
+  | { kind: "rule"; id: string }
+  | { kind: "person"; id: string };
 
 const DOMAIN = /^[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?(\.[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?)*\.?$/;
 
@@ -38,6 +39,8 @@ export function entityHref(e: Entity): string | undefined {
       return e.id ? `#/group/${encodeURIComponent(e.id)}` : undefined;
     case "rule":
       return e.id ? `#/rules?rule=${encodeURIComponent(e.id)}` : undefined;
+    case "person":
+      return /^[a-z][a-z0-9_]{0,31}$/.test(e.id) ? `#/person/${e.id}` : undefined;
   }
 }
 
@@ -90,7 +93,7 @@ export function stretchHref(start: string, seconds: number): string | undefined 
 }
 
 /** What a thing belongs to, as chips on its view: an app's category, a network's countries, a domain's apps, a client's group. */
-export function parentsOf(e: Entity, d: unknown, names: { group?: (id: string) => string } = {}): Crumb[] {
+export function parentsOf(e: Entity, d: unknown, names: { group?: (id: string) => string; person?: (mac: string) => { id: string; name: string } | undefined } = {}): Crumb[] {
   // The reads are typed loosely: a view shows what is there.
   const x = (d ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   const out: Crumb[] = [];
@@ -108,9 +111,12 @@ export function parentsOf(e: Entity, d: unknown, names: { group?: (id: string) =
     case "domain":
       for (const a of x.apps ?? []) if (a.app?.id !== "unknown") add({ kind: "app", id: a.app?.id ?? "" }, appName(a.app?.name ?? ""));
       break;
-    case "client":
+    case "client": {
+      const p = names.person?.(e.mac);
+      if (p) add({ kind: "person", id: p.id }, p.name);
       if (x.group) add({ kind: "group", id: x.group }, names.group?.(x.group) ?? x.group);
       break;
+    }
   }
   return out;
 }

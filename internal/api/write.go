@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"netryx/internal/alerts"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -144,6 +145,8 @@ func (s *server) writeRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/allow/{id}", s.routeM(methods{http.MethodDelete: s.allowDelete}))
 	mux.HandleFunc("/api/groups", s.routeM(methods{http.MethodGet: s.groupsList}))
 	mux.HandleFunc("/api/groups/{id}", s.routeM(methods{http.MethodPut: s.groupPut, http.MethodDelete: s.groupDelete}))
+	mux.HandleFunc("/api/people", s.routeM(methods{http.MethodGet: s.peopleList}))
+	mux.HandleFunc("/api/people/{id}", s.routeM(methods{http.MethodPut: s.personPut, http.MethodDelete: s.personDelete}))
 	mux.HandleFunc("/api/devices/{mac}", s.routeM(methods{http.MethodGet: s.device, http.MethodPut: s.devicePut}))
 	mux.HandleFunc("/api/devices/{mac}/conns/cut", s.routeM(methods{http.MethodPost: s.connCut}))
 	mux.HandleFunc("/api/filters", s.routeM(methods{http.MethodGet: s.filtersGet, http.MethodPut: s.filtersPut}))
@@ -871,6 +874,99 @@ func (s *server) groupDelete(r *http.Request) (any, error) {
 			}
 		}
 		return ch, nil
+	}, nil, func(plan) any { return map[string]string{"deleted": id} })
+}
+
+// ---- people --------------------------------------------------------------
+
+type personJSON struct {
+	ID   string   `json:"id"`
+	Name string   `json:"name"`
+	MACs []string `json:"macs"`
+}
+
+func (s *server) peopleList(*http.Request) (any, error) {
+	secs, err := s.wr.Sections()
+	if err != nil {
+		return nil, err
+	}
+	out := []personJSON{}
+	for _, p := range rules.FromSections(secs, s.wr.Known(), s.now()).People {
+		out = append(out, personJSON{ID: p.ID, Name: p.Name, MACs: p.MACs})
+	}
+	return out, nil
+}
+
+// personPut writes the whole person: its name and exactly the devices given.
+// A device another person has is refused and names them, so nothing changes
+// owner without the owner seeing it.
+func (s *server) personPut(r *http.Request) (any, error) {
+	id := r.PathValue("id")
+	if !rules.ValidID(id) {
+		return nil, bad("person id: lowercase Latin letters, digits and _, up to 32 characters")
+	}
+	if rules.AgentOwned(id) {
+		return nil, bad("names starting with agent_ are kept for the agent")
+	}
+	var b struct {
+		Name string   `json:"name"`
+		MACs []string `json:"macs"`
+	}
+	if err := body(r, &b); err != nil {
+		return nil, err
+	}
+	name, err := cleanName(b.Name)
+	if err != nil {
+		return nil, err
+	}
+	if name == "" {
+		return nil, bad("a person needs a name")
+	}
+	macs := []string{}
+	for _, v := range b.MACs {
+		m, ok := rules.NormMAC(v)
+		if !ok {
+			return nil, bad("not a MAC address: " + strconv.Quote(v))
+		}
+		if !slices.Contains(macs, m) {
+			macs = append(macs, m)
+		}
+	}
+	if len(macs) > rules.MaxPersonMACs {
+		return nil, bad("a person can have at most 32 devices")
+	}
+	return s.write(func(secs []uciconf.Section, cfg rules.Config) ([]uciconf.Change, error) {
+		if _, ok := hasSection(secs, "person", id); !ok && countType(secs, "person") >= rules.MaxPeople {
+			return nil, bad("more than 32 people")
+		}
+		if taken(secs, id, "person") {
+			return nil, errTaken
+		}
+		for _, p := range cfg.People {
+			if p.ID == id {
+				continue
+			}
+			for _, m := range macs {
+				if slices.Contains(p.MACs, m) {
+					return nil, bad(m + " is already " + p.Name + "'s")
+				}
+			}
+		}
+		return []uciconf.Change{{Section: id, Type: "person", Replace: true, Set: map[string][]string{"name": {name}, "mac": macs}}}, nil
+	}, nil, func(plan) any { return personJSON{ID: id, Name: name, MACs: macs} })
+}
+
+// personDelete removes the person alone: devices, groups and rules stay.
+func (s *server) personDelete(r *http.Request) (any, error) {
+	id := r.PathValue("id")
+	if !validName(id) {
+		return nil, bad("the person id is not valid")
+	}
+	return s.write(func(secs []uciconf.Section, cfg rules.Config) ([]uciconf.Change, error) {
+		if _, ok := hasSection(secs, "person", id); !ok || rules.AgentOwned(id) {
+			return nil, httpError{http.StatusNotFound, "no such person"}
+		}
+		return []uciconf.Change{{Section: id, Delete: true}}, nil
 	}, nil, func(plan) any { return map[string]string{"deleted": id} })
 }
 

@@ -26,6 +26,8 @@ export function hoverEntity(href: string): Entity | null {
       return { kind: "group", id: r.id };
     case "rules":
       return r.rule ? { kind: "rule", id: r.rule } : null;
+    case "person":
+      return { kind: "person", id: r.id };
     case "apps":
       return r.cat && !r.q ? { kind: "category", id: r.cat } : null;
     default:
@@ -52,6 +54,8 @@ export function hoverPath(e: Entity): string {
       return "/api/rules";
     case "category":
       return "/api/apps?range=24h";
+    case "person":
+      return "/api/people";
   }
 }
 
@@ -99,6 +103,10 @@ export function hoverSummary(e: Entity, data: unknown, now = Date.now()): { titl
     case "category": {
       const n = (Array.isArray(data) ? data : []).filter((a: Any) => a.app?.category === e.id).length;
       return { title: category(e.id), lines: [`${plural(n, "app", "apps")} the house used in 24 h`] };
+    }
+    case "person": {
+      const p = (Array.isArray(data) ? data : []).find((x: Any) => x.id === e.id);
+      return p ? { title: p.name, lines: [plural(len(p.macs), "device", "devices")] } : { title: e.id, lines: ["this person no longer exists"] };
     }
     case "rule": {
       const r = (Array.isArray(data) ? data : []).find((x: Any) => x.id === e.id) as Rule | undefined;

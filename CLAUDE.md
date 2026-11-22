@@ -748,6 +748,31 @@ enforced, and that is a debt rather than a decision.
   most three, each MAC once, nothing that is not a MAC; a fourth tick is
   refused rather than pushing one out unseen. (the page: `web/src/compare.test.ts`)
 
+- **A person is whose a device is, and nothing more**: a `person` section
+  (`name`, `list mac`) the console writes through the same gate as groups
+  (grant and token), the whole section at a time; MACs are read as the model
+  reads them, a device is one person's at most (a second is refused and named;
+  a config written by hand with a device twice gives it to the first), at most
+  32 people of 32 devices, and deleting a person leaves devices, groups and
+  rules as they were. (test: `TestAPersonIsWrittenAndReadBack`,
+  `TestADeviceBelongsToOnePerson`, `TestDeletingAPersonLeavesDevicesAndRules`,
+  `TestAPersonSurvivesARestart`, `TestAWriteRouteIsReachableOnlyThroughTheGate`;
+  @decided 2026-11-22: a person is kept in UCI, written only by the owner's action)
+- **The last hour of minutes survives a restart of netryx, in RAM only**: a
+  graceful stop writes it to `/tmp/netryx/minutes.json` through
+  `internal/ramfile` (the same private, whole-file, owner-checked writes as
+  `sessions.json`), the start reads it before any delta and takes the file
+  away; only minutes inside the kept hour of the new clock are taken, none
+  ahead of it, each held to the minute's key cap, and the hours take nothing
+  from it; a reboot empties it and the lists say since when they count.
+  (test: `TestTheMinutesSurviveARestart`, `TestLoadedMinutesKeepToTheRingAndTheClock`,
+  `TestALoadedMinuteIsHeldToTheKeyCap`, `TestTheMinutesAreKeptInRAMAcrossARestart`;
+  the file checks: the `internal/auth` session store tests, now over `internal/ramfile`)
+- **Compare's Now is the window's average**, with the window switch, right now
+  beside it; its busiest app, group and countries are links. (the page:
+  "the comparison lines up what tells devices apart, each name a link" in
+  `web/src/compare.test.ts`)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's

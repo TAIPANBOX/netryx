@@ -2,7 +2,7 @@
 // its name or by what identifies it (an address, a MAC, a hostname, an AS
 // number). Pure, so the ranking is tested without a page.
 
-import type { Device, Group, HouseApp, HouseDestinations } from "./types";
+import type { Device, Group, HouseApp, HouseDestinations, Person } from "./types";
 import { describeRule, type Rule } from "./rules";
 import { entityHref, type Entity } from "./entity";
 import { appName as appLabel, category, countryName } from "./format";
@@ -18,11 +18,11 @@ export interface Hit {
   keys: string;
 }
 
-const KIND_ORDER: Entity["kind"][] = ["client", "app", "category", "country", "network", "domain", "group", "rule"];
+const KIND_ORDER: Entity["kind"][] = ["person", "client", "app", "category", "country", "network", "domain", "group", "rule"];
 
 /** The index of everything named on the console's screens. Folded rows and unknowns are not things. */
 export function buildIndex(src: {
-  devices: Device[]; apps: HouseApp[]; dest: HouseDestinations; groups: Group[]; rules: Rule[]; appName?: (id: string) => string;
+  devices: Device[]; apps: HouseApp[]; dest: HouseDestinations; groups: Group[]; rules: Rule[]; appName?: (id: string) => string; people?: Person[];
 }): Hit[] {
   const out: Hit[] = [];
   const add = (e: Entity, label: string, sub: string, keys: string[] = []) => {
@@ -30,6 +30,7 @@ export function buildIndex(src: {
     if (!href || !label) return;
     out.push({ kind: e.kind, label, sub, href, keys: keys.join(" ").toLowerCase() });
   };
+  for (const p of src.people ?? []) add({ kind: "person", id: p.id }, p.name, `person · ${p.macs.length} ${p.macs.length === 1 ? "device" : "devices"}`, [p.id]);
   for (const d of src.devices) {
     const name = d.label || d.name || d.hostname || d.mac;
     add({ kind: "client", mac: d.mac }, name, ["client", d.hostname, ...(d.ipv4 ?? [])].filter(Boolean).join(" · "), [d.mac, d.hostname, ...(d.ipv4 ?? []), ...(d.ipv6 ?? [])]);

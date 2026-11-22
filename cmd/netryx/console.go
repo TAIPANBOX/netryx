@@ -41,6 +41,7 @@ import (
 	"netryx/internal/inventory"
 	"netryx/internal/neigh"
 	"netryx/internal/netview"
+	"netryx/internal/ramfile"
 	"netryx/internal/rollup"
 	"netryx/internal/rules"
 	"netryx/internal/wan"
@@ -146,6 +147,9 @@ type Options struct {
 	Geo, Apps, OUI string
 	// State is the directory history and labels.json live in.
 	State string
+	// Minutes is the file in RAM the last hour of minutes is kept in across
+	// a restart of netryx; empty keeps none.
+	Minutes string
 	// WAN is the ubus name of the internet interface; its IPv6 twin is
 	// WAN+"6" (or WAN+"_6", the name netifd gives a dynamic one).
 	WAN        string
@@ -311,7 +315,7 @@ func buildConsole(o Options) (*console, error) {
 	c.local.refresh()
 	c.store = rollup.NewStore(rollup.Options{Now: o.Now})
 	dir := filepath.Join(o.State, "history")
-	c.hist = &history{s: c.store, dir: dir, saved: o.Now()}
+	c.hist = &history{s: c.store, dir: dir, saved: o.Now(), minutes: o.Minutes}
 	c.hist.load()
 	c.macs = &macResolver{col: c.col, local: c.local, neigh: o.Neigh, leases: o.Leases, now: o.Now}
 	c.macs.refresh()
@@ -584,6 +588,8 @@ type history struct {
 	lastErr string
 	saved   time.Time
 	closed  bool // the stop has written it; nothing is written after that
+	// minutes is the file in RAM the last hour of minutes is kept in.
+	minutes string
 }
 
 // saveLag is how long after an hour's end the tick writes it: a bucket
@@ -602,6 +608,28 @@ func (h *history) load() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.loadLocked()
+	h.loadMinutes()
+}
+
+// loadMinutes takes the minutes the last stop kept, before any delta, and
+// takes the file away: a crash later must not leave it to be read again.
+func (h *history) loadMinutes() {
+	if h.minutes == "" {
+		return
+	}
+	b, why := ramfile.Read(h.minutes, rollup.MaxMinutesFile)
+	if why != "" {
+		h.log("the kept minutes are not read: %s", why)
+	}
+	if b == nil {
+		return
+	}
+	if err := h.s.LoadMinutes(b); err != nil {
+		h.log("the kept minutes: %v", err)
+	}
+	if err := ramfile.Remove(h.minutes); err != nil {
+		h.log("the kept minutes file: %v", err)
+	}
 }
 
 // loadLocked runs LoadDir. After the first call LoadDir reads only the files
@@ -648,7 +676,17 @@ func (h *history) shutdown() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.closed = true
-	return rollup.SaveOpen(h.s, h.dir)
+	err := rollup.SaveOpen(h.s, h.dir)
+	if h.minutes != "" {
+		b, merr := h.s.MinutesJSON()
+		if merr == nil {
+			merr = ramfile.Write(h.minutes, b)
+		}
+		if merr != nil {
+			h.log("keeping the minutes: %v", merr)
+		}
+	}
+	return err
 }
 
 // localNet answers whether an address is at home: inside a network the

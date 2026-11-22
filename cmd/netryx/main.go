@@ -29,6 +29,9 @@ import (
 // sessionsFile keeps the console's sessions across a restart of netryx.
 const sessionsFile = "/tmp/netryx/sessions.json"
 
+// minutesFile keeps the last hour of minutes across a restart of netryx.
+const minutesFile = "/tmp/netryx/minutes.json"
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -341,7 +344,7 @@ func main() {
 			log.Printf("state directory %s: %v; history will not survive a restart", *stateDir, err)
 		}
 		con, err := buildConsole(Options{
-			Geo: *geoPath, Apps: *appsPath, OUI: *ouiPath, State: *stateDir,
+			Geo: *geoPath, Apps: *appsPath, OUI: *ouiPath, State: *stateDir, Minutes: minutesFile,
 			WAN: *wanIface, Leases: *leases, PingTarget: *pingTarget, Listen: *addr,
 			LAN: ifs, Sync: *syncEvery, Collector: col,
 			Meta: *metaPath, FetchIcons: *fetchIcons,
