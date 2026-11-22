@@ -3,10 +3,12 @@
 # message the service returns into it, Telegram alerts, netryx ctl and the
 # command line's own output.
 #
-#   sh scripts/english-only.sh [dir...]     (default: web/src internal cmd)
+#   sh scripts/english-only.sh [dir...]
+#   (default: web/src internal cmd test lab scripts package docs README.md)
 #
-# Every source file under the dirs, tests excepted, must carry no Cyrillic
-# letter. Tests are left out on purpose: they feed the service names a
+# Every source, script and document under them, Go and TypeScript tests
+# excepted, must carry no Cyrillic letter: the repository is public, and the
+# lab scripts and their output are read as much as the page. Tests are left out on purpose: they feed the service names a
 # household may write in any script (a device called in Ukrainian must pass
 # through untouched), and that is data, not copy.
 #
@@ -14,8 +16,8 @@
 # 0xD3), so the gate needs no grep -P and reads the same on macOS and forge.
 set -eu
 
-[ "$#" -gt 0 ] || set -- web/src internal cmd
-files=$(find "$@" -type f \( -name '*.go' -o -name '*.ts' -o -name '*.tsx' -o -name '*.html' -o -name '*.css' -o -name '*.sh' \) \
+[ "$#" -gt 0 ] || set -- web/src internal cmd test lab scripts package docs README.md
+files=$(find "$@" -type f \( -name '*.go' -o -name '*.ts' -o -name '*.tsx' -o -name '*.html' -o -name '*.css' -o -name '*.sh' -o -name '*.mjs' -o -name '*.py' -o -name '*.md' -o -name '*.init' -o -name '*.rpcd' \) \
 	! -name '*_test.go' ! -name '*.test.ts' 2>/dev/null | sort)
 if [ -z "$files" ]; then
 	echo "measured nothing: no sources under $*" >&2

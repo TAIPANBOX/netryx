@@ -822,8 +822,9 @@ enforced, and that is a debt rather than a decision.
   are used, with one term per concept (quarantine, isolated, allowance, time
   limit); there is no translation layer yet. Tests may carry names in any
   script, since a household's own names pass through untouched.
-  (gate: `scripts/english-only.sh`; @decided 2026-11-21: the console is
-  English first, a second language may come later)
+  (gate: `scripts/english-only.sh`, over the sources, the test and lab
+  scripts, the package files and the documents; @decided 2026-11-21: the
+  console is English first, a second language may come later)
 
 ## How work is done here
 
