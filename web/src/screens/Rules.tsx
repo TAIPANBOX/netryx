@@ -3,14 +3,14 @@
 // router is the only judge of a rule: what it refuses is shown beside the form.
 
 import { EntityLink } from "./entity";
-import { h, Fragment } from "preact";
+import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import type { Device, Overview, Group } from "../types";
 import { getJSON, sendJSON, usePoll } from "../api";
 import { Header, Status, Loading, Empty, Pills, useSession, IconContext } from "../ui";
-import { time, BLOCKABLE_CATEGORIES, category } from "../format";
+import { time, BLOCKABLE_CATEGORIES, category, countryName } from "../format";
 import {
-  DAYS, describeRule, formFromRule, formProblem, fromAgent, appChoices, isPause, manifestName, ruleFromForm, stateOf, liveAllows, allowText, ruleVerb,
+  DAYS, formFromRule, formProblem, fromAgent, appChoices, isPause, manifestName, ruleFromForm, stateOf, liveAllows, allowText, ruleVerb, ruleWhen,
   type AppChoice, type Names, type Rule, type RuleForm,
 } from "../rules";
 import { CDN_NOTE } from "./controls";
@@ -136,7 +136,7 @@ function RuleCard({ r, names, now, canWrite, onEdit, refresh, focused }: { r: Ru
   return (
     <section ref={box} class={`card rule${st.kind === "active" ? " rule-active" : ""}${focused ? " rule-focused" : ""}`} aria-label={`Rule ${r.id}`}>
       <div class="rule-head">
-        <span class="strong break">{describeRule(r, names)}</span>
+        <RuleTitle r={r} names={names} class="strong break" />
         <span class={`state state-${st.kind}`}>
           <span class="dot" aria-hidden="true" />
           {st.text}
@@ -315,6 +315,30 @@ function RuleEditor(p: {
 }
 
 /** What a rule names, each a link: its targets, and whom it reaches. */
+/** A rule's summary with every name in it a link: what · who · when. */
+export function RuleTitle({ r, names, class: cls }: { r: Rule; names: Names; class?: string }) {
+  const what =
+    r.what === "all" ? ["the whole internet"]
+    : r.targets.map((t) =>
+        r.what === "country" ? <EntityLink key={t} e={{ kind: "country", cc: t }}>{countryName(t)}</EntityLink>
+        : r.what === "app" ? <EntityLink key={t} e={{ kind: "app", id: t }}>{names.app ? names.app(t) : t}</EntityLink>
+        : r.what === "category" ? <EntityLink key={t} e={{ kind: "category", id: t }}>{category(t)}</EntityLink>
+        : t,
+      );
+  const join = (xs: ComponentChildren[]) => xs.flatMap((x, i) => (i === 0 ? [x] : [", ", x]));
+  const shown = r.members.slice(0, 3);
+  const who: ComponentChildren[] =
+    r.who === "all" ? ["all devices"]
+    : r.who === "group" ? ["group \"", <EntityLink key="g" e={{ kind: "group", id: r.group }}>{names.group ? names.group(r.group) : r.group}</EntityLink>, "\""]
+    : r.who === "device" ? [...join(shown.map((m) => <EntityLink key={m} e={{ kind: "client", mac: m }}>{names.device ? names.device(m) : m}</EntityLink>)), ...(r.members.length > 3 ? [` and ${r.members.length - 3} more`] : [])]
+    : [r.who || "?"];
+  return (
+    <span class={cls}>
+      {join(what)} · {who} · {ruleWhen(r)}
+    </span>
+  );
+}
+
 function RuleLinks({ r, names }: { r: Rule; names: Names }) {
   const targets = r.targets.map((t) =>
     r.what === "country" ? <EntityLink key={t} e={{ kind: "country", cc: t }}>{t}</EntityLink>

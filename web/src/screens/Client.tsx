@@ -33,13 +33,21 @@ export function Traffic({ d, range, split, onSplit }: { d: Pick<ClientData, "tra
   const s = splitSeries(d.traffic, stepOf(range), split === "none" ? 1 : 3, ["other"]);
   const names = new Map(d.apps.map((a) => [a.app.id, appName(a.app.name)]));
   const layers: Layer[] = [];
-  if (s.other) layers.push({ label: "others", color: OTHER_COLOR, values: s.otherDown });
+  const layerKeys: (string | undefined)[] = [];
+  if (s.other) {
+    layers.push({ label: "others", color: OTHER_COLOR, values: s.otherDown });
+    layerKeys.push(undefined);
+  }
   const colors = [LAYER_COLORS[0], LAYER_COLORS[2], LAYER_COLORS[1]];
   for (let i = s.keys.length - 1; i >= 0; i--) {
     const k = s.keys[i];
     layers.push({ label: split === "none" ? "down" : names.get(k) ?? appName(k), color: colors[i], values: s.down[k] });
+    layerKeys.push(split === "none" ? undefined : k);
   }
-  const legend = [...layers].reverse().map((l) => ({ label: l.label, color: l.color }));
+  // A legend entry names its app, and leads to it.
+  const legend: { label: string; color: string; node?: ComponentChildren }[] = layers
+    .map((l, i) => ({ label: l.label, color: l.color, node: layerKeys[i] ? <EntityLink e={{ kind: "app", id: layerKeys[i]! }}>{l.label}</EntityLink> : undefined }))
+    .reverse();
   legend.push({ label: "up", color: UP_COLOR });
   const period = RANGES.find((r) => r.id === range)?.label ?? range;
   const peak = s.peakDown.rate > 0 ? ` · peak ${rate(s.peakDown.rate)} at ${time(s.peakDown.at)}` : "";

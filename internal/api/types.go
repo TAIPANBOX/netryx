@@ -73,8 +73,10 @@ type topAppJSON struct {
 }
 
 type countryJSON struct {
-	CC    string  `json:"cc"`
-	Org   string  `json:"org"`
+	CC  string `json:"cc"`
+	Org string `json:"org"`
+	// ASN is the network behind Org, "" when none is known.
+	ASN   string  `json:"asn"`
 	Down  uint64  `json:"down"`
 	Up    uint64  `json:"up"`
 	Share float64 `json:"share"`
@@ -281,8 +283,10 @@ type liveConnJSON struct {
 }
 
 type livePlaceJSON struct {
-	CC    string  `json:"cc"`
-	Org   string  `json:"org"`
+	CC  string `json:"cc"`
+	Org string `json:"org"`
+	// ASN is the network of the place's busiest flow, 0 when unknown.
+	ASN   uint32  `json:"asn"`
 	Down  float64 `json:"down"`
 	Up    float64 `json:"up"`
 	Other bool    `json:"other"`

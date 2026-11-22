@@ -182,9 +182,18 @@ function TopClients({ d }: { d: OverviewData }) {
             <div class="muted small">{c.mac === "other" ? "folded rows" : c.mac === "router" ? "the router's own traffic" : "device without a hardware address"}</div>
           ) : (
             <div class="muted small row-gap">
-              <span>{c.topApp ? appName(c.topApp.name) : "app unknown"}</span>
+              <span>{c.topApp ? <EntityLink e={{ kind: "app", id: c.topApp.id }}>{appName(c.topApp.name)}</EntityLink> : "app unknown"}</span>
               <span>·</span>
-              <span>{countryList(c.countries) || "no countries"}</span>
+              <span>
+                {countryList(c.countries)
+                  ? countryList(c.countries).split(", ").map((cc, i) => (
+                      <span key={cc}>
+                        {i > 0 && ", "}
+                        <EntityLink e={{ kind: "country", cc }}>{cc}</EntityLink>
+                      </span>
+                    ))
+                  : "no countries"}
+              </span>
             </div>
           )}
         </div>
@@ -237,7 +246,7 @@ function Countries({ d }: { d: OverviewData }) {
           <div class="col-tight">
             <span>
               <EntityLink e={{ kind: "country", cc: k.other ? "--" : k.cc }}>{k.other || k.cc === "--" ? "unknown or others" : countryName(k.cc)}</EntityLink>
-              {k.org && <span class="muted small"> · {k.org}</span>}
+              {k.org && <span class="muted small"> · <EntityLink e={{ kind: "network", asn: k.asn ?? "" }}>{k.org}</EntityLink></span>}
             </span>
             <Bars thin parts={[{ pct: k.share * 100, kind: "down" }]} />
             {!k.other && k.cc !== "--" && k.cc !== "LAN" && <BlockCountry cc={k.cc} />}

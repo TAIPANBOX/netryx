@@ -4,6 +4,7 @@
 // and error state, so one router read failing never blanks the page.
 
 import { crumbsFrom } from "../entity";
+import { EntityLink } from "./entity";
 import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useRef, useState } from "preact/hooks";
 import type { App, AppUsage, Destinations, Device, FlowsPage, Group, Live, NetworkView, Range, SeriesPoint } from "../types";
@@ -15,8 +16,9 @@ import { date, time, groupName } from "../format";
 import { alertText, type AlertsState } from "../security";
 import { connMap } from "../connmap";
 import { rulesOn, whereConnected } from "../client360";
-import { allowText, describeRule, liveAllows, manifestName, stateOf, usageLabel, usageText, type Usage } from "../rules";
+import { allowText, liveAllows, manifestName, stateOf, usageLabel, usageText, type Usage } from "../rules";
 import { deviceName } from "./Clients";
+import { RuleTitle } from "./Rules";
 import { Apps, Traffic, Where } from "./Client";
 import { LiveApps, LiveConns, LivePlaces, LiveTiles, LiveTraffic } from "./ClientLive";
 import { DeviceActions, DeviceEdit, DeviceSecurity, useRules } from "./controls";
@@ -65,13 +67,13 @@ export function Client360({ mac, from = "", range, onRange, win, onWin }: { mac:
 
 function Identity({ d }: { d: Device }) {
   const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
-  const rows: [string, string][] = [
+  const rows: [string, ComponentChildren][] = [
     ["Vendor", d.vendor ? `${d.vendor} (by OUI)` : "-"],
     ["MAC", d.mac.toUpperCase() + (d.random ? " (random, made up by the device)" : "")],
     ["IPv4", (d.ipv4 ?? []).join(", ") || "-"],
     ["IPv6", (d.ipv6 ?? []).join(", ") || "-"],
     ["Hostname", d.hostname || "-"],
-    ["Group", d.group ? groupName(d.group, groups) : "no group"],
+    ["Group", d.group ? <EntityLink e={{ kind: "group", id: d.group }}>{groupName(d.group, groups)}</EntityLink> : "no group"],
     ["First seen", date(d.first)],
     ["Last seen", d.online ? "online now" : `${date(d.last)} ${time(d.last)}`],
   ];
@@ -221,8 +223,8 @@ function RulesSection({ d }: { d: Device }) {
       ) : (
         on.map(({ rule: r, from }) => (
           <div key={r.id} class="col-tight small-13 rule-on">
-            <span class="break">{describeRule(r, { device: () => deviceName(d), app: appNames, group: (g) => groupName(g, groups) })}</span>
-            <span class="muted small">from {from} · blocked {r.hits} {r.hits === 1 ? "time" : "times"}</span>
+            <RuleTitle r={r} names={{ device: (m) => (m === d.mac ? deviceName(d) : m), app: appNames, group: (g) => groupName(g, groups) }} class="break" />
+            <span class="muted small"><EntityLink e={{ kind: "rule", id: r.id }}>the rule</EntityLink> · from {from} · blocked {r.hits} {r.hits === 1 ? "time" : "times"}</span>
             <span class={`state state-${stateOf(r, now).kind}`}><span class="dot" aria-hidden="true" />{stateOf(r, now).text}</span>
             {liveAllows(r, now, d.mac).map((a) => <span key={a.id} class="soft">{allowText(a)}</span>)}
           </div>
@@ -232,7 +234,7 @@ function RulesSection({ d }: { d: Device }) {
         {(u) =>
           u.map((x) => (
             <div key={x.rule} class="row-wrap small-13">
-              <span class="break">{usageLabel(x, appNames)}:</span>
+              <span class="break"><EntityLink e={{ kind: "rule", id: x.rule ?? "" }}>{usageLabel(x, appNames)}</EntityLink>:</span>
               <span class={x.spentUntil ? "state state-active" : "soft"}>{usageText(x)}</span>
             </div>
           ))

@@ -156,11 +156,7 @@ function whenText(r: Rule): string {
 
 /** "TikTok, YouTube · Alex's iPhone · Mon-Fri 21:00-07:00": what, who, when. */
 export function describeRule(r: Rule, names: Names = {}): string {
-  if (r.action === "limit") {
-    const d = daysText(r.days);
-    return [whatText(r, names), whoText(r, names), ...(d ? [d] : []), `${r.minutes ?? 0} min a day`].join(" · ");
-  }
-  return [whatText(r, names), whoText(r, names), whenText(r)].join(" · ");
+  return [whatText(r, names), whoText(r, names), ruleWhen(r)].join(" · ");
 }
 
 /** A pause is the rule the Pause button writes: everything, for one device, with an end or without. */
@@ -379,4 +375,13 @@ export function usageText(u: Usage, z: string = zone()): string {
 export function ruleVerb(r: Rule): string {
   if (r.action === "limit") return `limits to ${r.minutes ?? 0} min a day`;
   return r.what === "all" ? "blocks the whole internet" : "blocks";
+}
+
+/** The tail of describeRule: when the rule holds, and a limit's minutes. */
+export function ruleWhen(r: Rule): string {
+  if (r.action === "limit") {
+    const d = daysText(r.days);
+    return [...(d ? [d] : []), `${r.minutes ?? 0} min a day`].join(" · ");
+  }
+  return whenText(r);
 }

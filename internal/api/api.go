@@ -491,11 +491,11 @@ func (s *server) overview(r *http.Request) (any, error) {
 
 	// A country's organisation is the one its dominant place reached: the
 	// rows come sorted by bytes, so the first place seen for a country wins.
-	orgOf := map[string]string{}
+	orgOf, asnOf := map[string]string{}, map[string]string{}
 	for _, pr := range s.h.Top(rollup.Filter{}, "place", p.from, p.now, 0) {
 		cc := pr.Extra["cc"]
 		if _, seen := orgOf[cc]; !seen {
-			orgOf[cc] = pr.Extra["org"]
+			orgOf[cc], asnOf[cc] = pr.Extra["org"], pr.Extra["asn"]
 		}
 	}
 	// Countries are places on the internet: the house's own traffic is not
@@ -510,7 +510,7 @@ func (s *server) overview(r *http.Request) (any, error) {
 	countries := []countryJSON{}
 	for _, cr := range cut(wanRows, overviewTop) {
 		countries = append(countries, countryJSON{
-			CC: cr.Key, Org: orgOf[cr.Key], Down: cr.Bytes.Down, Up: cr.Bytes.Up,
+			CC: cr.Key, Org: orgOf[cr.Key], ASN: asnOf[cr.Key], Down: cr.Bytes.Down, Up: cr.Bytes.Up,
 			Share: share(rowBytes(cr), total), Other: cr.Key == serviceCC,
 		})
 	}
@@ -935,7 +935,7 @@ func (s *server) live(r *http.Request) (any, error) {
 		pk := placeKey{f.Geo.CC, f.Geo.Org}
 		p := places[pk]
 		if p == nil {
-			p = &livePlaceJSON{CC: f.Geo.CC, Org: f.Geo.Org, Other: f.Geo.CC == serviceCC}
+			p = &livePlaceJSON{CC: f.Geo.CC, Org: f.Geo.Org, ASN: f.Geo.ASN, Other: f.Geo.CC == serviceCC}
 			places[pk] = p
 			placeOrder = append(placeOrder, pk)
 		}

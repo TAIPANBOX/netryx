@@ -161,7 +161,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
                 <div class="col-tight grow">
                   <h1>{appName(d.app.name)}</h1>
                   <span class="soft small">
-                    {category(d.app.category) || "no category"} · {plural(d.clientCount, "client", "clients")} · {share(d.share)} of the house's traffic
+                    {d.app.category ? <EntityLink e={{ kind: "category", id: d.app.category }}>{category(d.app.category)}</EntityLink> : "no category"} · {plural(d.clientCount, "client", "clients")} · {share(d.share)} of the house's traffic
                   </span>
                   <RuleTags rules={rulesForApp(rules, d.app)} names={names} />
                 </div>
