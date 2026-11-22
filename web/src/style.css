@@ -381,3 +381,14 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .chart-pick { cursor: pointer; }
 .rule-focused { outline: 2px solid var(--accent); }
 .rule-links { gap: 4px 8px; }
+
+/* The search box (Cmd+K, Ctrl+K or /). */
+.search-veil { position: fixed; inset: 0; z-index: 60; background: rgba(5, 8, 12, 0.6); display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; }
+.search-box { width: min(640px, 100%); background: var(--card); border: 1px solid var(--edge); border-radius: 12px; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.search-input { width: 100%; font-size: 16px; }
+.search-hits { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }
+.search-hit { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.search-hit.active { background: var(--raised); }
+.search-hit .tag { justify-self: start; }
+.search-help { margin: 0; }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--edge); border-radius: 4px; padding: 0 4px; margin-left: 4px; }

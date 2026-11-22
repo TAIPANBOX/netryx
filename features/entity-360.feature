@@ -14,3 +14,14 @@ Feature: every thing in the console can be found and seen in place
     # -> TestAnEmptyStoreKnowsNoStep
     # -> TestTheListsCarryAnHourOfSparkline
     # (the line: "a list's hour is drawn only from where the router began counting" in web/src/live.test.ts)
+
+  Scenario: any thing can be found by typing
+    Given any screen of the console
+    When the owner presses Cmd+K, Ctrl+K or "/" outside a text field and types part of a name
+    Then the clients, apps, categories, countries, networks, domains, groups and rules that match are listed, best match first
+    And an address, a MAC, a hostname or an AS number finds its thing too
+    And a folded row or an unknown is never listed
+    # (the search: "typing a name finds the thing, best match first",
+    #  "an address, a MAC, a hostname or an AS number finds its thing too",
+    #  "a rule is found by what it names, and folded rows are not things",
+    #  "the list is short and says what kind each thing is" in web/src/search.test.ts)

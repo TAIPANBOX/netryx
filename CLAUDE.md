@@ -723,6 +723,13 @@ enforced, and that is a debt rather than a decision.
   `TestTheListsCarryAnHourOfSparkline`; the page: "a list's hour is drawn only
   from where the router began counting" in `web/src/live.test.ts`)
 
+- **Anything named can be found by typing**: Cmd+K, Ctrl+K or "/" outside a
+  text field opens a search over the clients, apps, categories, countries,
+  networks, domains, groups and rules the page can read, by name or by an
+  address, MAC, hostname or AS number; the whole name first, then its start, a
+  word's start, inside it, then what else identifies it; at most 12; folded
+  rows and unknowns are never things. (the page: `web/src/search.test.ts`)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's
