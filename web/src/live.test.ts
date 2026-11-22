@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Live, LivePoint } from "./types";
+import { time } from "./format";
 import { liveChart, sparkPath, hourSpark, liveSummary, whereText, placeName, layerLabel, connKeys, appsTileSub, cutNote, speedTile } from "./live";
 import type { App } from "./types";
 
@@ -185,10 +186,12 @@ test("the Speed tile leads with the window's average and shows the last seconds 
 
 test("a list's hour is drawn only from where the router began counting", () => {
   // Five steps over 120 px: a step is 30 px. The first two were never counted.
-  const s = hourSpark({ stepSec: 120, known: 2, bytes: [0, 0, 0, 120, 240] }, 120, 28);
+  const s = hourSpark({ stepSec: 120, known: 2, bytes: [0, 0, 0, 120, 240], since: "2026-11-22T21:40:00Z" }, 120, 28);
   assert.equal(s.d, "M60.0 26.0 L90.0 14.0 L120.0 2.0");
   assert.equal(s.peak, 2); // bytes per second: 240 B over 120 s
-  assert.equal(s.label, "last hour, peak 16 bit/s");
+  // A short line after a restart says when counting began.
+  assert.equal(s.label, `since ${time("2026-11-22T21:40:00Z")}, peak 16 bit/s`);
+  assert.equal(hourSpark({ stepSec: 120, known: 0, bytes: [0, 120], since: "2026-11-22T21:40:00Z" }).label, "last hour, peak 8 bit/s");
   // Nothing counted yet: nothing drawn, and it says so.
   const none = hourSpark({ stepSec: 120, known: 5, bytes: [0, 0, 0, 0, 0] });
   assert.equal(none.d, "");

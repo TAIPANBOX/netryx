@@ -60,6 +60,8 @@ type sparkJSON struct {
 	StepSec int      `json:"stepSec"`
 	Known   int      `json:"known"`
 	Bytes   []uint64 `json:"bytes"`
+	// Since is when the counted part begins: the start of step Known.
+	Since string `json:"since"`
 }
 
 // sparks reads every row's hour in one pass and answers it per key; a key
@@ -72,6 +74,7 @@ func (s *server) sparks(f rollup.Filter, dim string) func(key string) *sparkJSON
 		if len(b) != n {
 			b = make([]uint64, n)
 		}
-		return &sparkJSON{StepSec: int(sparkStep / time.Second), Known: sp.Known, Bytes: b}
+		since := sp.From.Add(time.Duration(sp.Known) * sparkStep).UTC().Format(time.RFC3339)
+		return &sparkJSON{StepSec: int(sparkStep / time.Second), Known: sp.Known, Bytes: b, Since: since}
 	}
 }

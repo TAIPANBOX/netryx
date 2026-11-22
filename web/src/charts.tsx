@@ -86,11 +86,19 @@ export function Swatch({ color }: { color: string }) {
 /** A list row's last hour: the counted steps only, its peak in the tooltip. */
 export function HourSparkline({ s, color = "var(--accent, #4C9AFF)" }: { s?: HourSpark; color?: string }) {
   const p = hourSpark(s, 96, 24);
-  return (
+  const svg = (
     <svg viewBox="0 0 96 24" preserveAspectRatio="none" role="img" aria-label={p.label || "no hour yet"} class="spark spark-hour">
       <title>{p.label}</title>
       {p.d && <path d={p.d} fill="none" stroke={color} stroke-width="1.5" vector-effect="non-scaling-stroke" />}
     </svg>
+  );
+  // A line shortened by a restart says so under it, not only in the tooltip.
+  if (!s || s.known <= 0) return svg;
+  return (
+    <span class="spark-wrap">
+      {svg}
+      <span class="muted spark-note">{s.known >= s.bytes.length ? "not counted yet" : p.label.split(",")[0]}</span>
+    </span>
   );
 }
 

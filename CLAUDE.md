@@ -1017,6 +1017,13 @@ enforced, and that is a debt rather than a decision.
 
 ## How work is done here
 
+- **A published screenshot never carries the lab line's private values**:
+  `scripts/lab/console-shots.mjs` reads `~/netryx-shots.deny` (kept off the
+  repository) and saves no page whose text holds any of them, nor anything
+  without the file or with it empty. (not enforced by a gate: @measured
+  2026-11-22 on forge, a deny list naming a value on the overview, an empty
+  list and no list each stopped the run before the first image)
+
 - Every scenario in `features/` names a test, and every named test exists.
   (gate: `scripts/scenarios-bound.sh`)
 - Every gate goes red on its own planted fault, stays green on a good tree, and

@@ -110,8 +110,9 @@ func TestTheLineCardAsksOnlyForTheLine(t *testing.T) {
 // pass, in steps of two minutes, with the steps nobody counted said.
 func TestTheListsCarryAnHourOfSparkline(t *testing.T) {
 	fl, h, inv, w, ap := fixture()
+	from := time.Date(2026, 11, 20, 11, 0, 0, 0, time.UTC)
 	h.sparks = map[string]rollup.SparksOf{
-		"mac": {Step: 2 * time.Minute, Known: 27, Keys: map[string][]uint64{laptop: append(make([]uint64, 29), 1200)}},
+		"mac": {From: from, Step: 2 * time.Minute, Known: 27, Keys: map[string][]uint64{laptop: append(make([]uint64, 29), 1200)}},
 		"app": {Step: 2 * time.Minute, Known: 0, Keys: map[string][]uint64{"netflix": append([]uint64{5}, make([]uint64, 29)...)}},
 	}
 	api := New(fl, h, inv, w, ap, clock, nil)
@@ -127,6 +128,10 @@ func TestTheListsCarryAnHourOfSparkline(t *testing.T) {
 	sp := field(lap, "spark")
 	if num(field(sp, "stepSec")) != 120 || num(field(sp, "known")) != 27 || len(arr(field(sp, "bytes"))) != 30 || num(at(field(sp, "bytes"), 29)) != 1200 {
 		t.Errorf("laptop spark %v", sp)
+	}
+	// It says when counting began, so a short line after a restart reads as short, not quiet.
+	if str(field(sp, "since")) != "2026-11-20T11:54:00Z" {
+		t.Errorf("since %v, want the 27th step's start", field(sp, "since"))
 	}
 	// A device that moved nothing in the hour still has its hour, all zero.
 	if b := arr(field(field(tvRow, "spark"), "bytes")); len(b) != 30 || num(b[0]) != 0 {

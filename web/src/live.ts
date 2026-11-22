@@ -3,7 +3,7 @@
 // Preact so node can test it.
 
 import type { App, Live, LivePoint } from "./types";
-import { appName, category, countryName, rate, ratePair, share } from "./format";
+import { appName, category, countryName, rate, ratePair, share, time } from "./format";
 import type { IconManifest } from "./icons";
 import { isRealCountry } from "./view";
 
@@ -226,7 +226,7 @@ export function speedTile(recent: { down: number; up: number } | undefined, now:
   return { value: `↓ ${p.down} · ↑ ${p.up}`, sub: `${p.unit}, average over ${win} · right now ↓ ${rate(now.down)}` };
 }
 
-export interface HourSpark { stepSec: number; known: number; bytes: number[] }
+export interface HourSpark { stepSec: number; known: number; bytes: number[]; since?: string }
 
 /** A list row's last hour as a path, from the first counted step on, with its peak rate. */
 export function hourSpark(s: HourSpark | undefined, w = 120, h = 28): { d: string; peak: number; label: string } {
@@ -245,5 +245,6 @@ export function hourSpark(s: HourSpark | undefined, w = 120, h = 28): { d: strin
     .map((x, j) => `${j ? "L" : "M"}${((from + j) * step).toFixed(1)} ${(h - 2 - (max > 0 ? (Math.max(0, x) / max) * span : 0)).toFixed(1)}`)
     .join(" ");
   const peak = s.stepSec > 0 ? max / s.stepSec : 0;
-  return { d, peak, label: `last hour, peak ${rate(peak)}` };
+  const when = known > 0 && s.since ? `since ${time(s.since)}` : "last hour";
+  return { d, peak, label: `${when}, peak ${rate(peak)}` };
 }
