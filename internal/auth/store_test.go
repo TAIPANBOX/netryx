@@ -194,3 +194,43 @@ func TestAFailedWriteLeavesNoStaleSessions(t *testing.T) {
 		t.Errorf("the signed-out session came back after a restart: %d", rec.Code)
 	}
 }
+
+// The fail-closed removal touches only netryx's own directory: when the
+// directory is a link elsewhere, nothing there is deleted.
+func TestAFailedWriteRemovesNothingOutsideItsOwnDirectory(t *testing.T) {
+	r, path := storeRig(t)
+	r.login("root", adminPW, lan)
+	elsewhere := filepath.Join(t.TempDir(), "other")
+	os.MkdirAll(elsewhere, 0o700)
+	victim := filepath.Join(elsewhere, "sessions.json")
+	os.WriteFile(victim, []byte("someone else's"), 0o600)
+	dir := filepath.Dir(path)
+	os.RemoveAll(dir)
+	os.Symlink(elsewhere, dir)
+	save = func(string, []byte, []signedIn) error { return os.ErrPermission }
+	defer func() { save = saveStore }()
+	sid, csrf := r.login("viewer", viewerPW, "10.0.0.3:1")
+	r.do(http.MethodPost, "/api/logout", lan, "", withCookie(sid), withCSRF(csrf))
+	if _, err := os.Stat(victim); err != nil {
+		t.Fatalf("a file behind a linked directory was removed: %v", err)
+	}
+}
+
+// Nor in a directory others can write: there nothing is removed, and what is
+// left is not loaded either, because the directory is not netryx's alone.
+func TestAFailedWriteRemovesNothingInADirectoryOthersCanWrite(t *testing.T) {
+	r, path := storeRig(t)
+	sid, csrf := r.login("viewer", viewerPW, lan)
+	os.Chmod(filepath.Dir(path), 0o777)
+	save = func(string, []byte, []signedIn) error { return os.ErrPermission }
+	defer func() { save = saveStore }()
+	r.do(http.MethodPost, "/api/logout", lan, "", withCookie(sid), withCSRF(csrf))
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("a file in a directory others can write was removed: %v", err)
+	}
+	save = saveStore
+	r.restart()
+	if rec := r.do(http.MethodGet, "/api/overview", lan, "", withCookie(sid)); rec.Code != http.StatusUnauthorized {
+		t.Errorf("the file left there was loaded: %d", rec.Code)
+	}
+}
