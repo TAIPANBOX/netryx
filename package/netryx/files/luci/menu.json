@@ -1,0 +1,13 @@
+{
+	"admin/network/netryx": {
+		"title": "Network console",
+		"order": 90,
+		"action": {
+			"type": "view",
+			"path": "netryx/console"
+		},
+		"depends": {
+			"acl": [ "luci-app-netryx" ]
+		}
+	}
+}

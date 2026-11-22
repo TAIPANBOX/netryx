@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,6 +21,7 @@ import (
 	"netryx/internal/ct"
 	"netryx/internal/device"
 	"netryx/internal/export"
+	"netryx/internal/handoff"
 	"netryx/internal/neigh"
 	"netryx/internal/nflog"
 	"netryx/internal/preflight"
@@ -43,6 +45,10 @@ func main() {
 	if os.Args[1] == "rpcd" {
 		// The ubus object netryx: rpcd runs /usr/libexec/rpcd/netryx, which runs this.
 		os.Exit(runRpcd(ctlSocket, os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
+	}
+	if os.Args[1] == "rpcd-luci" {
+		// The ubus object luci.netryx: LuCI's "Network console" page asks it for a handoff code.
+		os.Exit(runRpcdLuci(luciDeps{Dir: handoff.Dir, State: consoleStateFile, Now: time.Now, User: sessionUser}, os.Args[2:], os.Stdin, os.Stdout))
 	}
 	f, err := parseArgs(os.Args[1], os.Args[2:], flag.ExitOnError)
 	if err != nil {
@@ -453,16 +459,37 @@ func main() {
 		// Sessions outlive a restart of netryx in RAM only: /tmp is gone
 		// with a reboot, and rpcd still decides on every request.
 		gate.Store = sessionsFile
+		// A LuCI user opens the console without a second login: LuCI's page
+		// mints a one-time code there (netryx rpcd-luci) and the page redeems it.
+		gate.Handoff = handoff.Dir
 		listen := con.armListen(*addr, gate, time.Sleep, stop)
-		tlsConf := tlsFor(listen, *f.cert, *f.key)
+		tlsConf := tlsFor(listen, *f.cert, *f.key, ownCertDir)
+		handler := con.serveHandler(serveMux(con, snap), gate)
 		srv := &http.Server{
-			Addr: listen, Handler: con.serveHandler(serveMux(con, snap), gate),
+			Addr: listen, Handler: handler,
 			ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 			IdleTimeout: 60 * time.Second, TLSConfig: tlsConf,
 		}
+		// LuCI's "Network console" page builds the console's address from this.
+		if err := writeConsoleState(consoleStateFile, listen, tlsConf != nil); err != nil {
+			log.Printf("%s cannot be written (%v): LuCI's page cannot open the console", consoleStateFile, err)
+		}
 		if tlsConf != nil {
+			ln, err := net.Listen("tcp", listen)
+			if err != nil {
+				fatal(err)
+			}
+			// One port for both: TLS is the console, plain http from the house
+			// is sent to https, plain http from the router itself (the tunnel) is served.
+			tlsLn, plainLn := splitTLS(ln)
+			redirect := *f.httpRedirect
+			plain := &http.Server{
+				Handler:           con.plainSide(handler, func() bool { return redirect }, remoteLoopback),
+				ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second,
+			}
+			go func() { fatal(plain.Serve(plainLn)) }()
 			log.Printf("netryx on https://%s (console behind the LuCI sign-in, /api/, /metrics, /api/snapshot, /api/zabbix/discovery)", listen)
-			fatal(srv.ListenAndServeTLS("", ""))
+			fatal(srv.ServeTLS(tlsLn, "", ""))
 		}
 		if !loopbackListen(listen) {
 			log.Printf("no %s or %s: the console on %s is unencrypted, the LuCI password crosses the house network in the clear", *f.cert, *f.key, listen)
@@ -504,6 +531,7 @@ type cliFlags struct {
 	ubusURL      *string
 	cert         *string
 	key          *string
+	httpRedirect *bool
 	metricsToken *string
 }
 
@@ -540,6 +568,7 @@ func parseArgs(cmd string, args []string, eh flag.ErrorHandling) (*cliFlags, err
 		ubusURL:      fs.String("ubus-url", "http://127.0.0.1/ubus", "serve: uhttpd's JSON-RPC endpoint, where rpcd checks the LuCI login; asked on loopback only"),
 		cert:         fs.String("cert", "/etc/uhttpd.crt", "serve: the certificate (DER or PEM) the console serves https with on a house-side address; uhttpd's own by default"),
 		key:          fs.String("key", "/etc/uhttpd.key", "serve: the certificate's private key (DER or PEM)"),
+		httpRedirect: fs.Bool("http-redirect", true, "serve: send plain http from the house to https on the same port; false refuses it"),
 		metricsToken: fs.String("metrics-token", "", "serve: a bearer token that opens /metrics and the Zabbix routes from the house side; empty, they answer on loopback only. The service takes it from $"+metricsTokenEnv+" instead, which ps does not show"),
 	}
 	if err := fs.Parse(args); err != nil {

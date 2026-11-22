@@ -7,7 +7,7 @@ import { h, render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Range } from "./types";
 import type { IconManifest } from "./icons";
-import { getJSON, getSession, onUnauthorized } from "./api";
+import { getJSON, getSession, handoffCode, loginWithLuCI, onUnauthorized } from "./api";
 import { IconContext, SessionContext, SpanContext, type SessionInfo } from "./ui";
 import { parseSpan } from "./span";
 import { parseRoute, RANGES, WINDOWS, type Win } from "./query";
@@ -70,6 +70,8 @@ type Auth = { state: "checking" } | { state: "login" } | { state: "down"; text: 
 
 function App() {
   const [auth, setAuth] = useState<Auth>({ state: "checking" });
+  // Why the login shows when LuCI's link did not open the console.
+  const [note, setNote] = useState("");
   // The screen a missing session interrupted: where the login returns to.
   const back = useRef("#/");
 
@@ -78,6 +80,20 @@ function App() {
       back.current = nextLogin(location.hash);
       setAuth({ state: "login" });
     });
+    // Opened from LuCI: the one-time code leaves the address and the history
+    // at once, before anything else runs, and is redeemed for a session.
+    const code = handoffCode(location.hash);
+    if (code) {
+      history.replaceState(null, "", location.pathname + location.search + "#/");
+      loginWithLuCI(code).then((r) => {
+        if (r.ok) setAuth({ state: "in", info: { user: r.user, canWrite: r.canWrite, noRPC: false } });
+        else {
+          setNote(r.text);
+          setAuth({ state: "login" });
+        }
+      });
+      return off;
+    }
     getSession().then(
       (s) => {
         if (s) setAuth({ state: "in", info: { user: s.user, canWrite: !!s.canWrite && !s.noRPC, noRPC: !!s.noRPC } });
@@ -120,6 +136,7 @@ function App() {
   if (auth.state === "login") {
     return (
       <Login
+        note={note}
         onDone={(user, canWrite) => {
           if (location.hash !== back.current) location.hash = back.current;
           setAuth({ state: "in", info: { user, canWrite, noRPC: false } });

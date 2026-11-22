@@ -32,6 +32,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
+
+	"netryx/internal/handoff"
 )
 
 const (
@@ -91,6 +93,9 @@ type Gate struct {
 	Zone string
 	// Store keeps the sessions in a file across a restart; empty keeps them in memory only.
 	Store string
+	// Handoff is the directory of the codes LuCI's page mints
+	// (internal/handoff); empty, POST /api/login/luci opens nothing.
+	Handoff string
 
 	noRPC atomic.Bool
 }
@@ -129,10 +134,13 @@ func (g *Gate) CSRF(handle string) string {
 
 type keptKey struct{ sid, object, function string }
 
-// signedIn is one session netryx opened: the rpcd session behind a handle,
-// and the user it signed in as.
+// signedIn is one session netryx holds: the rpcd session behind a handle,
+// and the user it signed in as. A lent session is LuCI's own, handed to the
+// console by a code: netryx never ends it, so leaving the console never signs
+// anyone out of LuCI.
 type signedIn struct {
 	handle, sid, user string
+	lent              bool
 }
 
 type gate struct {
@@ -269,6 +277,9 @@ func (s *gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case p == "/api/login":
 		s.login(w, r)
+		return
+	case p == "/api/login/luci":
+		s.luci(w, r)
 		return
 	case p == "/api/session" && r.Method == http.MethodGet:
 		s.session(w, r)
@@ -593,7 +604,15 @@ func (s *gate) login(w http.ResponseWriter, r *http.Request) {
 	}
 	canWrite, _ := s.access(ctx, sid, "control", "write")
 	si := &signedIn{handle: newHandle(), sid: sid, user: in.User}
-	if old := s.add(si); old != nil {
+	s.open(w, r, si)
+	s.logf("login for %q from %s", in.User, src)
+	writeJSON(w, http.StatusOK, map[string]any{"csrf": s.g.CSRF(si.handle), "user": in.User, "canWrite": canWrite, "zone": s.g.zone()})
+}
+
+// open maps the session to a new handle and sets the cookie; a full table
+// pushes out the oldest, whose rpcd session is ended unless it was lent.
+func (s *gate) open(w http.ResponseWriter, r *http.Request, si *signedIn) {
+	if old := s.add(si); old != nil && !old.lent {
 		if err := s.destroy(old.sid); err != nil {
 			s.logf("the oldest console session was pushed out; rpcd did not end it: %v", err)
 		}
@@ -602,8 +621,70 @@ func (s *gate) login(w http.ResponseWriter, r *http.Request) {
 		Name: CookieName, Value: si.handle, Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil,
 	})
-	s.logf("login for %q from %s", in.User, src)
-	writeJSON(w, http.StatusOK, map[string]any{"csrf": s.g.CSRF(si.handle), "user": in.User, "canWrite": canWrite, "zone": s.g.zone()})
+}
+
+// luci redeems a code LuCI's page minted for a signed-in user: once, within
+// 30 s, and only for an rpcd session that is alive and may view. The code
+// comes in a JSON body, is limited like a password and is never logged.
+func (s *gate) luci(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	src := source(r)
+	s.mu.Lock()
+	wait, ok := s.lim.take(s.now(), s.limits(r)...)
+	s.mu.Unlock()
+	if !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(int((wait+time.Second-1)/time.Second)))
+		writeErr(w, http.StatusTooManyRequests, "rate")
+		return
+	}
+	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+		writeErr(w, http.StatusUnsupportedMediaType, "json")
+		return
+	}
+	var in struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 256)).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad login")
+		return
+	}
+	if s.g.Handoff == "" {
+		writeErr(w, http.StatusUnauthorized, "login")
+		return
+	}
+	c, err := handoff.Redeem(s.g.Handoff, in.Code, s.now())
+	if err != nil {
+		s.logf("a LuCI handoff from %s was refused: the code is unknown, used or expired", src)
+		writeErr(w, http.StatusUnauthorized, "login")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), rpcTimeout)
+	defer cancel()
+	// The session is LuCI's: whatever the answer, it is never ended here.
+	ok, err = s.access(ctx, c.SID, "view", "read")
+	switch {
+	case errors.Is(err, ErrSessionGone):
+		s.logf("a LuCI handoff for %q from %s was refused: rpcd no longer knows its session", c.User, src)
+		writeErr(w, http.StatusUnauthorized, "login")
+		return
+	case err != nil:
+		s.logf("a LuCI handoff for %q from %s: rpcd did not answer the view grant: %v", c.User, src, err)
+		writeErr(w, http.StatusServiceUnavailable, "rpc")
+		return
+	case !ok:
+		s.logf("a LuCI handoff for %q from %s was refused: no netryx grant in its ACL", c.User, src)
+		writeErr(w, http.StatusForbidden, "forbidden")
+		return
+	}
+	canWrite, _ := s.access(ctx, c.SID, "control", "write")
+	si := &signedIn{handle: newHandle(), sid: c.SID, user: c.User, lent: true}
+	s.open(w, r, si)
+	s.logf("login for %q from %s through LuCI", c.User, src)
+	writeJSON(w, http.StatusOK, map[string]any{"csrf": s.g.CSRF(si.handle), "user": c.User, "canWrite": canWrite, "zone": s.g.zone()})
 }
 
 func (s *gate) session(w http.ResponseWriter, r *http.Request) {
@@ -619,7 +700,10 @@ func (s *gate) session(w http.ResponseWriter, r *http.Request) {
 // says, and ends the rpcd session.
 func (s *gate) logout(w http.ResponseWriter, r *http.Request, si signedIn) {
 	s.drop(si.handle)
-	if err := s.destroy(si.sid); err != nil {
+	if si.lent {
+		// LuCI's own session: the console lets go of it, LuCI keeps it.
+		s.forget(si.sid)
+	} else if err := s.destroy(si.sid); err != nil {
 		s.logf("logout: rpcd did not end the session (%v); its handle is gone, so netryx refuses it", err)
 	}
 	http.SetCookie(w, &http.Cookie{

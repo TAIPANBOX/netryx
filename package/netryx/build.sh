@@ -73,6 +73,14 @@ install -m 0644 "$ROOT/package/netryx/files/netryx.acl.json" "$TREE/usr/share/rp
 # (docs/agent.md): an rpcd exec plugin that runs `netryx rpcd`.
 mkdir -p "$TREE/usr/libexec/rpcd"
 install -m 0755 "$ROOT/package/netryx/files/netryx.rpcd" "$TREE/usr/libexec/rpcd/netryx"
+# LuCI's "Network console" entry (Network menu): the page, its menu entry, the
+# ACL that lets a LuCI user call the handoff, and the ubus object luci.netryx
+# that mints the one-time code. Inert on a router without LuCI.
+install -m 0755 "$ROOT/package/netryx/files/luci/luci.netryx.rpcd" "$TREE/usr/libexec/rpcd/luci.netryx"
+install -m 0644 "$ROOT/package/netryx/files/luci/acl.json" "$TREE/usr/share/rpcd/acl.d/luci-app-netryx.json"
+mkdir -p "$TREE/usr/share/luci/menu.d" "$TREE/www/luci-static/resources/view/netryx"
+install -m 0644 "$ROOT/package/netryx/files/luci/menu.json" "$TREE/usr/share/luci/menu.d/luci-app-netryx.json"
+install -m 0644 "$ROOT/package/netryx/files/luci/console.js" "$TREE/www/luci-static/resources/view/netryx/console.js"
 
 # A filtered device's DNS is redirected to the safe resolver (port 553) before
 # the input chain, so a zone whose input is REJECT would refuse it: fw4 puts
@@ -168,7 +176,7 @@ fi
 # executables 0755, everything else 0644.
 find "$TREE" -type d -exec chmod 0755 {} +
 find "$TREE" -type f -exec chmod 0644 {} +
-chmod 0755 "$TREE/usr/sbin/netryx" "$TREE/etc/init.d/netryx" "$TREE/usr/libexec/rpcd/netryx"
+chmod 0755 "$TREE/usr/sbin/netryx" "$TREE/etc/init.d/netryx" "$TREE/usr/libexec/rpcd/netryx" "$TREE/usr/libexec/rpcd/luci.netryx"
 
 sh "$ROOT/package/netryx/mkipk.sh" "$TREE" "$ARCH" "$VERSION"
 

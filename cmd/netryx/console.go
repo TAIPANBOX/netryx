@@ -1742,19 +1742,28 @@ func loadKeyPair(certFile, keyFile string) (tls.Certificate, error) {
 	return tls.X509KeyPair(cb, kb)
 }
 
-// tlsFor is the TLS the console is served with: on a house-side address,
-// with uhttpd's certificate and key when both files exist. Otherwise nil,
-// and the console is plain http, as LuCI over http is; the login form says
-// the password then crosses the house network unencrypted.
-func tlsFor(listen, certFile, keyFile string) *tls.Config {
+// tlsFor is the TLS the console is served with on a house-side address:
+// uhttpd's certificate and key when both files exist, otherwise, with ownDir
+// set, a certificate of its own made there once (ownPair). Nil on loopback
+// (the SSH tunnel stays plain http) and when neither can be had; the login
+// form then says the password crosses the house network unencrypted.
+func tlsFor(listen, certFile, keyFile, ownDir string) *tls.Config {
 	if loopbackListen(listen) {
 		return nil
 	}
-	if _, err := os.Stat(certFile); err != nil {
-		return nil
-	}
-	if _, err := os.Stat(keyFile); err != nil {
-		return nil
+	_, e1 := os.Stat(certFile)
+	_, e2 := os.Stat(keyFile)
+	if e1 != nil || e2 != nil {
+		if ownDir == "" {
+			return nil
+		}
+		crt, key, err := ownPair(ownDir, listen)
+		if err != nil {
+			log.Printf("no %s or %s, and no certificate of its own could be made in %s (%v): the console runs unencrypted", certFile, keyFile, ownDir, err)
+			return nil
+		}
+		log.Printf("no %s or %s: the console uses its own self-signed certificate %s", certFile, keyFile, crt)
+		certFile, keyFile = crt, key
 	}
 	c, err := loadKeyPair(certFile, keyFile)
 	if err != nil {

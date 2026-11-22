@@ -143,10 +143,35 @@ netryx check                                # asks the kernel whether this route
 `netryx check` dry-runs the exact ruleset through the kernel without touching the running
 firewall, reports the flow-offloading setting, and names what is missing by its cause.
 
-The console listens on `127.0.0.1:8788` by default and signs you in with your LuCI account. Reach it
-through SSH, `ssh -L 8788:127.0.0.1:8788 root@192.168.1.1`, then <http://127.0.0.1:8788/>, or set
-`netryx.main.listen` to the router's LAN address. Everything else is in `/etc/config/netryx`, each
-option explained where it stands.
+### Opening the console
+
+The console signs you in with your LuCI account; there is no password of its own. Three ways in:
+
+- **From LuCI.** Network → Network console opens it signed in, with no second login. The LuCI
+  page asks the router for a one-time code (128 bits, good for 30 seconds and one use, bound to
+  your LuCI session and user name), and the console exchanges it for a session of its own. The
+  code travels in the address fragment, which the browser never sends to a server, and the console
+  takes it out of the address and the history at once. Leaving the console does not sign you out
+  of LuCI. This needs the console on a house-side address (below).
+- **Over HTTPS on the house network.** Set `netryx.main.listen` to the router's LAN address (or
+  `0.0.0.0:8788`) and restart netryx. The console then speaks https, with uhttpd's certificate
+  when the router has one (`/etc/uhttpd.crt`, the one LuCI over https uses) and otherwise a
+  self-signed certificate of its own, made once and kept in `/etc/netryx/console.crt` (ECDSA
+  P-256, the key readable by root only). Plain http to the same port is sent to https
+  (`option http_redirect '0'` refuses it instead). No HSTS is sent: the console is usually
+  reached by IP address.
+- **Through an SSH tunnel.** By default the console listens on `127.0.0.1:8788` only:
+  `ssh -L 8788:127.0.0.1:8788 root@192.168.1.1`, then <http://127.0.0.1:8788/>. From the router
+  itself the console stays plain http, so the tunnel works whatever `listen` says.
+
+**Accepting the self-signed certificate.** The first time, the browser warns that the certificate
+is not trusted, because the router made it itself. Open `https://<router>:8788/` once, check the
+address is your router's, and accept it (Chrome and Edge: Advanced, then Proceed; Firefox: Advanced,
+then Accept the Risk; Safari: Show Details, then visit this website). The browser remembers it, and
+the certificate stays the same across restarts and upgrades. Then open the console from LuCI again:
+a code is good for 30 seconds, which a first warning page can outlast.
+
+Everything else is in `/etc/config/netryx`, each option explained where it stands.
 
 A login other than root needs the netryx grant in `/etc/config/rpcd`, written as `list` lines:
 
@@ -158,7 +183,8 @@ config login
 	list write 'netryx'
 ```
 
-`list read` lets the login see the console, `list write` lets it change rules. Written as
+`list read` lets the login see the console, `list write` lets it change rules; add
+`list read 'luci-app-netryx'` for LuCI's Network console entry. Written as
 `option read 'netryx'`, rpcd does not take it as a grant, and the console answers that this user
 has no access to netryx.
 
@@ -171,7 +197,10 @@ build from the same script (`build.sh` maps the OpenWrt name to Go's).
   only the router itself, brand icons are built into the binary or fetched once by the router
   from the brand's own site, and a device's own name cannot bring markup onto the page.
 - **Every view needs a LuCI session**, every change also its CSRF token, and the cookie is an
-  opaque handle, never the rpcd session. Logins are rate limited.
+  opaque handle, never the rpcd session. Logins are rate limited. A code from LuCI's page is good
+  once, for 30 seconds, for the session that asked for it; only its hash is kept, in RAM, and it is
+  never logged. The ubus object that mints it, `luci.netryx`, is apart from `netryx`, so an
+  agent's grant for `netryx.*` cannot reach it.
 - **Only the router's own names reach it.** A request with any other Host header (a rebound DNS
   name, the WAN address) gets 421.
 - **Rules outlive the process and fail closed.** The ruleset is one nftables table applied in one

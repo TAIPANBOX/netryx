@@ -346,16 +346,16 @@ func TestUhttpdsOwnCertificateIsServed(t *testing.T) {
 		}
 	}
 	crt, key := good[0].cert, good[0].key
-	if c := tlsFor("192.168.1.1:8788", crt, key); c == nil || len(c.Certificates) != 1 || c.MinVersion < 0x0303 {
+	if c := tlsFor("192.168.1.1:8788", crt, key, ""); c == nil || len(c.Certificates) != 1 || c.MinVersion < 0x0303 {
 		t.Errorf("a house address with uhttpd's pair is served over TLS 1.2+: %+v", c)
 	}
-	if c := tlsFor("127.0.0.1:8788", crt, key); c != nil {
+	if c := tlsFor("127.0.0.1:8788", crt, key, ""); c != nil {
 		t.Error("loopback stays plain http")
 	}
-	if c := tlsFor("192.168.1.1:8788", filepath.Join(dir, "none.crt"), key); c != nil {
+	if c := tlsFor("192.168.1.1:8788", filepath.Join(dir, "none.crt"), key, ""); c != nil {
 		t.Error("no certificate, plain http (the page warns)")
 	}
-	if c := tlsFor("192.168.1.1:8788", good[0].cert, filepath.Join(dir, "m.key")); c != nil {
+	if c := tlsFor("192.168.1.1:8788", good[0].cert, filepath.Join(dir, "m.key"), ""); c != nil {
 		t.Error("a pair that does not match is not served")
 	}
 }
