@@ -72,16 +72,22 @@ type rpcClient struct {
 	url string
 	c   *http.Client
 	id  atomic.Uint64
+	// sessionTime is the session length asked for at login; zero is rpcd's default.
+	sessionTime time.Duration
 }
 
 // NewRPC speaks to rpcd at url (uhttpd's ubus prefix, normally
 // http://127.0.0.1/ubus). A nil client is one that dials loopback only, so a
 // password never leaves the router whatever the URL or a redirect says.
-func NewRPC(url string, c *http.Client) RPC {
+func NewRPC(url string, c *http.Client, opts ...RPCOption) RPC {
 	if c == nil {
 		c = loopbackClient()
 	}
-	return &rpcClient{url: url, c: c}
+	r := &rpcClient{url: url, c: c}
+	for _, o := range opts {
+		o(r)
+	}
+	return r
 }
 
 // loopbackClient dials only loopback addresses, and follows uhttpd's
@@ -171,7 +177,11 @@ func (r *rpcClient) call(ctx context.Context, sid, object, method string, args a
 }
 
 func (r *rpcClient) Login(ctx context.Context, user, pass string) (string, error) {
-	rep, err := r.call(ctx, nullSID, "session", "login", map[string]string{"username": user, "password": pass})
+	args := map[string]any{"username": user, "password": pass}
+	if secs := int(r.sessionTime / time.Second); secs > 0 {
+		args["timeout"] = secs
+	}
+	rep, err := r.call(ctx, nullSID, "session", "login", args)
 	if err != nil {
 		return "", err
 	}
@@ -258,3 +268,10 @@ func Probe(ctx context.Context, r RPC) error {
 	}
 	return nil
 }
+
+// RPCOption configures NewRPC.
+type RPCOption func(*rpcClient)
+
+// SessionTime asks rpcd for sessions of this length at login, as LuCI asks
+// for its sessiontime; rpcd's own default is five minutes. Zero leaves it.
+func SessionTime(d time.Duration) RPCOption { return func(r *rpcClient) { r.sessionTime = d } }

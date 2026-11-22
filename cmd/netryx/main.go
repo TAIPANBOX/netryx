@@ -444,7 +444,8 @@ func main() {
 		// Every route, the scrape endpoints included, sits behind the Host
 		// check: a page elsewhere must not reach any of it by rebinding a
 		// name. Behind it, the LuCI login: every view needs a session.
-		rpc := auth.NewRPC(*f.ubusURL, nil)
+		// Sessions as long as LuCI's, not rpcd's five minutes.
+		rpc := auth.NewRPC(*f.ubusURL, nil, auth.SessionTime(luciSessionTime(os.DirFS("/"))))
 		gate := con.newGate(rpc, *f.metricsToken)
 		// Sessions outlive a restart of netryx in RAM only: /tmp is gone
 		// with a reboot, and rpcd still decides on every request.

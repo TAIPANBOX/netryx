@@ -404,6 +404,10 @@ enforced, and that is a debt rather than a decision.
   `TestTheSessionsFileIsPrivateAndWrittenWhole`, `TestASessionsFileOthersCouldTouchIsNotLoaded`,
   `TestEndedSessionsLeaveTheFile`, `TestOnlyWellFormedSessionsAreLoaded`; @decided
   2026-11-22: sessions are kept across a restart of netryx)
+- **A session lasts as long as LuCI's**: the login asks rpcd for
+  `luci.sauth.sessiontime` (an hour when unset or not between five minutes and
+  a day), not rpcd's five minutes. (test: `TestASessionLastsTheSessionTimeAsked`,
+  `TestTheSessionsLastAsLongAsLuCIs`)
 - **Logins are limited**: per address in the house, per /64 outside, in a
   bounded table. (test: `TestLoginIsRateLimited`, `TestHouseIPv6LoginsAreCountedPerAddress`,
   `TestAnOutsideIPv6NetworkSharesItsAttempts`, `TestTheLoginTableIsBounded`)
