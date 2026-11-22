@@ -362,6 +362,9 @@ enforced, and that is a debt rather than a decision.
   `TestATokenFileOthersCanReadDisablesTelegram`, `TestSeveralAllowedUsersNeedAHomeChannel`,
   `TestTelegramIsBoundedPerHour`;
   sent through the real test bot on the Flint 2, docs/flint2-measured.md section 5)
+- **With the console chosen, the alerts say whether Hermes's bot was found**,
+  so the owner knows what choosing Telegram would do.
+  (test: `TestTheConsoleChannelSaysWhetherTheBotWasFound`)
 - **An alert Telegram cannot take stays in the console with the reason**:
   sending runs on its own goroutine with a 10 s deadline, a failure is tried
   again after 10 minutes, three times; the serious kinds go first, a local
@@ -465,7 +468,10 @@ enforced, and that is a debt rather than a decision.
   (test: `TestAFlowThatMovedNothingIsStillCountedOnce`)
 - **Loopback is no flow**: a connection with either end on 127.0.0.0/8 or
   ::1 never reaches the rollup, a rate or the journal, so the console's own
-  tunnel is not a client. (test: `TestLoopbackIsNotTraffic`, `TestTheConsoleTunnelIsNotAClient`)
+  tunnel is not a client. Nor is one with an unspecified, limited broadcast or
+  multicast end (a DHCP discover, mDNS): it has no device, and is no row.
+  (test: `TestLoopbackIsNotTraffic`, `TestTheConsoleTunnelIsNotAClient`,
+  `TestBroadcastAndMulticastAreNotTraffic`)
 - **Traffic with both ends at home is LAN, not WAN**: it carries the country
   `LAN`, no organisation and no address lookup, and keeps its app; the WAN
   chart and the countries leave it out, a device's own views keep it.

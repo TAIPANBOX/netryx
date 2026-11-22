@@ -912,6 +912,39 @@ func TestLoopbackIsNotTraffic(t *testing.T) {
 	}
 }
 
+// A DHCP discover (0.0.0.0 to 255.255.255.255), a limited broadcast and
+// multicast have no device and no remote: they never become a row, a rate or
+// a key of their own, as 255.255.255.255 once did in the console.
+func TestBroadcastAndMulticastAreNotTraffic(t *testing.T) {
+	f := newFakes()
+	tb := NewTable(f.options())
+	for i, fl := range []struct {
+		src   string
+		sport uint16
+		dst   string
+		dport uint16
+	}{
+		{"0.0.0.0", 68, "255.255.255.255", 67},
+		{laptop, 40100, "255.255.255.255", 9},
+		{laptop, 5353, "224.0.0.251", 5353},
+		{"fe80::1", 546, "ff02::1:2", 547},
+	} {
+		id := uint32(10 + i)
+		tb.Apply(event(ct.New, id, fl.src, fl.sport, fl.dst, fl.dport, 0, 0), t0)
+		tb.Sync([]ct.Event{event(ct.Update, id, fl.src, fl.sport, fl.dst, fl.dport, 300, 300)}, t0.Add(5*time.Second))
+		tb.Apply(event(ct.Destroy, id, fl.src, fl.sport, fl.dst, fl.dport, 600, 600), t0.Add(6*time.Second))
+	}
+	if ds := f.got(); len(ds) != 0 {
+		t.Fatalf("broadcast or multicast reached the rollup: %+v", ds)
+	}
+	if r := tb.Rates(); len(r) != 0 {
+		t.Fatalf("broadcast or multicast has a rate: %+v", r)
+	}
+	if rows, _ := tb.Query(Query{}); len(rows) != 0 || len(tb.Live()) != 0 {
+		t.Fatalf("broadcast or multicast is a flow: %+v %+v", rows, tb.Live())
+	}
+}
+
 // The device a flow's bytes belong to is asked again whenever it is still
 // unknown: an address whose hardware address is learned after the flow
 // opened has its rate under that hardware address, never under the address.

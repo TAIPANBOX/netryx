@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"netryx/internal/alerts"
 	"netryx/internal/rules"
 	"os"
 	"path/filepath"
@@ -559,5 +560,28 @@ func TestTheAPICountsDevicesBehindOnePort(t *testing.T) {
 	got := securityOf(cfg, nil, nil, links, nil, nil)["02:4e:58:00:00:04"]
 	if got.Isolation == nil || got.Isolation.SharedPort != 2 {
 		t.Fatalf("camera = %+v; want two devices on lan3", got.Isolation)
+	}
+}
+
+// With the console chosen, the alerts' state still says whether Hermes's bot
+// was found, so the owner knows what choosing Telegram would do.
+func TestTheConsoleChannelSaysWhetherTheBotWasFound(t *testing.T) {
+	found := func() (alerts.Bot, string) { return alerts.Bot{Chat: "1"}, "" }
+	missing := func() (alerts.Bot, string) {
+		return alerts.Bot{}, "Hermes is not installed: alerts stay in the console"
+	}
+	ready, why := telegramState("console", found)
+	if ready || !strings.Contains(why, "as configured") || !strings.Contains(why, "Hermes's bot is ready") {
+		t.Errorf("console, bot found: %v %q", ready, why)
+	}
+	ready, why = telegramState("console", missing)
+	if ready || !strings.Contains(why, "as configured") || !strings.Contains(why, "Hermes is not installed") {
+		t.Errorf("console, no bot: %v %q", ready, why)
+	}
+	if ready, why = telegramState("telegram", found); !ready || why != "" {
+		t.Errorf("telegram, bot found: %v %q", ready, why)
+	}
+	if ready, why = telegramState("telegram", missing); ready || !strings.HasPrefix(why, "Hermes is not installed") {
+		t.Errorf("telegram, no bot: %v %q", ready, why)
 	}
 }
