@@ -355,7 +355,7 @@ select.input { padding-right: 8px; }
 .entity-link { color: var(--text); text-decoration: none; cursor: pointer; }
 .entity-link:hover, .entity-link:focus-visible { color: var(--link-hover); text-decoration: underline; }
 .wins { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
-.win { position: fixed; width: 380px; max-height: min(80vh, 640px); overflow: auto; pointer-events: auto; background: var(--card); border: 1px solid var(--edge); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
+.win { position: fixed; width: min(380px, calc(100vw - 24px)); max-height: min(calc(100vh - 24px), 440px); overflow: auto; pointer-events: auto; background: var(--card); border: 1px solid var(--edge); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
 .win-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: grab; user-select: none; touch-action: none; }
 .win-head:active { cursor: grabbing; }
 .win-title { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -364,3 +364,14 @@ select.input { padding-right: 8px; }
 .win-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .kv-mini { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: 13px; }
 .kv-mini > span:nth-child(odd) { color: var(--muted); }
+
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.self-start { align-self: flex-start; }
+.identity-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 24px; align-items: start; }
+.dev-edit { align-items: flex-end; }
+@media (max-width: 720px) { .identity-grid { grid-template-columns: minmax(0, 1fr); } }
+.win:focus { outline: none; }
+.win:focus-visible { outline: 2px solid var(--accent); }
+.map-scroll { overflow-x: auto; }
+.map-scroll .sankey { min-width: 760px; }
+.row-item { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }

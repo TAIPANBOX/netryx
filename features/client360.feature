@@ -18,7 +18,8 @@ Feature: a client's name opens its card, and its card opens its full view
     And a card can be dragged but never off the screen, and closes with its X or with Esc, the one in front first
     # (the cards: "several cards stay open together", "opening a card that is open brings it forward",
     #  "a click brings a card forward; X closes it; Esc closes the top one", "a card is dragged but never off the screen",
-    #  "the number of open cards is bounded" in web/src/windows.test.ts)
+    #  "the number of open cards is bounded", "Esc closes a card, but not while the owner types in a field",
+    #  "a card is never wider than the window" in web/src/windows.test.ts)
 
   Scenario: the full view shows the whole picture
     Given the owner opens a client's full view
@@ -33,7 +34,8 @@ Feature: a client's name opens its card, and its card opens its full view
     Then it runs from the device to its apps, the domains, the networks and the countries, banded by what moved, the busiest few in each column
     And every name on it leads to that app, domain, network or country
     # (the map: "the map runs device, apps, domains, networks, countries", "every node leads somewhere",
-    #  "each column keeps its busiest few and folds the rest" in web/src/connmap.test.ts)
+    #  "each column keeps its busiest few and folds the rest",
+    #  "a name that carries under 3% of the window folds into the rest" in web/src/connmap.test.ts)
 
   Scenario: the rules and limits on the device, and where they come from
     Given rules for the device, for its group and for everyone
@@ -46,3 +48,15 @@ Feature: a client's name opens its card, and its card opens its full view
     When they rename it or pick another group
     Then only what changed is sent, and a blank name changes nothing
     # (the change: "a rename or a new group sends only what changed" in web/src/client360.test.ts)
+
+  Scenario: the full view's speed is steady
+    Given the full view's Now
+    When the owner reads its speed
+    Then it leads with the average over the window picked and shows the last seconds beside it
+    # (the tile: "the Speed tile leads with the window's average" in web/src/live.test.ts)
+
+  Scenario: the rows hold still under the pointer
+    Given a live table whose order would move
+    When the pointer is over it
+    Then nothing moves under it, so a click lands on the row that was there
+    # (the order: "while the pointer is over the table the order holds" in web/src/steady.test.ts)

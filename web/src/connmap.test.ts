@@ -62,7 +62,20 @@ test("five columns are laid out across the width, one scale for all", () => {
   const m = connMap("Laptop", [flow({ app: yt, name: "www.youtube.com", org: "GOOGLE", asn: 15169, cc: "US", winDown: 10 })]);
   const out = sankeyLayout(m.nodes, m.links, { height: 300, top: 30, bottom: 20, gap: 14 }, 5, 1000);
   const xs = [0, 1, 2, 3, 4].map((c) => out.nodes.find((n) => n.col === c)?.x);
-  assert.deepEqual(xs, [20, 260, 500, 740, 980]);
+  assert.deepEqual(xs, [20, 222.5, 425, 627.5, 830], "the last column leaves room for its labels on the right");
   const three = sankeyLayout([{ id: "a", col: 0, label: "a", color: "" }, { id: "b", col: 2, label: "b", color: "" }], [{ from: "a", to: "b", value: 1 }], { height: 300, top: 30, bottom: 20, gap: 14 });
   assert.deepEqual(three.nodes.map((n) => n.x), [20, 560], "three columns as before");
+});
+
+test("a name that carries under 3% of the window folds into the rest, so small flows never pile up", () => {
+  const rows = [
+    flow({ app: yt, name: "big.example", org: "BIG", asn: 1, cc: "US", winDown: 9700 }),
+    flow({ app: gh, name: "tiny.example", org: "TINY", asn: 2, cc: "DE", winDown: 200 }),
+    flow({ app: { id: "x", name: "X", category: "other" }, name: "small.example", org: "SMALL", asn: 3, cc: "FR", winDown: 100 }),
+  ];
+  const m = connMap("Laptop", rows);
+  const labels = (c: number) => m.nodes.filter((n) => n.col === c).map((n) => n.label);
+  assert.deepEqual(labels(1), ["YouTube", "2 other apps"]);
+  assert.deepEqual(labels(2), ["big.example", "2 other domains"]);
+  assert.deepEqual(labels(4), ["United States", "2 other countries"]);
 });

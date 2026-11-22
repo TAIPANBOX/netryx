@@ -23,7 +23,7 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
   const { rules } = useRules();
   const names = useRuleNames();
   const d = polled.data;
-  const { rows: countries, sort, pick } = useSteadyRows(
+  const { rows: countries, sort, pick, holdProps } = useSteadyRows(
     "destinations",
     d?.countries ?? [],
     (c) => c.cc,
@@ -69,7 +69,7 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
                       <th>Rules</th>
                     </tr>
                   </thead>
-                  <tbody ref={body}>
+                  <tbody ref={body} {...holdProps}>
                     {countries.map((c) => {
                       const href = countryHref(c.cc);
                       const name = c.other || c.cc === "--" ? "unknown or others" : countryName(c.cc);
@@ -182,7 +182,7 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
               <Card label="Clients that went there" title="Clients">
                 {d.clients.length === 0 && <Empty>No client went there in this period.</Empty>}
                 {d.clients.map((c) => (
-                  <div key={c.mac} class="row-link">
+                  <div key={c.mac} class="row-item">
                     <div class="row-between">
                       <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
                       <span class="soft small nowrap">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>

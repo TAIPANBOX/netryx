@@ -252,7 +252,7 @@ function Forwards({ d }: { d: NetworkView }) {
             <div class="col-tight">
               <span class="strong">{r.name || `forward ${i + 1}`}</span>
               <span class="small">
-                {r.proto} {r.port} → {r.device ? <ClientLink mac={r.device.mac} name={forwardTarget(r)} /> : forwardTarget(r)}
+                {r.proto} {r.port} → {r.device ? <ClientLink mac={r.device.mac} name={forwardTarget(r)} title={r.device.name} /> : forwardTarget(r)}
               </span>
             </div>
             <span class="muted small nowrap">{r.enabled ? `from ${r.from || "wan"}` : "turned off"}</span>

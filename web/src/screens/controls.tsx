@@ -5,7 +5,7 @@
 // right to write.
 
 import { h, Fragment } from "preact";
-import { useContext, useRef, useState } from "preact/hooks";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import { once } from "../guard";
 import type { Device, Group, LiveConn } from "../types";
 import { getJSON, mac as enc, sendJSON, usePoll } from "../api";
@@ -311,7 +311,15 @@ export function DeviceEdit({ d }: { d: Device }) {
   const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
   const [name, setName] = useState(d.label || d.name);
   const [group, setGroup] = useState(d.group);
-  const x = useChange();
+  const [dirty, setDirty] = useState(false);
+  // The form follows the device (an approval, the agent, another tab) until
+  // the owner starts editing it.
+  useEffect(() => {
+    if (dirty) return;
+    setName(d.label || d.name);
+    setGroup(d.group);
+  }, [d.label, d.name, d.group, dirty]);
+  const x = useChange(() => setDirty(false));
   if (!canWrite) return null;
   const body = editBody({ name: d.label || d.name, group: d.group }, { name, group });
   return (
@@ -328,11 +336,11 @@ export function DeviceEdit({ d }: { d: Device }) {
     >
       <label class="field">
         <span class="muted small">Name</span>
-        <input class="input" value={name} maxLength={64} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+        <input class="input" value={name} maxLength={64} onInput={(e) => { setDirty(true); setName((e.target as HTMLInputElement).value); }} />
       </label>
       <label class="field">
         <span class="muted small">Group</span>
-        <select class="input" value={group} onChange={(e) => setGroup((e.target as HTMLSelectElement).value)}>
+        <select class="input" value={group} onChange={(e) => { setDirty(true); setGroup((e.target as HTMLSelectElement).value); }}>
           <option value="">no group</option>
           {groups.filter((g) => g.id !== "new").map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>

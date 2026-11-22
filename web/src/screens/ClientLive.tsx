@@ -13,7 +13,7 @@ import { Pills, Card, CC, Empty, AppIcon, IconContext } from "../ui";
 import { appName, category, countryName, duration, nameSource, num, plural, rate, ratePair } from "../format";
 import { LAYER_COLORS, OTHER_COLOR, UP_COLOR } from "../view";
 import { layerColor } from "../icons";
-import { appsTileSub, connKeys, layerLabel, liveChart, liveSummary, placeName, sparkPath, whereText, LIVE_TICKS } from "../live";
+import { appsTileSub, connKeys, layerLabel, liveChart, liveSummary, placeName, sparkPath, speedTile, whereText, LIVE_TICKS } from "../live";
 
 import { BlockApp, CutButton, CUT_NOTE } from "./controls";
 import { useSession } from "../ui";
@@ -21,14 +21,13 @@ import { useSession } from "../ui";
 /** Connections listed; the API sends the busiest 50. */
 const CONNS_SHOWN = 12;
 
-export function LiveTiles({ l }: { l: Live }) {
+export function LiveTiles({ l, recent, win }: { l: Live; recent?: { down: number; up: number }; win: Win }) {
   const s = liveSummary(l);
-  const r = ratePair(l.rate.down, l.rate.up);
   const conns = l.conns ?? [];
-  const step = Math.round(l.stepSec);
   const hasLan = (l.places ?? []).some((p) => p.cc === "LAN");
+  const speed = speedTile(recent, l.rate, windowLabel(win));
   const tiles = [
-    { label: "Speed now", value: `↓ ${r.down} · ↑ ${r.up}`, sub: `${r.unit}, ${step > 0 ? `over the last ${step} s` : "over the last interval"}` },
+    { label: "Speed", value: speed.value, sub: speed.sub },
     {
       label: "Active connections",
       value: num(l.flows),
@@ -89,7 +88,7 @@ export function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: str
   const manifest = useContext(IconContext);
   const avg = new Map(recent.map((r) => [r.app.id, r.recent ?? { up: 0, down: 0 }]));
   const avgOf = (a: LiveApp) => avg.get(a.app.id) ?? { up: a.up, down: a.down };
-  const { rows, sort, pick } = useSteadyRows(
+  const { rows, sort, pick, holdProps } = useSteadyRows(
     "client-live-apps",
     apps,
     (a) => a.app.id,
@@ -113,7 +112,7 @@ export function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: str
       }
     >
       {apps.length === 0 && <Empty>The device is not sending anything now.</Empty>}
-      <div class="col-tight" ref={list}>
+      <div class="col-tight" ref={list} {...holdProps}>
       {rows.map((a) => {
         const name = appName(a.app.name);
         const d = sparkPath(a.spark);

@@ -54,7 +54,7 @@ export function Client360({ mac, range, onRange, win, onWin }: { mac: string; ra
               <SecuritySection d={d} />
             </div>
             <ConnectionMap mac={mac} name={name} win={win} />
-            <Now mac={mac} win={win} />
+            <Now mac={mac} win={win} avg={d.recent} />
             <History mac={mac} range={range} onRange={onRange} win={win} />
             <RulesSection d={d} />
           </div>
@@ -77,16 +77,20 @@ function Identity({ d }: { d: Device }) {
     ["Last seen", d.online ? "online now" : `${date(d.last)} ${time(d.last)}`],
   ];
   return (
-    <section aria-label="Identity" class="card device-card">
+    <section aria-label="Identity" class="card">
       <div class="card-head">
         <h1>{deviceName(d)}</h1>
         <span class={d.online ? "state state-active" : "soft small"}>{d.online ? "online" : "offline"}</span>
       </div>
-      <div class="kv-mini kv-wide">
-        {rows.map(([k, v]) => [<span key={k + "k"}>{k}</span>, <span key={k + "v"} class="break">{v}</span>])}
+      <div class="identity-grid">
+        <div class="kv-mini">
+          {rows.map(([k, v]) => [<span key={k + "k"}>{k}</span>, <span key={k + "v"} class="break">{v}</span>])}
+        </div>
+        <div class="col-tight">
+          <DeviceActions d={d} />
+          <DeviceEdit d={d} />
+        </div>
       </div>
-      <DeviceActions d={d} />
-      <DeviceEdit d={d} />
     </section>
   );
 }
@@ -126,14 +130,18 @@ function ConnectionMap({ mac, name, win }: { mac: string; name: string; win: Win
       <Section polled={flows} empty={(p) => (connMap(name, p.rows).nodes.length ? "" : `Nothing moved in the last ${windowLabel(win)}.`)}>
         {(p) => {
           const m = connMap(name, p.rows);
-          return <Sankey nodes={m.nodes} links={m.links} href={m.href} cols={5} width={1000} height={340} label={`Map: where ${name}'s connections went over the last ${windowLabel(win)}`} />;
+          return (
+            <div class="map-scroll">
+              <Sankey nodes={m.nodes} links={m.links} href={m.href} cols={5} width={1000} height={340} label={`Map: where ${name}'s connections went over the last ${windowLabel(win)}`} />
+            </div>
+          );
         }}
       </Section>
     </Card>
   );
 }
 
-function Now({ mac, win }: { mac: string; win: Win }) {
+function Now({ mac, win, avg }: { mac: string; win: Win; avg?: { down: number; up: number } }) {
   const base = `/api/devices/${enc(mac)}`;
   const live = usePoll((s) => getJSON<Live>(`${base}/live`, s), 2_000, [mac]);
   const recent = usePoll((s) => getJSON<AppUsage[]>(`${base}/apps?range=1h&window=${win}`, s), 10_000, [mac, win]);
@@ -150,7 +158,7 @@ function Now({ mac, win }: { mac: string; win: Win }) {
       <Section polled={live}>
         {(l) => (
           <div class="stack">
-            <LiveTiles l={l} />
+            <LiveTiles l={l} recent={avg} win={win} />
             <LiveTraffic l={l} seen={seen.current} />
             <LiveApps apps={l.apps ?? []} mac={mac} recent={recent.data ?? []} win={win} />
             <div class="grid-2">
@@ -186,11 +194,11 @@ function History({ mac, range, onRange, win }: { mac: string; range: Range; onRa
         <Pills label="History period" inset value={range} onPick={(v) => onRange(v as Range)} items={RANGES.map((r) => ({ id: r.id, label: r.label }))} />
       </div>
       <Section polled={hist}>
-        {(h) => (
+        {(got) => (
           <div class="stack">
-            <Traffic d={h} range={range} split={split} onSplit={setSplit} />
-            <Apps apps={h.apps} mac={mac} win={win} />
-            <Where dest={h.dest} />
+            <Traffic d={got} range={range} split={split} onSplit={setSplit} />
+            <Apps apps={got.apps} mac={mac} win={win} />
+            <Where dest={got.dest} />
           </div>
         )}
       </Section>

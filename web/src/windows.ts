@@ -64,3 +64,20 @@ export function moveWin(s: WinState, id: number, x: number, y: number, size: Siz
   const p = clamp(x, y, size, view);
   return { ...s, wins: s.wins.map((w) => (w.id === id ? { ...w, x: p.x, y: p.y } : w)) };
 }
+
+/** Esc closes the card in front, unless the owner is typing in a field or something else already handled the key. */
+export function escCloses(e: { key: string; defaultPrevented: boolean; target: { tagName?: string; isContentEditable?: boolean } | null }): boolean {
+  if (e.key !== "Escape" || e.defaultPrevented) return false;
+  const t = e.target;
+  return !(t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName ?? "")));
+}
+
+/** A card's size: 380 wide, never wider than the window less its margins; 440 high, as the page draws it. */
+export function cardSize(view: Size): Size {
+  return { w: Math.min(380, view.w - 2 * MARGIN), h: 440 };
+}
+
+/** Every card back inside the window after it changed size. */
+export function refit(s: WinState, size: Size, view: Size): WinState {
+  return { ...s, wins: s.wins.map((w) => ({ ...w, ...clamp(w.x, w.y, size, view) })) };
+}

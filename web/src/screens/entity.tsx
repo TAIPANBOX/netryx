@@ -13,7 +13,7 @@ import { useCards } from "./windows";
 import type { Group } from "../types";
 
 /** The link that opens a client's card. */
-export function ClientLink({ mac, name, class: cls }: { mac: string; name: string; class?: string }) {
+export function ClientLink({ mac, name, title, class: cls }: { mac: string; name: string; title?: string; class?: string }) {
   const { open } = useCards();
   const href = `#/client/${enc(mac)}`;
   return (
@@ -24,7 +24,7 @@ export function ClientLink({ mac, name, class: cls }: { mac: string; name: strin
         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
         e.stopPropagation();
-        open(`client:${mac}`, { title: name, body: () => <ClientCard mac={mac} /> }, e.currentTarget as Element);
+        open(`client:${mac}`, { title: title ?? name, body: () => <ClientCard mac={mac} /> }, e.currentTarget as Element);
       }}
     >
       {name}
@@ -34,6 +34,7 @@ export function ClientLink({ mac, name, class: cls }: { mac: string; name: strin
 
 /** The floating card: who the device is, where it is connected, what it does now. */
 export function ClientCard({ mac }: { mac: string }) {
+  const { close } = useCards();
   const base = `/api/devices/${enc(mac)}`;
   const dev = usePoll((s) => getJSON<Device>(`${base}?window=3m`, s), 10_000, [mac]);
   const apps = usePoll((s) => getJSON<AppUsage[]>(`${base}/apps?range=1h&window=3m`, s), 15_000, [mac]);
@@ -78,7 +79,7 @@ export function ClientCard({ mac }: { mac: string }) {
         ))
       )}
       <div class="row-wrap">
-        <a class="btn" href={`#/client/${enc(mac)}`}>Open full</a>
+        <a class="btn" href={`#/client/${enc(mac)}`} onClick={(e) => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) close(`client:${mac}`); }}>Open full</a>
         <a class="btn" href={`#/flows?q=${encodeURIComponent("mac:" + mac)}`}>Show flows</a>
       </div>
     </div>

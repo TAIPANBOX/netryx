@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Live, LivePoint } from "./types";
-import { liveChart, sparkPath, liveSummary, whereText, placeName, layerLabel, connKeys, appsTileSub, cutNote } from "./live";
+import { liveChart, sparkPath, liveSummary, whereText, placeName, layerLabel, connKeys, appsTileSub, cutNote, speedTile } from "./live";
 import type { App } from "./types";
 
 const END = Date.parse("2026-11-20T12:00:00Z");
@@ -173,4 +173,12 @@ test("the apps tile names the busiest app only while something moves", () => {
   assert.equal(appsTileSub({ apps: 3, topName: "YouTube", topShare: 0.62 }), "YouTube busiest, 62%");
   assert.equal(appsTileSub({ apps: 3, topName: "unknown", topShare: 0 }), "all idle now");
   assert.equal(appsTileSub({ apps: 0, topName: "", topShare: 0 }), "none");
+});
+
+test("the Speed tile leads with the window's average and shows the last seconds beside it", () => {
+  assert.deepEqual(speedTile({ down: 175000, up: 400 }, { down: 0, up: 0 }, "3 min"), {
+    value: "↓ 1.4 · ↑ 0",
+    sub: "Mbit/s, average over 3 min · right now ↓ 0 bit/s",
+  });
+  assert.deepEqual(speedTile(undefined, { down: 1000, up: 0 }, "3 min").sub, "kbit/s, the last few seconds (no average yet)");
 });

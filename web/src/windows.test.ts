@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EMPTY, openWin, closeWin, focusWin, topWin, moveWin, placeNear, MAX_WINDOWS } from "./windows";
+import { EMPTY, openWin, closeWin, focusWin, topWin, moveWin, placeNear, MAX_WINDOWS, escCloses, cardSize, refit } from "./windows";
 
 const view = { w: 1440, h: 900 };
 const size = { w: 380, h: 420 };
@@ -53,4 +53,24 @@ test("the number of open cards is bounded, the oldest closing first", () => {
   for (let i = 0; i < MAX_WINDOWS + 2; i++) s = openWin(s, `client:${i}`, null, size, view);
   assert.equal(s.wins.length, MAX_WINDOWS);
   assert.ok(!s.wins.some((w) => w.key === "client:0" || w.key === "client:1"));
+});
+
+test("Esc closes a card, but not while the owner types in a field", () => {
+  assert.equal(escCloses({ key: "Escape", defaultPrevented: false, target: { tagName: "DIV" } }), true);
+  for (const tagName of ["INPUT", "TEXTAREA", "SELECT"]) {
+    assert.equal(escCloses({ key: "Escape", defaultPrevented: false, target: { tagName } }), false, tagName);
+  }
+  assert.equal(escCloses({ key: "Escape", defaultPrevented: false, target: { tagName: "DIV", isContentEditable: true } }), false);
+  assert.equal(escCloses({ key: "Escape", defaultPrevented: true, target: { tagName: "DIV" } }), false, "something else handled it");
+  assert.equal(escCloses({ key: "Enter", defaultPrevented: false, target: { tagName: "DIV" } }), false);
+});
+
+test("a card is never wider than the window, and cards come back inside it when it shrinks", () => {
+  assert.deepEqual(cardSize({ w: 1440, h: 900 }), { w: 380, h: 440 });
+  assert.deepEqual(cardSize({ w: 375, h: 700 }), { w: 351, h: 440 });
+  let s = openWin(EMPTY, "client:a", null, size, view);
+  s = moveWin(s, s.wins[0].id, 1000, 400, size, view);
+  const small = { w: 800, h: 600 };
+  s = refit(s, cardSize(small), small);
+  assert.deepEqual([s.wins[0].x, s.wins[0].y], [800 - 380 - 12, 600 - 440 - 12]);
 });

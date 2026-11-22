@@ -4,14 +4,12 @@
 
 import { h, createContext, type ComponentChildren } from "preact";
 import { useCallback, useContext, useEffect, useRef, useState } from "preact/hooks";
-import { EMPTY, closeWin, focusWin, moveWin, openWin, topWin, type WinState } from "../windows";
-
-const SIZE = { w: 380, h: 440 };
+import { EMPTY, cardSize, closeWin, escCloses, focusWin, moveWin, openWin, refit, topWin, type WinState } from "../windows";
 
 interface Card { title: string; body: () => ComponentChildren }
-interface Api { open: (key: string, card: Card, anchor?: Element | null) => void }
+interface Api { open: (key: string, card: Card, anchor?: Element | null) => void; close: (key: string) => void }
 
-const Ctx = createContext<Api>({ open: () => {} });
+const Ctx = createContext<Api>({ open: () => {}, close: () => {} });
 export const useCards = () => useContext(Ctx);
 
 const view = () => ({ w: window.innerWidth, h: window.innerHeight });
@@ -22,21 +20,37 @@ export function CardsProvider({ children }: { children: ComponentChildren }) {
   const open = useCallback((key: string, card: Card, anchor?: Element | null) => {
     cards.current.set(key, card);
     const r = anchor?.getBoundingClientRect();
-    setSt((s) => openWin(s, key, r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null, SIZE, view()));
+    setSt((s) => openWin(s, key, r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null, cardSize(view()), view()));
+  }, []);
+  const close = useCallback((key: string) => {
+    setSt((s) => {
+      const w = s.wins.find((x) => x.key === key);
+      return w ? closeWin(s, w.id) : s;
+    });
   }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (!escCloses({ key: e.key, defaultPrevented: e.defaultPrevented, target: e.target as HTMLElement | null })) return;
       setSt((s) => {
         const t = topWin(s);
         return t ? closeWin(s, t.id) : s;
       });
     };
+    const onResize = () => setSt((s) => refit(s, cardSize(view()), view()));
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
   }, []);
+  // A card closed leaves nothing behind.
+  useEffect(() => {
+    const open = new Set(st.wins.map((w) => w.key));
+    for (const k of cards.current.keys()) if (!open.has(k)) cards.current.delete(k);
+  }, [st]);
   return (
-    <Ctx.Provider value={{ open }}>
+    <Ctx.Provider value={{ open, close }}>
       {children}
       <div class="wins">
         {st.wins.map((w) => {
@@ -51,7 +65,7 @@ export function CardsProvider({ children }: { children: ComponentChildren }) {
               title={card.title}
               onFocus={() => setSt((s) => focusWin(s, w.id))}
               onClose={() => setSt((s) => closeWin(s, w.id))}
-              onMove={(x, y) => setSt((s) => moveWin(s, w.id, x, y, SIZE, view()))}
+              onMove={(x, y) => setSt((s) => moveWin(s, w.id, x, y, cardSize(view()), view()))}
             >
               {card.body()}
             </Window>
@@ -64,6 +78,9 @@ export function CardsProvider({ children }: { children: ComponentChildren }) {
 
 function Window(p: { x: number; y: number; z: number; title: string; onFocus: () => void; onClose: () => void; onMove: (x: number, y: number) => void; children: ComponentChildren }) {
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const box = useRef<HTMLElement>(null);
+  // The card takes the focus when it opens, so the keyboard reaches it at once.
+  useEffect(() => box.current?.focus(), []);
   const down = (e: PointerEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
     drag.current = { sx: e.clientX, sy: e.clientY, ox: p.x, oy: p.y };
@@ -77,7 +94,7 @@ function Window(p: { x: number; y: number; z: number; title: string; onFocus: ()
     drag.current = null;
   };
   return (
-    <section class="win" role="dialog" aria-label={p.title} style={{ left: `${p.x}px`, top: `${p.y}px`, zIndex: p.z }} onPointerDown={p.onFocus}>
+    <section ref={box} tabIndex={-1} class="win" role="dialog" aria-label={p.title} style={{ left: `${p.x}px`, top: `${p.y}px`, zIndex: p.z }} onPointerDown={p.onFocus}>
       <div class="win-head" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         <span class="win-title">{p.title}</span>
         <button type="button" class="win-x" aria-label={`Close ${p.title}`} onClick={p.onClose}>✕</button>

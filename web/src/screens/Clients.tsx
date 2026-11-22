@@ -46,7 +46,7 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
   const online = all.filter((d) => d.online).length;
   // The busiest over the window first by default; any column sorts, and
   // rows move at most every 30 s.
-  const { rows, sort, pick } = useSteadyRows(
+  const { rows, sort, pick, holdProps } = useSteadyRows(
     "clients",
     found,
     (d) => d.mac,
@@ -104,7 +104,7 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
                     {th("Last seen", "last")}
                   </tr>
                 </thead>
-                <tbody ref={body}>
+                <tbody ref={body} {...holdProps}>
                   {rows.map((d) => (
                     <tr key={d.mac} data-key={d.mac}>
                       <td>

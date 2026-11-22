@@ -12,6 +12,8 @@ import { LAYER_COLORS, OTHER_COLOR } from "./view";
 export interface ConnMap { nodes: SankeyNode[]; links: SankeyLink[]; href: Record<string, string> }
 
 const NEUTRAL = "#7FB2F0";
+/** A name that carries less of the window than this folds into the rest: small bands would pile their labels up. */
+const MIN_SHARE = 0.03;
 const KINDS = [
   { id: "app", other: "apps" },
   { id: "domain", other: "domains" },
@@ -40,10 +42,17 @@ export function connMap(name: string, rows: FlowRow[], top = 5): ConnMap {
     .filter((f) => f.v > 0);
   if (flows.length === 0) return { nodes: [], links: [], href: {} };
   // The busiest keys of each column; the rest fold into one node.
+  const total = flows.reduce((a, f) => a + f.v, 0);
   const kept = KINDS.map((_, c) => {
     const sum = new Map<string, number>();
     for (const f of flows) sum.set(f.keys[c].id, (sum.get(f.keys[c].id) ?? 0) + f.v);
-    return new Set([...sum.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, top).map(([k]) => k));
+    return new Set(
+      [...sum.entries()]
+        .filter(([, v]) => v >= MIN_SHARE * total)
+        .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+        .slice(0, top)
+        .map(([k]) => k),
+    );
   });
   const nodeId = (c: number, k: Key) => `${KINDS[c].id}:${kept[c].has(k.id) ? k.id : "*"}`;
   const nodes = new Map<string, SankeyNode & { v: number }>();

@@ -150,7 +150,7 @@ function TopClients({ d }: { d: OverviewData }) {
     <Card label="Top clients" title="Top clients" aside={<a href="#/clients" class="small">all clients</a>}>
       {d.topClients.length === 0 && <Empty>No clients in this period.</Empty>}
       {d.topClients.map((c) => (
-        <div key={c.mac} class="row-link">
+        <div key={c.mac} class="row-item">
           <div class="row-between">
             <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
             <span class="soft small">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>

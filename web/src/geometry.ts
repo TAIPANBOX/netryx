@@ -135,7 +135,9 @@ const NODE_W = 10;
 /** Where each column stands: the three-column chart as it always was, more columns spread evenly over the width. */
 function columns(cols: number, width: number): number[] {
   if (cols === 3 && width === 600) return COLS;
-  const last = width - 20;
+  // Every column but the first labels its nodes on its right, the last too:
+  // it stands far enough in to leave them room.
+  const last = width - 170;
   return Array.from({ length: cols }, (_, c) => 20 + (c * (last - 20)) / Math.max(1, cols - 1));
 }
 

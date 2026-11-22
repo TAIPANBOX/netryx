@@ -27,7 +27,7 @@ export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r
   const all = polled.data ?? [];
   const cats = categoriesIn(all);
   const found = all.filter((a) => (!cat || a.app.category === cat) && matchApp(a, q));
-  const { rows, sort, pick } = useSteadyRows(
+  const { rows, sort, pick, holdProps } = useSteadyRows(
     "apps",
     found,
     (a) => a.app.id,
@@ -86,7 +86,7 @@ export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r
                     <th>Rules</th>
                   </tr>
                 </thead>
-                <tbody ref={body}>
+                <tbody ref={body} {...holdProps}>
                   {rows.map((a) => {
                     const name = a.other ? "other apps" : appName(a.app.name);
                     const href = appHref(a);
@@ -166,7 +166,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
               <Card label="Clients of the app" title="Clients">
                 {d.clients.length === 0 && <Empty>No client used it in this period.</Empty>}
                 {d.clients.map((c) => (
-                  <div key={c.mac} class="row-link">
+                  <div key={c.mac} class="row-item">
                     <div class="row-between">
                       <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
                       <span class="soft small nowrap">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>

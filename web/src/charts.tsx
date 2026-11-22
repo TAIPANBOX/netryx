@@ -116,8 +116,10 @@ export function Sankey({ nodes, links, label, cols = 3, width = 600, height = 30
       ))}
       {out.nodes.map((n) => {
         const icon = n.col === 1 && n.icon;
+        // Three columns label the last on its left; more columns label every
+        // one on its right, where the layout left them room.
         const [tx, ty, anchor] =
-          n.col === 0 ? [n.x, n.y - 8, "start"] : n.col === last ? [n.x - 8, n.y + n.h / 2 + 4, "end"] : [n.x + (icon ? 36 : 16), n.y + n.h / 2 + 4, "start"];
+          n.col === 0 ? [n.x, n.y - 8, "start"] : n.col === last && cols <= 3 ? [n.x - 8, n.y + n.h / 2 + 4, "end"] : [n.x + (icon ? 36 : 16), n.y + n.h / 2 + 4, "start"];
         const room = cols > 3 ? 22 : icon ? 23 : 26;
         const body = (
           <Fragment>

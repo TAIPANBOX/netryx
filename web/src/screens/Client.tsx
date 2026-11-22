@@ -67,7 +67,7 @@ export function Traffic({ d, range, split, onSplit }: { d: Pick<ClientData, "tra
 
 export function Apps({ apps, mac, win }: { apps: AppUsage[]; mac: string; win: Win }) {
   const [open, setOpen] = useState<string>("");
-  const { rows, sort, pick } = useSteadyRows(
+  const { rows, sort, pick, holdProps } = useSteadyRows(
     "client-apps",
     apps,
     (a) => a.app.id,
@@ -91,7 +91,7 @@ export function Apps({ apps, mac, win }: { apps: AppUsage[]; mac: string; win: W
         <Empty>No apps in this period.</Empty>
       ) : (
         <div class="scroll-x">
-          <div class="apps-table" ref={list}>
+          <div class="apps-table" ref={list} {...holdProps}>
             <div class="apps-grid apps-head">
               {head("App", "name", "asc")}
               {head("Category", "category", "asc")}
@@ -221,6 +221,3 @@ export function Where({ dest }: { dest: Destinations }) {
     </Card>
   );
 }
-
-// Client rules: the rules that reach this device, from the same list as the
-// Rules tab, its time limits, and its alerts.

@@ -3,7 +3,7 @@
 // Preact so node can test it.
 
 import type { App, Live, LivePoint } from "./types";
-import { appName, category, countryName, share } from "./format";
+import { appName, category, countryName, rate, ratePair, share } from "./format";
 import type { IconManifest } from "./icons";
 import { isRealCountry } from "./view";
 
@@ -210,4 +210,18 @@ export interface CutAnswer {
 export function cutNote(a: CutAnswer): string {
   if (a.held !== false) return "Cut.";
   return `Cut, but ${a.note || "the connection may come back on its next packet"}.`;
+}
+
+/**
+ * The Speed tile of a device's Now: the average over the window picked leads
+ * (a steady figure), the last seconds beside it; before the router has an
+ * average, the last seconds alone, said so.
+ */
+export function speedTile(recent: { down: number; up: number } | undefined, now: { down: number; up: number }, win: string): { value: string; sub: string } {
+  if (!recent) {
+    const p = ratePair(now.down, now.up);
+    return { value: `↓ ${p.down} · ↑ ${p.up}`, sub: `${p.unit}, the last few seconds (no average yet)` };
+  }
+  const p = ratePair(recent.down, recent.up);
+  return { value: `↓ ${p.down} · ↑ ${p.up}`, sub: `${p.unit}, average over ${win} · right now ↓ ${rate(now.down)}` };
 }
