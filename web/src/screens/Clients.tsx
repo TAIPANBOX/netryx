@@ -91,14 +91,14 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
                   <tr>
                     {th("State", "state")}
                     {th("Name", "name", "asc")}
+                    {th(`Now, ${windowLabel(win)} avg ↓ · ↑`, "now", "desc", true)}
+                    {th("24 h ↓ · ↑", "day", "desc", true)}
+                    <th>App</th>
                     {th("Vendor", "vendor", "asc")}
                     <th>IPv4 · IPv6</th>
                     <th>MAC</th>
                     <th>Connection</th>
                     <th>Group</th>
-                    {th(`Now, ${windowLabel(win)} avg ↓ · ↑`, "now", "desc", true)}
-                    {th("24 h ↓ · ↑", "day", "desc", true)}
-                    <th>App</th>
                     {th("Countries", "countries", "desc", true)}
                     {th("Last seen", "last")}
                   </tr>
@@ -114,6 +114,24 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
                         <a href={`#/client/${mac(d.mac)}`} class="strong">{deviceName(d)}</a>
                         {d.hostname && d.hostname !== deviceName(d) && <div class="muted small">{d.hostname}</div>}
                       </td>
+                      <td class="num small" title={`average over the last ${windowLabel(win)}; right now ↓ ${rate(d.rate.down)} · ↑ ${rate(d.rate.up)}`}>
+                        ↓ {rate(d.recent?.down ?? 0)}
+                        <br />{" "}↑ {rate(d.recent?.up ?? 0)}
+                      </td>
+                      <td class="num small">
+                        ↓ {bytes(d.last24h.down)}
+                        <br />{" "}↑ {bytes(d.last24h.up)}
+                      </td>
+                      <td>
+                        {d.topApp ? (
+                          <span class="app-cell">
+                            <AppIcon id={d.topApp.id} name={appName(d.topApp.name)} size={20} />
+                            <span>{appName(d.topApp.name)}</span>
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                       <td class="soft">{d.vendor || "-"}</td>
                       <td class="mono small">
                         {[...(d.ipv4 ?? []), ...(d.ipv6 ?? [])].map((ip) => (
@@ -127,24 +145,6 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
                       </td>
                       <td class="soft small">{linkText(d)}</td>
                       <td class="soft">{groupName(d.group, groups) || "-"}</td>
-                      <td class="num small" title={`average over the last ${windowLabel(win)}; right now ↓ ${rate(d.rate.down)} · ↑ ${rate(d.rate.up)}`}>
-                        ↓ {rate(d.recent?.down ?? 0)}
-                        <br />↑ {rate(d.recent?.up ?? 0)}
-                      </td>
-                      <td class="num small">
-                        ↓ {bytes(d.last24h.down)}
-                        <br />↑ {bytes(d.last24h.up)}
-                      </td>
-                      <td>
-                        {d.topApp ? (
-                          <span class="app-cell">
-                            <AppIcon id={d.topApp.id} name={appName(d.topApp.name)} size={20} />
-                            <span>{appName(d.topApp.name)}</span>
-                          </span>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
                       <td class="num">{d.countryCount}</td>
                       <td class="soft small">{d.online ? "online now" : `${date(d.last)} ${time(d.last)}`}</td>
                     </tr>

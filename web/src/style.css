@@ -331,14 +331,15 @@ select.input { padding-right: 8px; }
 /* below 720 px a house table (and the networks) is a list of rows, each a small card: no
    sideways scrolling to reach the Rules column */
 @media (max-width: 720px) {
-  .house-table, .net-table { min-width: 0; }
-  .house-table thead, .net-table thead { display: none; }
+  .house-table, .net-table, .clients-table { min-width: 0; }
+  .house-table thead, .net-table thead, .clients-table thead { display: none; }
   .house-table, .house-table tbody, .house-table tr, .house-table td,
-  .net-table, .net-table tbody, .net-table tr, .net-table td { display: block; width: 100%; }
-  .house-table tr, .net-table tr { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
-  .house-table td, .net-table td { border: 0; padding: 2px 0; }
-  .house-table td.num, .net-table td.num { text-align: left; }
-  .house-table td.num br, .net-table td.num br { display: none; }
+  .net-table, .net-table tbody, .net-table tr, .net-table td,
+  .clients-table, .clients-table tbody, .clients-table tr, .clients-table td { display: block; width: 100%; }
+  .house-table tr, .net-table tr, .clients-table tr { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
+  .house-table td, .net-table td, .clients-table td { border: 0; padding: 2px 0; }
+  .house-table td.num, .net-table td.num, .clients-table td.num { text-align: left; }
+  .house-table td.num br, .net-table td.num br, .clients-table td.num br { display: none; }
 }
 
 /* calm live tables */

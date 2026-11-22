@@ -34,7 +34,7 @@ export function useSteadyRows<T>(table: string, rows: T[], key: (r: T) => string
 }
 
 function arrow(sort: SortState, cols: string[]) {
-  return cols.includes(sort.col) ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
+  return cols.includes(sort.col) ? (sort.dir === "asc" ? " ▴" : " ▾") : "";
 }
 
 /** A sortable header cell of a table. */
