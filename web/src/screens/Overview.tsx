@@ -1,10 +1,11 @@
 // Overview: the state of the line, the house's traffic over the period, and who,
 // what and where it went to.
 
+import { ClientLink } from "./entity";
 import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { Overview as OverviewData, Range } from "../types";
-import { getJSON, mac, usePoll } from "../api";
+import { getJSON, usePoll } from "../api";
 import { stepOf } from "../query";
 import { splitSeries, timeTicks } from "../geometry";
 import { StackedArea, Legend, Bars, type Layer } from "../charts";
@@ -149,9 +150,9 @@ function TopClients({ d }: { d: OverviewData }) {
     <Card label="Top clients" title="Top clients" aside={<a href="#/clients" class="small">all clients</a>}>
       {d.topClients.length === 0 && <Empty>No clients in this period.</Empty>}
       {d.topClients.map((c) => (
-        <a key={c.mac} href={c.other ? undefined : `#/client/${mac(c.mac)}`} class="row-link">
+        <div key={c.mac} class="row-link">
           <div class="row-between">
-            <span class="strong">{c.mac === "other" ? "other devices" : clientName(c)}</span>
+            <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
             <span class="soft small">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>
           </div>
           <Bars parts={[{ pct: house ? (100 * c.down) / house : 0, kind: "down" }, { pct: house ? (100 * c.up) / house : 0, kind: "up" }]} />
@@ -164,7 +165,7 @@ function TopClients({ d }: { d: OverviewData }) {
               <span>{countryList(c.countries) || "no countries"}</span>
             </div>
           )}
-        </a>
+        </div>
       ))}
     </Card>
   );

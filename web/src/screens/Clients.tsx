@@ -1,12 +1,13 @@
 // Clients: every device the router knows, as a table with the columns of the
 // spec's section 2.2. Not in the mockup; styled like its tables.
 
+import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { windowLabel, type Win } from "../query";
 import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { Device, Group } from "../types";
-import { getJSON, mac, usePoll } from "../api";
+import { getJSON, usePoll } from "../api";
 import { Header, Status, Loading, Empty, AppIcon } from "../ui";
 import { bytes, rate, time, date, band, appName, num, groupName } from "../format";
 
@@ -111,7 +112,7 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
                         <span class="sr">{d.online ? "online" : "offline"}</span>
                       </td>
                       <td>
-                        <a href={`#/client/${mac(d.mac)}`} class="strong">{deviceName(d)}</a>
+                        <ClientLink mac={d.mac} name={deviceName(d)} class="strong" />
                         {d.hostname && d.hostname !== deviceName(d) && <div class="muted small">{d.hostname}</div>}
                       </td>
                       <td class="num small" title={`average over the last ${windowLabel(win)}; right now ↓ ${rate(d.rate.down)} · ↑ ${rate(d.rate.up)}`}>

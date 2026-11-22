@@ -1,11 +1,12 @@
 // Apps: every app the house used in the period, and one app across the
 // house: who used it, where it went, how it was named, when it moved.
 
+import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { AppDetail, HouseApp, Range } from "../types";
-import { getJSON, mac, usePoll } from "../api";
+import { getJSON, usePoll } from "../api";
 import { RANGES, stepOf, windowLabel, type Win } from "../query";
 import { splitSeries, timeTicks } from "../geometry";
 import { AreaChart, Bars, Legend } from "../charts";
@@ -165,14 +166,14 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
               <Card label="Clients of the app" title="Clients">
                 {d.clients.length === 0 && <Empty>No client used it in this period.</Empty>}
                 {d.clients.map((c) => (
-                  <a key={c.mac} href={c.other ? undefined : `#/client/${mac(c.mac)}`} class="row-link">
+                  <div key={c.mac} class="row-link">
                     <div class="row-between">
-                      <span class="strong">{c.mac === "other" ? "other devices" : clientName(c)}</span>
+                      <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
                       <span class="soft small nowrap">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>
                     </div>
                     {c.other && c.mac !== "other" && <div class="muted small">{c.mac === "router" ? "the router's own traffic" : "no hardware address"}</div>}
                     <Bars thin parts={[{ pct: d.down + d.up ? (100 * (c.down + c.up)) / (d.down + d.up) : 0, kind: "down" }]} />
-                  </a>
+                  </div>
                 ))}
               </Card>
               <Card label="Where the app goes" title="Countries and networks">

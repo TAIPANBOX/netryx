@@ -1,102 +1,27 @@
-// Client card, mode "Now": what the device is doing right now, polled
-// every 2 s while the page is visible. Layout: the device and the live line, four tiles,
-// the last five minutes by app, the active apps, the connections and where
-// they go.
+// Pieces of the client's full view (Client360.tsx) for now: four tiles, the
+// last five minutes by app, the active apps, the connections and where they
+// go, from the live view polled every 2 s.
 
-import { h, type ComponentChildren } from "preact";
+import { h } from "preact";
 import { useContext, useRef } from "preact/hooks";
-import type { App, AppUsage, Device, Live, LiveApp, LiveConn, LivePlace } from "../types";
+import type { App, AppUsage, Live, LiveApp, LiveConn, LivePlace } from "../types";
 import { windowLabel, type Win } from "../query";
 import { useFlip, useSteadyRows } from "./table";
-import { getJSON, mac as enc, usePoll } from "../api";
+
 import { StackedArea, Legend, type Layer } from "../charts";
-import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon, IconContext } from "../ui";
-import { appName, category, clock, countryName, duration, nameSource, num, plural, rate, ratePair } from "../format";
+import { Pills, Card, CC, Empty, AppIcon, IconContext } from "../ui";
+import { appName, category, countryName, duration, nameSource, num, plural, rate, ratePair } from "../format";
 import { LAYER_COLORS, OTHER_COLOR, UP_COLOR } from "../view";
 import { layerColor } from "../icons";
 import { appsTileSub, connKeys, layerLabel, liveChart, liveSummary, placeName, sparkPath, whereText, LIVE_TICKS } from "../live";
-import { deviceName, linkText } from "./Clients";
-import { BlockApp, CutButton, DeviceActions, DeviceSecurity, CUT_NOTE } from "./controls";
+
+import { BlockApp, CutButton, CUT_NOTE } from "./controls";
 import { useSession } from "../ui";
 
-/** How often the card asks the router; the router syncs at 2 s while it is asked. */
-const EVERY_MS = 2_000;
 /** Connections listed; the API sends the busiest 50. */
 const CONNS_SHOWN = 12;
 
-export function ClientLive({ mac, modes, win, onWin }: { mac: string; modes: ComponentChildren; win: Win; onWin: (w: Win) => void }) {
-  const base = `/api/devices/${enc(mac)}`;
-  const dev = usePoll((s) => getJSON<Device>(`${base}?window=${win}`, s), 10_000, [mac, win]);
-  // Each app's average over the window, from the router's minutes: the order
-  // of the active apps follows it, not the last two seconds.
-  const recent = usePoll((s) => getJSON<AppUsage[]>(`${base}/apps?range=1h&window=${win}`, s), 10_000, [mac, win]);
-  const polled = usePoll((s) => getJSON<Live>(`${base}/live`, s), EVERY_MS, [mac]);
-  // Apps seen in this view, so a chart layer keeps its name after the app
-  // stops and leaves the apps list.
-  const seen = useRef(new Map<string, App>());
-  const l = polled.data;
-  for (const a of l?.apps ?? []) seen.current.set(a.app.id, a.app);
-  for (const c of l?.conns ?? []) seen.current.set(c.app.id, c.app);
-  const name = dev.data ? deviceName(dev.data) : mac;
-  const notFound = polled.status === 404 && !l;
-
-  return (
-    <div class="page">
-      <Header section="clients" pills={modes} win={win} onWin={onWin} />
-      <main class="main">
-        <div class="crumbs">
-          <a href="#/clients">Clients</a> / {name}
-        </div>
-        {notFound ? <Empty>The router knows no device with MAC {mac.toUpperCase()}.</Empty> : <Status polled={polled} />}
-        {!l ? (
-          notFound ? null : <Loading />
-        ) : (
-          <div class="stack">
-            <LiveDevice d={dev.data} name={name} at={polled.at} stale={!!polled.error} />
-            <LiveTiles l={l} />
-            <LiveTraffic l={l} seen={seen.current} />
-            <LiveApps apps={l.apps ?? []} mac={mac} recent={recent.data ?? []} win={win} />
-            <div class="grid-2">
-              <LiveConns mac={mac} conns={l.conns ?? []} flows={l.flows} />
-              <LivePlaces places={l.places ?? []} />
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
-
-function LiveDevice({ d, name, at, stale }: { d?: Device; name: string; at?: number; stale: boolean }) {
-  const meta = d ? [...(d.ipv4 ?? []).slice(0, 1), linkText(d), d.online ? "online" : "offline"].filter(Boolean).join(" · ") : "";
-  return (
-    <section aria-label="Device" class="card live-device">
-      <div class="device-id">
-        <div class="device-icon device-icon-sm">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#9BD0FF" stroke-width="1.8" aria-hidden="true">
-            <rect x="2" y="4" width="20" height="13" rx="2" />
-            <path d="M8 21h8M12 17v4" />
-          </svg>
-        </div>
-        <div class="col-tight">
-          <h1>{name}</h1>
-          {meta && <span class="soft small">{meta}</span>}
-        </div>
-      </div>
-      <div class="live-line" role="status">
-        <span class={stale ? "dot dot-off" : "dot dot-live"} aria-hidden="true" />
-        <span>
-          {stale ? "Live: the router is not answering" : "Live"} · updated every {EVERY_MS / 1000} s
-          {at ? ` · last at ${clock(new Date(at).toISOString())}` : ""}
-        </span>
-      </div>
-      {d && <DeviceActions d={d} />}
-      {d && <DeviceSecurity d={d} />}
-    </section>
-  );
-}
-
-function LiveTiles({ l }: { l: Live }) {
+export function LiveTiles({ l }: { l: Live }) {
   const s = liveSummary(l);
   const r = ratePair(l.rate.down, l.rate.up);
   const conns = l.conns ?? [];
@@ -129,7 +54,7 @@ function LiveTiles({ l }: { l: Live }) {
   );
 }
 
-function LiveTraffic({ l, seen }: { l: Live; seen: Map<string, App> }) {
+export function LiveTraffic({ l, seen }: { l: Live; seen: Map<string, App> }) {
   const manifest = useContext(IconContext);
   const c = liveChart(l.series, 3);
   const used = new Set<string>();
@@ -160,7 +85,7 @@ function LiveTraffic({ l, seen }: { l: Live; seen: Map<string, App> }) {
   );
 }
 
-function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: string; recent: AppUsage[]; win: Win }) {
+export function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: string; recent: AppUsage[]; win: Win }) {
   const manifest = useContext(IconContext);
   const avg = new Map(recent.map((r) => [r.app.id, r.recent ?? { up: 0, down: 0 }]));
   const avgOf = (a: LiveApp) => avg.get(a.app.id) ?? { up: a.up, down: a.down };
@@ -223,7 +148,7 @@ function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: string; re
   );
 }
 
-function LiveConns({ mac, conns, flows }: { mac: string; conns: LiveConn[]; flows: number }) {
+export function LiveConns({ mac, conns, flows }: { mac: string; conns: LiveConn[]; flows: number }) {
   const shown = conns.slice(0, CONNS_SHOWN);
   const keys = connKeys(shown);
   const rest = Math.max(0, flows - shown.length);
@@ -263,7 +188,7 @@ function LiveConns({ mac, conns, flows }: { mac: string; conns: LiveConn[]; flow
   );
 }
 
-function LivePlaces({ places }: { places: LivePlace[] }) {
+export function LivePlaces({ places }: { places: LivePlace[] }) {
   const total = places.reduce((a, p) => a + p.down, 0);
   return (
     <Card label="Destinations now" title="Destinations now">

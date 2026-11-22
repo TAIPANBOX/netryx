@@ -2,11 +2,12 @@
 // period, who went there and which rules close them; and one country: its
 // clients, apps and networks over the period.
 
+import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
 import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { CountryDetail, HouseDestinations, Range } from "../types";
-import { getJSON, mac, usePoll } from "../api";
+import { getJSON, usePoll } from "../api";
 import { RANGES, windowLabel, type Win } from "../query";
 import { Bars } from "../charts";
 import { Header, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
@@ -181,14 +182,14 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
               <Card label="Clients that went there" title="Clients">
                 {d.clients.length === 0 && <Empty>No client went there in this period.</Empty>}
                 {d.clients.map((c) => (
-                  <a key={c.mac} href={c.other ? undefined : `#/client/${mac(c.mac)}`} class="row-link">
+                  <div key={c.mac} class="row-link">
                     <div class="row-between">
-                      <span class="strong">{c.mac === "other" ? "other devices" : clientName(c)}</span>
+                      <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
                       <span class="soft small nowrap">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>
                     </div>
                     {c.other && c.mac !== "other" && <div class="muted small">{c.mac === "router" ? "the router's own traffic" : "no hardware address"}</div>}
                     <Bars thin parts={[{ pct: d.down + d.up ? (100 * (c.down + c.up)) / (d.down + d.up) : 0, kind: "down" }]} />
-                  </a>
+                  </div>
                 ))}
               </Card>
               <Card label="Apps that went there" title="Apps">
