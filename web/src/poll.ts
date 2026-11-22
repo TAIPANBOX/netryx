@@ -49,6 +49,12 @@ export function createPoller<T>(o: PollerOptions<T>): Poller {
   function run() {
     timer = null;
     if (disposed || paused || ctl) return;
+    // The page may have turned still (hidden, paused) with no event to say
+    // so: then wait for resume() instead of asking.
+    if (loadedOnce && o.hidden()) {
+      paused = true;
+      return;
+    }
     const mine = new AbortController();
     ctl = mine;
     o.load(mine.signal).then(

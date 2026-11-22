@@ -83,6 +83,8 @@ export function useFlip(ref: RefObject<HTMLElement>) {
       if (still || before === undefined || Math.abs(before - top) < 1) continue;
       c.style.transition = "none";
       c.style.transform = `translateY(${before - top}px)`;
+      // Read layout so the start position takes effect before the move.
+      void c.offsetHeight;
       requestAnimationFrame(() => {
         c.style.transition = "transform 450ms ease";
         c.style.transform = "";

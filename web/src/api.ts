@@ -198,17 +198,20 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
   loadRef.current = load;
 
   // Pause holds the figures still: no poll asks again while it is on, except
-  // a screen's first load, so a screen opened while paused still shows data.
-  const hasData = useRef(false);
-  hasData.current = state.data !== undefined;
+  // the first load after the screen opened or its question changed (another
+  // window, period, filter), so what is shown always answers what is asked.
   useEffect(() => {
-    const hidden = () => document.visibilityState === "hidden" || (isPaused() && hasData.current);
+    let answered = false;
+    const hidden = () => document.visibilityState === "hidden" || (isPaused() && answered);
     const poller = createPoller<T>({
       load: (signal) => loadRef.current(signal),
       everyMs,
       clock: { setTimeout: (fn, ms) => window.setTimeout(fn, ms), clearTimeout: (h) => window.clearTimeout(h as number) },
       hidden,
-      onData: (data) => setState({ data, at: Date.now() }),
+      onData: (data) => {
+        answered = true;
+        setState({ data, at: Date.now() });
+      },
       onError: (e) => {
         const status = e instanceof ApiError ? e.status : 0;
         const error = e instanceof Error ? e.message : String(e);

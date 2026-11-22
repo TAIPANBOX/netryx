@@ -29,6 +29,7 @@ Feature: the live figures settle, hold their order and sort as the owner likes
     # -> TestLiveFlowsCanBeReadByRecentVolume
     # -> TestOldMinutesFallOutOfTheWindow
     # -> TestASlotReusedLaterHoldsNothingOld
+    # -> TestAReusedKeyStartsItsWindowEmpty
     # -> TestLiveFlowsAreAskedByTheWindow
 
   Scenario: rows hold their places while the figures update
@@ -49,5 +50,6 @@ Feature: the live figures settle, hold their order and sort as the owner likes
   Scenario: Pause holds the page still
     Given the owner wants to read the figures
     When they press Pause
-    Then nothing on the page is asked again until they press it once more
-    # (the pause: "Pause freezes every poll until it is lifted" in web/src/steady.test.ts)
+    Then nothing on the page is asked again until they press it once more, except what they change while paused
+    # (the pause: "Pause freezes every poll until it is lifted" in web/src/steady.test.ts and
+    #  "a page that turns still between polls asks no more until it moves again" in web/src/poll.test.ts)

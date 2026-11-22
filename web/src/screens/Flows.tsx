@@ -74,11 +74,7 @@ export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWi
   // busiest over it come first; rows move at most every 30 s.
   const down = (f: FlowRow) => (live ? f.winDown ?? 0 : f.down);
   const up = (f: FlowRow) => (live ? f.winUp ?? 0 : f.up);
-  const { rows, sort, pick } = useSteadyRows(
-    "flows",
-    loaded,
-    flowKey,
-    {
+  const getters: Record<string, (f: FlowRow) => string | number> = {
       vol: (f) => down(f) + up(f),
       down,
       up,
@@ -89,9 +85,12 @@ export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWi
       app: (f) => appName(f.app.name),
       cc: (f) => f.cc || "--",
       dur: (f) => seconds(f, polled.at ?? Date.now()),
-    },
-    { col: "vol", dir: "desc" },
-  );
+  };
+  // Live and the journal sort apart: live by volume over the window, the
+  // journal newest first, each remembered on its own.
+  const liveRows = useSteadyRows("flows-live", live ? loaded : [], flowKey, getters, { col: "vol", dir: "desc" });
+  const journalRows = useSteadyRows("flows-journal", live ? [] : loaded, flowKey, getters, { col: "end", dir: "desc" });
+  const { rows, sort, pick } = live ? liveRows : journalRows;
   const list = useRef<HTMLDivElement>(null);
   useFlip(list);
   const head = (label: ComponentChildren, col: string, first: "asc" | "desc" = "asc", also?: string[]) => (

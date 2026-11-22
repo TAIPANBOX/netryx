@@ -589,6 +589,8 @@ func (t *Table) restart(en *entry, now time.Time, out *[]Delta) {
 	en.Start = now
 	en.Name, en.NameSrc = "", ""
 	en.App, en.Geo = enrich.App{}, enrich.ASInfo{}
+	// Nor has it moved anything yet in the window.
+	en.win, en.winAt = [winSlots][2]uint64{}, 0
 }
 
 // bounded is a map capped at a fixed size that forgets its oldest key first.

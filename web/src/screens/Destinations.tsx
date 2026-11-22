@@ -29,6 +29,7 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
     {
       name: (c) => countryName(c.cc),
       clients: (c) => c.clients,
+      share: (c) => c.share,
       bytes: (c) => c.down + c.up,
       now: (c) => (c.recent ? c.recent.down + c.recent.up : 0),
     },
@@ -61,7 +62,7 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
                     <tr>
                       {th("Country", "name", "asc")}
                       {th("Clients", "clients")}
-                      {th("Share", "bytes")}
+                      {th("Share", "share")}
                       {th(`${periodOf(range)} ↓ · ↑`, "bytes", "desc", true)}
                       {th(`Now, ${windowLabel(win)} avg`, "now", "desc", true)}
                       <th>Rules</th>

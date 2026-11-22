@@ -391,7 +391,10 @@ type Store struct {
 	// at its first delta. The minutes are not saved, so before it only the
 	// hours and days know what happened, and a delta stamped earlier does
 	// not make the minutes before it whole.
-	since   time.Time
+	since time.Time
+	// firstAt is when the first delta was taken: nothing before it in its
+	// minute was counted, so a window starts there at the earliest.
+	firstAt time.Time
 	dropped uint64
 	late    uint64
 	minCap  int
@@ -563,6 +566,7 @@ func (s *Store) Add(d flows.Delta) {
 	}
 	if s.since.IsZero() {
 		s.since = now.Truncate(time.Minute)
+		s.firstAt = now
 	}
 	d.MAC, d.App, d.CC = s.intern(d.MAC), s.intern(d.App), s.intern(d.CC)
 	d.Domain, d.Org, d.NameSrc = s.intern(d.Domain), s.intern(d.Org), s.intern(d.NameSrc)
@@ -1116,10 +1120,14 @@ func (s *Store) Recent(f Filter, dim string, span time.Duration) ([]Row, time.Du
 	}
 	now := s.now().UTC()
 	from := now.Add(-span).Truncate(time.Minute)
+	start := from
+	if start.Before(s.firstAt) {
+		start = s.firstAt.UTC()
+	}
 	if from.Before(s.since) {
 		from = s.since
 	}
-	covered := now.Sub(from)
+	covered := now.Sub(start)
 	if covered <= 0 {
 		return nil, 0
 	}

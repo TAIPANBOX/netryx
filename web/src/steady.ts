@@ -22,8 +22,8 @@ export const MARGIN = 0.12;
  * The order to show: `rows` come in the order the chosen sort wants, each with
  * the value that sort is about (NaN for a column that is not a number). A new
  * row takes its place at once and a gone one leaves; the rest move only once
- * MIN_GAP_MS has passed since the last move and two neighbours shown in the
- * wrong order differ by more than MARGIN.
+ * MIN_GAP_MS has passed since the last move and two rows shown in the wrong
+ * order differ by more than MARGIN.
  */
 export function steadyOrder(prev: Steady | null, rows: { key: string; value: number }[], now: number, sortKey: string): Steady {
   const desired = rows.map((r) => r.key);
@@ -42,15 +42,19 @@ export function steadyOrder(prev: Steady | null, rows: { key: string; value: num
     shown.add(k);
   }
   if (now - prev.at < MIN_GAP_MS) return { order: kept, at: prev.at, sortKey };
-  for (let i = 0; i + 1 < kept.length; i++) {
-    const a = kept[i];
-    const b = kept[i + 1];
-    if ((rank.get(b) ?? 0) >= (rank.get(a) ?? 0)) continue;
-    const va = value.get(a) ?? NaN;
-    const vb = value.get(b) ?? NaN;
-    const big = Math.max(Math.abs(va), Math.abs(vb));
-    if (Number.isNaN(va) || Number.isNaN(vb) || (big > 0 && Math.abs(va - vb) > MARGIN * big)) {
-      return { order: desired, at: now, sortKey };
+  // Any two rows shown in the wrong order, not only neighbours: values that
+  // drift a little at a time can put a row far above the one shown first.
+  for (let i = 0; i < kept.length; i++) {
+    for (let j = i + 1; j < kept.length; j++) {
+      const a = kept[i];
+      const b = kept[j];
+      if ((rank.get(b) ?? 0) >= (rank.get(a) ?? 0)) continue;
+      const va = value.get(a) ?? NaN;
+      const vb = value.get(b) ?? NaN;
+      const big = Math.max(Math.abs(va), Math.abs(vb));
+      if (Number.isNaN(va) || Number.isNaN(vb) || (big > 0 && Math.abs(va - vb) > MARGIN * big)) {
+        return { order: desired, at: now, sortKey };
+      }
     }
   }
   return { order: kept, at: prev.at, sortKey };

@@ -83,3 +83,20 @@ func TestASlotReusedLaterHoldsNothingOld(t *testing.T) {
 		t.Fatalf("over 3 min at 12:12 %+v, want 150: minute 0's 4000 must not come back as minute 11", rows)
 	}
 }
+
+// A reused key is a new flow: its window starts empty, never with what the
+// connection before it moved.
+func TestAReusedKeyStartsItsWindowEmpty(t *testing.T) {
+	f := newFakes()
+	tb := NewTable(f.options())
+	tb.Sync(nil, t0)
+	tb.Apply(event(ct.New, 1, phone, 51001, youtube, 443, 0, 0), t0)
+	tb.Sync([]ct.Event{watch(1, 0, 50000)}, t0.Add(10*time.Second))
+	// The counter falls: the kernel reused the id for a new connection.
+	tb.Sync([]ct.Event{watch(1, 0, 30)}, t0.Add(20*time.Second))
+	tb.Sync([]ct.Event{watch(1, 0, 70)}, t0.Add(30*time.Second))
+	rows, _ := tb.Query(Query{Live: true, Window: 3 * time.Minute})
+	if len(rows) != 1 || rows[0].WinDown > 70 {
+		t.Fatalf("the new connection on the old key %+v: its window must hold only its own bytes", rows)
+	}
+}

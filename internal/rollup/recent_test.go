@@ -46,8 +46,10 @@ func TestRecentCoversOnlyWhatTheStoreSaw(t *testing.T) {
 	feed(s, delta(base.Add(40*time.Second), phone, "youtube", "US", 0, 900))
 	s.now = func() time.Time { return base.Add(90 * time.Second) }
 	rows, covered := s.Recent(Filter{}, "mac", 10*time.Minute)
-	if covered != 90*time.Second || len(rows) != 1 {
-		t.Errorf("covered %v rows %+v, want 1m30s from the store's first minute", covered, rows)
+	// The store's first delta came at 40 s into its minute: nothing before
+	// it was counted, so the window starts there, not at the minute.
+	if covered != 50*time.Second || len(rows) != 1 {
+		t.Errorf("covered %v rows %+v, want 50 s from the store's first delta", covered, rows)
 	}
 	if rows, covered := newTestStore(Options{}, later).Recent(Filter{}, "mac", time.Minute); rows != nil || covered != 0 {
 		t.Errorf("an empty store answered %+v over %v", rows, covered)

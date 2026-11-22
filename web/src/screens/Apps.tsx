@@ -34,6 +34,7 @@ export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r
       name: (a) => appName(a.app.name),
       category: (a) => category(a.app.category),
       clients: (a) => a.clients,
+      share: (a) => a.share,
       bytes: (a) => a.down + a.up,
       now: (a) => (a.recent ? a.recent.down + a.recent.up : 0),
     },
@@ -78,7 +79,7 @@ export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r
                     {th("App", "name", "asc")}
                     {th("Category", "category", "asc")}
                     {th("Clients", "clients")}
-                    {th("Share", "bytes")}
+                    {th("Share", "share")}
                     {th(`${periodOf(range)} ↓ · ↑`, "bytes", "desc", true)}
                     {th(`Now, ${windowLabel(win)} avg`, "now", "desc", true)}
                     <th>Rules</th>

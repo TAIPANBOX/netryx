@@ -88,3 +88,10 @@ test("the window pills are one, three and ten minutes", () => {
   assert.deepEqual(WINDOWS.map((w) => [w.id, w.label]), [["1m", "1 min"], ["3m", "3 min"], ["10m", "10 min"]]);
   assert.equal(windowLabel("10m"), "10 min");
 });
+
+test("a clear leader moves up even when every neighbour is close", () => {
+  let s: Steady = steadyOrder(null, rows([["a", 100], ["b", 99], ["c", 98]]), T, "now:desc");
+  // Drifted: each neighbour ~9% apart, but c is 21% above a.
+  s = steadyOrder(s, rows([["c", 121], ["b", 110], ["a", 100]]), T + 60_000, "now:desc");
+  assert.deepEqual(s.order, ["c", "b", "a"]);
+});
