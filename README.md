@@ -51,8 +51,8 @@ camera and a game console, on the real internet. The names, addresses and MACs a
 
 | | |
 |---|---|
-| ![A device's card over 24 hours: its traffic by app, and each app with its category, bytes and share](docs/images/client.png) | ![The rules: a daily TikTok limit for the Kids group, a bedtime for the game console, and two countries blocked for the camera](docs/images/rules.png) |
-| **A device**, here a phone over 24 hours, by app | **Rules**, a time limit, a bedtime and a country block |
+| ![A device's full view: who it is and where it is connected, a map of where its connections go, what it does now, its history, and the rules and limits on it](docs/images/client.png) | ![The rules: a daily TikTok limit for the Kids group, a bedtime for the game console, and two countries blocked for the camera](docs/images/rules.png) |
+| **A device**, its full view: where it is connected and where its connections go | **Rules**, a time limit, a bedtime and a country block |
 | ![Quarantine: a new smart plug waiting for approval, and two alerts, a new device and a camera that tried to reach a blocked country](docs/images/security.png) | ![The live connection table filtered to one phone, with the details of one flow: its app, country, network and bytes](docs/images/flows.png) |
 | **Security**, a newcomer in quarantine and the alerts | **Flows**, every live connection, searchable |
 | ![Every app the house used over 24 hours: its category, the clients that used it, its share of the house and its traffic, and the rules that limit it](docs/images/apps.png) | ![Every country the house reached over 24 hours with the clients that went there, its share and a block button, and the networks and domains behind them](docs/images/destinations.png) |
