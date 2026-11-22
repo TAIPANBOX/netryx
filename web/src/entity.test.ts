@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { entityHref, withFrom, crumbsFrom, filterHash, stretchHref } from "./entity";
+import { entityHref, withFrom, crumbsFrom, filterHash, stretchHref, parentsOf } from "./entity";
 import { parseRoute } from "./query";
 
 test("every kind of name leads to its own screen", () => {
@@ -56,4 +56,18 @@ test("a filter is written into the address, so Back and a shared link keep it", 
 test("a click on a stretch of a chart asks the flows of that stretch", () => {
   assert.equal(stretchHref("2026-11-22T20:00:00Z", 600), "#/flows?from=2026-11-22T20%3A00%3A00Z&to=2026-11-22T20%3A10%3A00Z");
   assert.equal(stretchHref("not a time", 600), undefined);
+});
+
+test("a thing's view names what it belongs to, each a link", () => {
+  assert.deepEqual(parentsOf({ kind: "app", id: "youtube" }, { app: { id: "youtube", name: "YouTube", category: "video" } }), [{ label: "Video", href: "#/apps?cat=video" }]);
+  assert.deepEqual(parentsOf({ kind: "app", id: "x" }, { app: { id: "x", name: "X", category: "other" } }), []);
+  assert.deepEqual(parentsOf({ kind: "network", asn: 13335 }, { countries: [{ cc: "US" }, { cc: "DE" }, { cc: "--" }] }), [
+    { label: "United States", href: "#/destination/US" },
+    { label: "Germany", href: "#/destination/DE" },
+  ]);
+  assert.deepEqual(parentsOf({ kind: "domain", name: "a.example" }, { apps: [{ app: { id: "youtube", name: "YouTube" } }, { app: { id: "unknown", name: "unknown" } }] }), [{ label: "YouTube", href: "#/app/youtube" }]);
+  assert.deepEqual(parentsOf({ kind: "client", mac: "aa:bb:cc:dd:ee:01" }, { group: "kids" }, { group: () => "Kids" }), [{ label: "Kids", href: "#/group/kids" }]);
+  assert.deepEqual(parentsOf({ kind: "client", mac: "aa:bb:cc:dd:ee:01" }, { group: "" }), []);
+  assert.deepEqual(parentsOf({ kind: "country", cc: "US" }, {}), []);
+  assert.deepEqual(parentsOf({ kind: "app", id: "youtube" }, undefined), []);
 });

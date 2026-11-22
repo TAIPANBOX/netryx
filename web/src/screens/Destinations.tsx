@@ -4,6 +4,7 @@
 
 import { EntityLink, ClientNames } from "./entity";
 import { ClientLink } from "./entity";
+import { ChipChain } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
 import { SortTh, useFlip, useSteadyRows } from "./table";
@@ -159,7 +160,7 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
       <Header section="destinations" range={range} onRange={onRange} />
       <main class="main">
         <Status polled={polled} />
-        <p class="crumbs"><a href="#/destinations">Destinations</a> / {countryName(cc)}</p>
+        <ChipChain base={[{ label: "Destinations", href: "#/destinations" }]} last={countryName(cc)} />
         {!d ? (
           <Loading />
         ) : (

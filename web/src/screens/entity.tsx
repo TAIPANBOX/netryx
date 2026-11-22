@@ -4,11 +4,13 @@
 // link as a link does.
 
 import { h, Fragment, type ComponentChildren } from "preact";
-import { entityHref, withFrom, type Entity } from "../entity";
+import { crumbsFrom, entityHref, withFrom, type Crumb, type Entity } from "../entity";
+import { manifestName } from "../rules";
 import type { AppUsage, ClientRef, Device, NetworkView } from "../types";
 import { clientsLine } from "../house";
 import { getJSON, mac as enc, usePoll } from "../api";
-import { AppIcon, Empty, Loading } from "../ui";
+import { AppIcon, Empty, IconContext, Loading } from "../ui";
+import { useContext } from "preact/hooks";
 import { appName, bytes, clientName, date, rate, time, groupName } from "../format";
 import { whereConnected } from "../client360";
 import { useCards } from "./windows";
@@ -114,5 +116,31 @@ export function ClientNames({ n, top, from = "" }: { n: number; top: ClientRef[]
       ))}
       {rest > 0 && ` and ${rest} more`}
     </span>
+  );
+}
+
+/**
+ * Where a view sits, as a chain of chips: the path the owner took (or the
+ * screen it belongs under), the thing itself, and the things it belongs to.
+ */
+export function ChipChain({ from, base, last, parents = [] }: { from?: string; base: Crumb[]; last: string; parents?: Crumb[] }) {
+  const appNames = manifestName(useContext(IconContext));
+  const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
+  const taken = crumbsFrom(from, { app: appNames, group: (id) => groupName(id, groups) });
+  const path = taken.length ? taken : base;
+  return (
+    <nav class="chips" aria-label="Where this is">
+      {path.map((c) => (
+        <Fragment key={c.href}>
+          <a class="chip" href={c.href}>{c.label}</a>
+          <span class="chip-sep" aria-hidden="true">›</span>
+        </Fragment>
+      ))}
+      <span class="chip chip-here" aria-current="page">{last}</span>
+      {parents.length > 0 && <span class="muted small chip-note">belongs to</span>}
+      {parents.map((c) => (
+        <a key={c.href} class="chip chip-parent" href={c.href}>{c.label}</a>
+      ))}
+    </nav>
   );
 }

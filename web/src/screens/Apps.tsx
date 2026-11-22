@@ -1,8 +1,8 @@
 // Apps: every app the house used in the period, and one app across the
 // house: who used it, where it went, how it was named, when it moved.
 
-import { filterHash } from "../entity";
-import { EntityLink, ClientNames } from "./entity";
+import { filterHash, parentsOf } from "../entity";
+import { ChipChain, EntityLink, ClientNames } from "./entity";
 import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -152,7 +152,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
       <Header section="apps" range={range} onRange={onRange} />
       <main class="main">
         <Status polled={polled} />
-        <p class="crumbs"><a href="#/apps">Apps</a> / {d ? appName(d.app.name) : id}</p>
+        <ChipChain base={[{ label: "Apps", href: "#/apps" }]} last={d ? appName(d.app.name) : id} parents={parentsOf({ kind: "app", id }, d)} />
         {!d ? (
           <Loading />
         ) : (

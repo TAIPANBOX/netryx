@@ -3,8 +3,8 @@
 // its security, and what can be done to it. Each section has its own empty
 // and error state, so one router read failing never blanks the page.
 
-import { crumbsFrom } from "../entity";
-import { EntityLink } from "./entity";
+import { parentsOf } from "../entity";
+import { ChipChain, EntityLink } from "./entity";
 import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useRef, useState } from "preact/hooks";
 import type { App, AppUsage, Destinations, Device, FlowsPage, Group, Live, NetworkView, Range, SeriesPoint } from "../types";
@@ -39,11 +39,12 @@ export function Client360({ mac, from = "", range, onRange, win, onWin }: { mac:
   const d = dev.data;
   const name = d ? deviceName(d) : mac;
   const notFound = dev.status === 404 && !d;
+  const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
   return (
     <div class="page">
       <Header section="clients" range={range} onRange={onRange} win={win} onWin={onWin} />
       <main class="main">
-        <Crumbs from={from} name={name} />
+        <ChipChain from={from} base={[{ label: "Clients", href: "#/clients" }]} last={name} parents={parentsOf({ kind: "client", mac }, d, { group: (g) => groupName(g, groups) })} />
         {notFound ? <Empty>The router knows no device with MAC {mac.toUpperCase()}.</Empty> : <Status polled={dev} />}
         {!d ? (
           notFound ? null : <Loading />
@@ -244,20 +245,3 @@ function RulesSection({ d }: { d: Device }) {
   );
 }
 
-/** Clients › name, or the path the owner took (Apps › YouTube › name). */
-function Crumbs({ from, name }: { from: string; name: string }) {
-  const appNames = manifestName(useContext(IconContext));
-  const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
-  const path = crumbsFrom(from, { app: appNames, group: (id) => groupName(id, groups) });
-  const shown = path.length ? path : [{ label: "Clients", href: "#/clients" }];
-  return (
-    <p class="crumbs">
-      {shown.map((c) => (
-        <span key={c.href}>
-          <a href={c.href}>{c.label}</a> ›{" "}
-        </span>
-      ))}
-      {name}
-    </p>
-  );
-}

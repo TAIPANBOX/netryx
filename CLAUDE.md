@@ -737,6 +737,13 @@ enforced, and that is a debt rather than a decision.
   shows none. (the page: `web/src/hover.test.ts`; the timing itself is not
   enforced by a test, seen in the lab)
 
+- **A thing's view says where it sits**: a chain of chips names the path the
+  owner took (`from`) or the screen it belongs under, then the thing, then what
+  it belongs to (an app's category, a network's countries, a domain's apps, a
+  client's group), each a link; folded rows and unknowns are no parent.
+  (the page: "a thing's view names what it belongs to, each a link" in
+  `web/src/entity.test.ts`)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's

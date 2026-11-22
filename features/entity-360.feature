@@ -33,3 +33,14 @@ Feature: every thing in the console can be found and seen in place
     And a click on the card keeps it open until it is closed, Esc is pressed or the owner moves elsewhere
     # (the card: "a link's address says which thing its card shows, and where to read it",
     #  "a card says the few things worth knowing before opening it" in web/src/hover.test.ts)
+
+  Scenario: a thing's view says where it sits and what it belongs to
+    Given the view of a client, app, country, network, domain or group
+    When it opens
+    Then a chain of chips names the path the owner took to it, or the screen it belongs under, and the thing itself
+    And chips name what it belongs to: an app's category, a network's countries, a domain's apps, a client's group, each a link
+    And the view lists what belongs to it: a group's devices, an app's clients, places and domains, a network's clients and apps
+    # (the chips: "a thing's view names what it belongs to, each a link",
+    #  "the breadcrumbs name the path the owner took" in web/src/entity.test.ts)
+    # -> TestANetworkPageNamesItsCountriesClientsAndApps
+    # -> TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries

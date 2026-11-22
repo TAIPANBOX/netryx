@@ -203,7 +203,7 @@ function Screen() {
     case "domain":
       return <DomainScreen key={route.domain} domain={route.domain} from={route.from} range={range} onRange={pick} />;
     case "group":
-      return <GroupScreen key={route.id} id={route.id} />;
+      return <GroupScreen key={route.id} id={route.id} from={route.from} />;
     case "destination":
       return <Destination key={route.cc} cc={route.cc} range={range} onRange={pick} />;
     default:
