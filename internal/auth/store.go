@@ -182,3 +182,23 @@ func saveStore(path string, secret []byte, sessions []signedIn) error {
 	}
 	return os.Rename(name, path)
 }
+
+// removeStore deletes the kept table, but only from netryx's own directory:
+// a directory that is a link, or not this process's alone, is left as it
+// is, so the fail-closed removal never deletes a file elsewhere as root.
+func removeStore(path string) error {
+	di, err := os.Lstat(filepath.Dir(path))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil || !di.IsDir() {
+		return errors.New("its directory is not a directory, so nothing was removed")
+	}
+	if err := private(di, false); err != nil {
+		return fmt.Errorf("its directory: %v, so nothing was removed", err)
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}

@@ -397,8 +397,10 @@ enforced, and that is a debt rather than a decision.
   the file is plain, whole and well formed, otherwise ignored with the reason
   logged. A logout and a session rpcd has let go leave the file, written in
   the same critical section as the table; a write that fails removes the file
-  (fail closed); a handle twice loads once; rpcd still decides on every
+  (fail closed), but only from netryx's own directory, never through a link or
+  in a directory others can write; a handle twice loads once; rpcd still decides on every
   request. (test: `TestASessionSurvivesARestart`, `TestAFailedWriteLeavesNoStaleSessions`,
+  `TestAFailedWriteRemovesNothingOutsideItsOwnDirectory`, `TestAFailedWriteRemovesNothingInADirectoryOthersCanWrite`,
   `TestTheSessionsFileIsPrivateAndWrittenWhole`, `TestASessionsFileOthersCouldTouchIsNotLoaded`,
   `TestEndedSessionsLeaveTheFile`, `TestOnlyWellFormedSessionsAreLoaded`; @decided
   2026-11-22: sessions are kept across a restart of netryx)

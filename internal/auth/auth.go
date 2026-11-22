@@ -22,11 +22,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"mime"
 	"net/http"
 	"net/netip"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -192,7 +190,7 @@ func (s *gate) persistLocked() error {
 		// Fail closed: a table that could not be written must not stay
 		// behind stale, or a restart would bring back a session that
 		// signed out. Without the file a restart signs everyone out.
-		if rerr := os.Remove(s.g.Store); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+		if rerr := removeStore(s.g.Store); rerr != nil {
 			err = fmt.Errorf("%v; and the old file could not be removed: %v", err, rerr)
 		}
 	}

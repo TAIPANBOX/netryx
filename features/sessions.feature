@@ -29,3 +29,5 @@ Feature: a restart of netryx signs nobody out
     Then that session does not come back, even when the kept table could not be written
     # -> TestEndedSessionsLeaveTheFile
     # -> TestAFailedWriteLeavesNoStaleSessions
+    # -> TestAFailedWriteRemovesNothingOutsideItsOwnDirectory
+    # -> TestAFailedWriteRemovesNothingInADirectoryOthersCanWrite
