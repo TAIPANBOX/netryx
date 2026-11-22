@@ -14,7 +14,7 @@ test("a link's address says which thing its card shows, and where to read it", (
   assert.deepEqual(hoverEntity("#/rules?rule=r_1"), { kind: "rule", id: "r_1" });
   assert.deepEqual(hoverEntity("#/apps?cat=video"), { kind: "category", id: "video" });
   // Screens that are not one thing have no card.
-  for (const h of ["#/", "#/clients", "#/apps", "#/apps?q=you", "#/rules", "#/flows?q=x", "https://example.com/", "#/app/BAD ID"]) assert.equal(hoverEntity(h), null, h);
+  for (const h of ["#/", "#/clients", "#/apps", "#/apps?q=you", "#/rules", "#/flows?q=x", "elsewhere/page", "#/app/BAD ID"]) assert.equal(hoverEntity(h), null, h);
 
   assert.equal(hoverPath({ kind: "client", mac: "aa:bb:cc:dd:ee:01" }), "/api/devices/aa:bb:cc:dd:ee:01");
   assert.equal(hoverPath({ kind: "app", id: "youtube" }), "/api/apps/youtube?range=24h");
