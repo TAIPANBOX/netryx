@@ -389,6 +389,19 @@ enforced, and that is a debt rather than a decision.
 - **The cookie never carries the rpcd session**, only an opaque handle, and a
   slow or failed login leaves no session. (test: `TestTheCookieIsNotTheRPCSession`,
   `TestASlowLoginLeavesNoSession`, `TestAnRPCFailureIsNeverALogin`)
+- **Sessions survive a restart of netryx, in RAM only**: the table of
+  handles and the CSRF secret are kept in `/tmp/netryx/sessions.json` (gone
+  with a reboot), written whole (a temporary file renamed over it), 0600 in a
+  0700 directory; read back only when the file and its directory belong to
+  netryx's own uid and no one else may write them (nor read the file), and
+  the file is plain, whole and well formed, otherwise ignored with the reason
+  logged. A logout and a session rpcd has let go leave the file, written in
+  the same critical section as the table; a write that fails removes the file
+  (fail closed); a handle twice loads once; rpcd still decides on every
+  request. (test: `TestASessionSurvivesARestart`, `TestAFailedWriteLeavesNoStaleSessions`,
+  `TestTheSessionsFileIsPrivateAndWrittenWhole`, `TestASessionsFileOthersCouldTouchIsNotLoaded`,
+  `TestEndedSessionsLeaveTheFile`, `TestOnlyWellFormedSessionsAreLoaded`; @decided
+  2026-11-22: sessions are kept across a restart of netryx)
 - **Logins are limited**: per address in the house, per /64 outside, in a
   bounded table. (test: `TestLoginIsRateLimited`, `TestHouseIPv6LoginsAreCountedPerAddress`,
   `TestAnOutsideIPv6NetworkSharesItsAttempts`, `TestTheLoginTableIsBounded`)
