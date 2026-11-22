@@ -914,6 +914,12 @@ enforced, and that is a debt rather than a decision.
   `TestTheRoutersOwnNameReachesTheConsole`; @decided 2026-11-22: the router's own
   host name and its local-domain form are admitted; a page elsewhere cannot send
   that Host without controlling the house's resolver)
+- **A request that arrived outside the house is refused**: on 0.0.0.0 or ::
+  the console listens on the WAN address too, and the Host header is the
+  client's to write, so the address the connection was made to must be
+  loopback, the listen address or one of the router's house-side addresses,
+  or the answer is 421; serve logs the warning at start. The default listen is
+  loopback. (test: `TestARequestArrivingOnTheWANAddressIsRefused`)
 - **A command cannot flood or hold the service**: what ubus or ping prints is
   kept up to 1 MiB and the rest drained, and a child left holding the output
   pipe is cut off 2 s after the command exits or its deadline passes, with

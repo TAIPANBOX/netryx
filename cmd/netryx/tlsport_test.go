@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/tls"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -198,5 +200,36 @@ func TestASilentConnectionIsLetGo(t *testing.T) {
 	silent.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if _, err := silent.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
 		t.Errorf("the silent connection: %v, want it closed (EOF)", err)
+	}
+}
+
+// On 0.0.0.0 or :: the console also listens on the WAN address. A request
+// that arrived there is refused whatever Host it names, since the Host header
+// is the client's to write; only the router's house-side addresses and
+// loopback are served.
+func TestARequestArrivingOnTheWANAddressIsRefused(t *testing.T) {
+	o := testOptions(t)
+	o.Listen = "0.0.0.0:8788"
+	c, err := buildConsole(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := c.guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "console") }))
+	for arrived, want := range map[string]int{
+		"203.0.113.7":    http.StatusMisdirectedRequest, // the router's WAN address
+		"192.168.50.1":   http.StatusOK,                 // the house bridge
+		"192.168.2.1":    http.StatusOK,                 // the guest bridge
+		"2001:db8:50::1": http.StatusOK,
+		"127.0.0.1":      http.StatusOK,                 // the SSH tunnel
+		"192.168.50.10":  http.StatusMisdirectedRequest, // not the router's own
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+		r.Host = "192.168.50.1:8788" // a Host the router would answer
+		r = r.WithContext(context.WithValue(r.Context(), http.LocalAddrContextKey, &net.TCPAddr{IP: net.ParseIP(arrived), Port: 8788}))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		if rec.Code != want {
+			t.Errorf("arrived on %s: %d, want %d", arrived, rec.Code, want)
+		}
 	}
 }

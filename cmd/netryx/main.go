@@ -470,6 +470,9 @@ func main() {
 			ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 			IdleTimeout: 60 * time.Second, TLSConfig: tlsConf,
 		}
+		if h, _, err := net.SplitHostPort(listen); err == nil && (h == "" || h == "0.0.0.0" || h == "::") {
+			log.Printf("listen %s takes in every address of the router, the WAN's too: a request that arrives on an address outside the house is refused (421); set listen to the LAN address to keep it off the WAN altogether", listen)
+		}
 		// LuCI's "Network console" page builds the console's address from this.
 		if err := writeConsoleState(consoleStateFile, listen, tlsConf != nil); err != nil {
 			log.Printf("%s cannot be written (%v): LuCI's page cannot open the console", consoleStateFile, err)

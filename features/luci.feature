@@ -83,3 +83,9 @@ Feature: the console is opened from LuCI without a second login, and over https
     # -> TestPlainHTTPOnTheHTTPSPortIsSentToHTTPS
     # -> TestASilentConnectionIsLetGo
     # -> TestTheInitCommandLineIsParsedAsWritten
+
+  Scenario: a console listening on every address still serves the house only
+    Given the console listens on 0.0.0.0 or ::, which takes in the WAN address too
+    When a request arrives on an address of the router outside the house, whatever Host it names
+    Then it is refused, and the log says at start that the LAN address is the better listen
+    # -> TestARequestArrivingOnTheWANAddressIsRefused

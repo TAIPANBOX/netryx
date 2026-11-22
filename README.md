@@ -153,8 +153,11 @@ The console signs you in with your LuCI account; there is no password of its own
   code travels in the address fragment, which the browser never sends to a server, and the console
   takes it out of the address and the history at once. Leaving the console does not sign you out
   of LuCI. This needs the console on a house-side address (below).
-- **Over HTTPS on the house network.** Set `netryx.main.listen` to the router's LAN address (or
-  `0.0.0.0:8788`) and restart netryx. The console then speaks https, with uhttpd's certificate
+- **Over HTTPS on the house network.** Set `netryx.main.listen` to the router's LAN address, for
+  example `192.168.1.1:8788`, and restart netryx. `0.0.0.0:8788` also works and keeps the SSH
+  tunnel on loopback, but it takes in the WAN address too: netryx then refuses every request that
+  arrives on an address outside the house (421) and says so in the log, so the LAN address is the
+  better choice. The console then speaks https, with uhttpd's certificate
   when the router has one (`/etc/uhttpd.crt`, the one LuCI over https uses) and otherwise a
   self-signed certificate of its own, made once and kept in `/etc/netryx/console.crt` (ECDSA
   P-256, the key readable by root only). Plain http to the same port is sent to https
