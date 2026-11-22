@@ -1,0 +1,22 @@
+config interface 'loopback'
+	option device 'lo'
+	option proto 'static'
+
+config interface 'wg0'
+	option proto 'wireguard'
+	option private_key 'cHJpdmF0ZS1rZXktb2YtdGhlLXJvdXRlci0wMDAwMDA9'
+	option listen_port '51820'
+	list addresses '10.8.0.1/24'
+
+config wireguard_wg0 'phone'
+	option description 'Sam'\''s phone'
+	option public_key 'cGhvbmUtcHVibGljLWtleS0wMDAwMDAwMDAwMDAwMDA9'
+	option preshared_key 'cHJlc2hhcmVkLWtleS1vZi10aGUtcGhvbmUtMDAwMDA9'
+	list allowed_ips '10.8.0.2/32'
+
+config wireguard_wg0
+	option public_key 'bGFwdG9wLXB1YmxpYy1rZXktMDAwMDAwMDAwMDAwMDA9'
+	option endpoint_host 'laptop.example'
+	option endpoint_port '51820'
+	list allowed_ips '10.8.0.3/32'
+	list allowed_ips 'fd00:8::3/128'
