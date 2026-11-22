@@ -26,6 +26,8 @@ camera and a game console, on the real internet. The names, addresses and MACs a
 - **Who is on the network, and what they do.** Every device by its hardware address, with its
   name, vendor, address, how it is connected, and its traffic by app, by country and by network,
   live and over an hour, a day, a week or a month.
+- **How the router is wired.** Its networks, the ports and who is plugged into each, Wi-Fi
+  radios and clients with their signal, WireGuard peers and port forwards, read only.
 - **The whole house at a glance.** Every app the house used and every country, network and domain
   it reached, with the clients behind each and the rules that close it.
 - **Apps, not ports.** A connection is named by the name the device asked for: the TLS handshake,
@@ -55,6 +57,8 @@ camera and a game console, on the real internet. The names, addresses and MACs a
 | **Security**, a newcomer in quarantine and the alerts | **Flows**, every live connection, searchable |
 | ![Every app the house used over 24 hours: its category, the clients that used it, its share of the house and its traffic, and the rules that limit it](docs/images/apps.png) | ![Every country the house reached over 24 hours with the clients that went there, its share and a block button, and the networks and domains behind them](docs/images/destinations.png) |
 | **Apps**, the whole house by app, with who used each | **Destinations**, countries, networks and domains, and who went there |
+
+![The router's wiring: its networks with addresses and traffic, the ports with the device behind each, a router without Wi-Fi saying so, WireGuard peers with their last handshake, and two port forwards](docs/images/network.png)
 
 ![Every device: its address, MAC, connection, group, traffic now and over 24 hours, its top app and how many countries it talked to](docs/images/clients.png)
 

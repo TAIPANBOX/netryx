@@ -14,9 +14,10 @@ export type Route =
   | { name: "apps" }
   | { name: "app"; id: string }
   | { name: "destinations" }
-  | { name: "destination"; cc: string };
+  | { name: "destination"; cc: string }
+  | { name: "network" };
 
-/** Reads a location hash: #/, #/clients, #/client/<mac>, #/flows?q=..., #/rules, #/rules/filters, #/security, #/apps, #/app/<id>, #/destinations, #/destination/<cc> */
+/** Reads a location hash: #/, #/clients, #/client/<mac>, #/flows?q=..., #/rules, #/rules/filters, #/security, #/apps, #/app/<id>, #/destinations, #/destination/<cc>, #/network */
 export function parseRoute(hash: string): Route {
   const raw = hash.replace(/^#/, "");
   const [path, query = ""] = raw.split("?", 2);
@@ -52,6 +53,8 @@ export function parseRoute(hash: string): Route {
     }
     case "destinations":
       return { name: "destinations" };
+    case "network":
+      return { name: "network" };
     case "destination": {
       const cc = (parts[1] ?? "").toUpperCase();
       return /^[A-Z]{2}$/.test(cc) ? { name: "destination", cc } : { name: "destinations" };

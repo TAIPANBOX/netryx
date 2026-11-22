@@ -312,3 +312,18 @@ select.input { padding-right: 8px; }
 .rule-tag { padding: 1px 6px; border-radius: 4px; font-size: 11px; white-space: nowrap; border: 1px solid var(--line); color: var(--soft); text-decoration: none; }
 .rule-tag-active { color: var(--bad); border-color: rgba(252, 165, 165, 0.5); }
 .rule-tag-failed { color: var(--up); border-color: rgba(245, 165, 36, 0.5); }
+
+/* the Network screen */
+.card-pad { padding: 16px 18px 0; }
+.net-table { min-width: 980px; }
+.port-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.port { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); }
+.port-up { border-color: var(--edge); }
+.ok { color: var(--ok); }
+.net-device { display: flex; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
+.net-device .right { margin-left: auto; }
+.radio { display: inline-flex; flex-direction: column; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.radio-off { opacity: 0.6; }
+.ap { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); }
+.wg { gap: 6px; }
+.is-off { opacity: 0.6; }

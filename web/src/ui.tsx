@@ -11,7 +11,7 @@ import { logout } from "./api";
 import { time } from "./format";
 import { appIcon, type IconManifest } from "./icons";
 
-type Section = "overview" | "clients" | "apps" | "destinations" | "flows" | "rules" | "security";
+type Section = "overview" | "clients" | "apps" | "destinations" | "flows" | "rules" | "security" | "network";
 
 // The sections the mockup names that this stage does not have yet are shown
 // greyed out, so the layout matches and nothing pretends to work.
@@ -23,7 +23,7 @@ const NAV: { id: Section | null; label: string; href?: string }[] = [
   { id: "flows", label: "Flows", href: "#/flows" },
   { id: "security", label: "Security", href: "#/security" },
   { id: "rules", label: "Rules", href: "#/rules" },
-  { id: null, label: "Network" },
+  { id: "network", label: "Network", href: "#/network" },
 ];
 
 /** Who is signed in and what they may do; the page sets it once /api/session has answered. */

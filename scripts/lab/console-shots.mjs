@@ -22,6 +22,7 @@ const shots = [
   ["security", "#/security", 1440, 1000],
   ["apps", "#/apps", 1440, 1000],
   ["destinations", "#/destinations", 1440, 1000],
+  ["network", "#/network", 1440, 1000],
 ];
 // One login; every view reuses its cookie.
 const first = await browser.newContext();

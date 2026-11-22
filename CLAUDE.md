@@ -638,6 +638,30 @@ enforced, and that is a debt rather than a decision.
   (test: `TestTheHouseAppsCountOnlyClients`, `TestARowWithoutClientsSaysWhoseTrafficItIs`,
   `TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries`)
 
+## The promise about the Network screen
+
+- **Network shows how the router is wired, and only reads it**: netifd's
+  networks (loopback left out, the one with a default route marked as the
+  internet) with sysfs counters, the house bridges' wired ports (radios are
+  not ports) with link, speed and the hardware switch, the devices the
+  inventory learned behind each port and access point, Wi-Fi radios and
+  networks from `/etc/config/wireless` and hostapd, WireGuard from the
+  network config and one `wg show all dump`, and the firewall's DNAT
+  redirects. No name from a config is passed to a program.
+  (test: `TestInterfacesAreReadFromNetifd`, `TestTheViewIsReadFromTheRouter`,
+  `TestWirelessConfigNamesRadiosAndNetworks`, `TestPortForwardsAreTheFirewallsDNATRedirects`,
+  `TestWgIsAskedOnceForEveryInterface`, `TestTheNetworkViewNamesTheDevicesBehindEachPortAndAccessPoint`)
+- **No secret reaches the page**: a WireGuard private or preshared key and a
+  Wi-Fi key are never read into the view, though `wg` prints the first two.
+  (test: `TestWireGuardPeersCarryNamesHandshakesAndTrafficButNoSecret`, `TestTheNetworkViewNeverCarriesASecret`)
+- **What the router lacks is said**: no Wi-Fi radio, Wi-Fi configured but no
+  access point running, no WireGuard, no wg tool, no forwards, netifd not
+  answering; a console without the source answers 503.
+  (test: `TestWhatTheRouterLacksIsSaid`, `TestTheNetworkViewSaysWhatTheRouterLacks`,
+  `TestWithoutANetworkSourceTheViewIsUnavailable`)
+- **The router is asked at most every 5 s** however often the page polls,
+  and one reading is bounded to 5 s. (test: `TestTheViewIsCachedForAFewSeconds`)
+
 ## The promise about the running console
 
 - **The console runs without its data files.** A missing or unreadable

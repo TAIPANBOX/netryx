@@ -152,7 +152,7 @@ func TestTheViewIsReadFromTheRouter(t *testing.T) {
 		"ubus call network.interface dump":      read(t, "vm-interface-dump.json"),
 		"ubus list hostapd.*":                   []byte("hostapd.phy1-ap0\n"),
 		"ubus call hostapd.phy1-ap0 get_status": read(t, "hostapd-status.json"),
-		"wg show wg0 dump":                      read(t, "wg-dump.txt"),
+		"wg show all dump":                      read(t, "wg-dump.txt"),
 	}
 	s := &Source{FS: routerFS(t, true), Run: run.run, Bridges: []string{"br-lan"}, Now: func() time.Time { return time.Unix(1763830100, 0) }}
 	v := s.View(context.Background())
@@ -234,11 +234,11 @@ func TestTheViewIsCachedForAFewSeconds(t *testing.T) {
 	}
 }
 
-// Only a name that is a Linux interface name is ever passed to wg.
-func TestOnlyInterfaceNamesReachWg(t *testing.T) {
+// wg is asked once, for every interface, so no name from the config is ever
+// passed to it; its single-interface dump would carry no interface name.
+func TestWgIsAskedOnceForEveryInterface(t *testing.T) {
 	var asked []string
-	fsys := fstest.MapFS{"etc/config/network": {Data: []byte("config interface 'wg0'\n\toption proto 'wireguard'\nconfig interface 'x'\n\toption proto 'wireguard'\n")}}
-	fsys["etc/config/network"].Data = append(fsys["etc/config/network"].Data, []byte("config interface '-bad'\n\toption proto 'wireguard'\n")...)
+	fsys := fstest.MapFS{"etc/config/network": {Data: []byte("config interface 'wg0'\n\toption proto 'wireguard'\nconfig interface 'wg1'\n\toption proto 'wireguard'\n")}}
 	s := &Source{FS: fsys, Run: func(_ context.Context, name string, args ...string) ([]byte, error) {
 		if name == "wg" {
 			asked = append(asked, strings.Join(args, " "))
@@ -246,9 +246,7 @@ func TestOnlyInterfaceNamesReachWg(t *testing.T) {
 		return nil, errors.New("no")
 	}, Now: time.Now}
 	s.View(context.Background())
-	for _, a := range asked {
-		if strings.Contains(a, "-bad") {
-			t.Errorf("wg asked about %q", a)
-		}
+	if len(asked) != 1 || asked[0] != "show all dump" {
+		t.Errorf("wg asked %q, want once: show all dump", asked)
 	}
 }

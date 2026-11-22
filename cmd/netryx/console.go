@@ -40,6 +40,7 @@ import (
 	"netryx/internal/icons"
 	"netryx/internal/inventory"
 	"netryx/internal/neigh"
+	"netryx/internal/netview"
 	"netryx/internal/rollup"
 	"netryx/internal/rules"
 	"netryx/internal/wan"
@@ -401,7 +402,12 @@ func buildConsole(o Options) (*console, error) {
 		conf:    o.RulesConfig,
 		bridges: o.LAN, oui: oui, every: 30 * time.Second,
 	}
-	apiOpts := []api.Option{api.OnLivePoll(c.livePolled)}
+	apiOpts := []api.Option{
+		api.OnLivePoll(c.livePolled),
+		// The Network screen reads the router's wiring only: ubus, sysfs,
+		// the UCI files and `wg show`, never a key or a password.
+		api.WithNetwork(&netview.Source{FS: o.FS, Run: netview.Runner(o.Run), Bridges: o.LAN, Now: o.Now}),
+	}
 	if c.rules != nil {
 		// The console writes the config the agent writes, and the engine
 		// reads it back: names and rules from the page and from Hermes are

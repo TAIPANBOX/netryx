@@ -317,20 +317,17 @@ func (s *Source) wireguard(ctx context.Context) WireGuard {
 		w.Why = NoWireGuard
 		return w
 	}
-	for i := range w.Interfaces {
-		name := w.Interfaces[i].Name
-		if !validIface(name) {
-			continue
+	// One `wg show all dump` for every interface: it prefixes each line with
+	// its interface, which the single-interface dump does not, and no name
+	// from the config is passed to the program.
+	out, err := s.Run(ctx, "wg", "show", "all", "dump")
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			w.Note = NoWgTool
 		}
-		out, err := s.Run(ctx, "wg", "show", name, "dump")
-		if err != nil {
-			if strings.Contains(err.Error(), "not found") {
-				w.Note = NoWgTool
-			}
-			continue
-		}
-		ApplyWireGuardDump(w.Interfaces[i:i+1], out)
+		return w
 	}
+	ApplyWireGuardDump(w.Interfaces, out)
 	return w
 }
 
@@ -488,7 +485,7 @@ func ParseWireGuardConfig(b []byte) []WGIface {
 	return out
 }
 
-// ApplyWireGuardDump adds what `wg show <if> dump` says to the interfaces of
+// ApplyWireGuardDump adds what `wg show all dump` says to the interfaces of
 // the config: the interface's public key, and each peer's endpoint, last
 // handshake and traffic. The private and preshared keys it prints are read
 // past, never kept.
