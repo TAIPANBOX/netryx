@@ -712,6 +712,17 @@ enforced, and that is a debt rather than a decision.
   a screen opens or its question changes. (the page: `web/src/steady.test.ts`;
   the glide itself is not enforced by a test, measured in the lab)
 
+## The promise about seeing things in place
+
+- **A list row's last hour is one pass over the minutes**: `Sparks` answers
+  every client's or app's hour in steps of two minutes at once, a step is
+  bytes down and up together, and the steps before the store's first minute
+  are said (`known`), never drawn as a quiet house; a row that moved nothing
+  has its hour, all zero; the folded row has none.
+  (test: `TestSparksAreEachKeysMinutesInSteps`, `TestAnEmptyStoreKnowsNoStep`,
+  `TestTheListsCarryAnHourOfSparkline`; the page: "a list's hour is drawn only
+  from where the router began counting" in `web/src/live.test.ts`)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's

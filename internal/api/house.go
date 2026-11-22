@@ -52,6 +52,8 @@ type houseAppJSON struct {
 	Top     []clientRefJSON `json:"top"`
 	Other   bool            `json:"other"`
 	Recent  rateJSON        `json:"recent"`
+	// Spark is the app's last hour; none on the folded row.
+	Spark *sparkJSON `json:"spark,omitempty"`
 }
 
 type networkJSON struct {
@@ -207,13 +209,18 @@ func (s *server) houseApps(r *http.Request) (any, error) {
 	total := sumBytes(all)
 	clients := s.h.Pairs(rollup.Filter{}, "app", "mac", p.from, p.now)
 	out := []houseAppJSON{}
+	spark := s.sparks(rollup.Filter{}, "app")
 	for _, ar := range cut(all, maxHouseApps) {
 		cl := clients[ar.Key]
-		out = append(out, houseAppJSON{
+		j := houseAppJSON{
 			App: cat.value(ar.Key), Down: ar.Bytes.Down, Up: ar.Bytes.Up, Flows: ar.Bytes.Flows,
 			Share: share(rowBytes(ar), total), Clients: clientCount(cl),
 			Top: topRefs(cl, names), Other: ar.Key == serviceKey, Recent: recent[ar.Key],
-		})
+		}
+		if !j.Other {
+			j.Spark = spark(ar.Key)
+		}
+		out = append(out, j)
 	}
 	return out, nil
 }

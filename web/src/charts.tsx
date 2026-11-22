@@ -8,6 +8,7 @@
 
 import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useState } from "preact/hooks";
+import { hourSpark, type HourSpark } from "./live";
 import { areaPath, cumulate, pickColumn, sankeyLayout, type SankeyLink, type SankeyNode } from "./geometry";
 import { rate } from "./format";
 import { appIcon } from "./icons";
@@ -80,6 +81,17 @@ export function AreaChart(p: Omit<StackedProps, "layers"> & { down: number[] }) 
 /** A small colour square for a legend. */
 export function Swatch({ color }: { color: string }) {
   return <span class="swatch" style={{ background: color }} />;
+}
+
+/** A list row's last hour: the counted steps only, its peak in the tooltip. */
+export function HourSparkline({ s, color = "var(--accent, #4C9AFF)" }: { s?: HourSpark; color?: string }) {
+  const p = hourSpark(s, 96, 24);
+  return (
+    <svg viewBox="0 0 96 24" preserveAspectRatio="none" role="img" aria-label={p.label || "no hour yet"} class="spark spark-hour">
+      <title>{p.label}</title>
+      {p.d && <path d={p.d} fill="none" stroke={color} stroke-width="1.5" vector-effect="non-scaling-stroke" />}
+    </svg>
+  );
 }
 
 export function Legend({ items, ticks }: { items: { label: string; color: string; node?: ComponentChildren }[]; ticks?: string[] }) {

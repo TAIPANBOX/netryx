@@ -73,6 +73,12 @@ type fakeHistory struct {
 	recent  map[string][]rollup.Row
 	covered time.Duration
 	spans   []time.Duration
+	// sparks answers Sparks by dimension.
+	sparks map[string]rollup.SparksOf
+}
+
+func (h *fakeHistory) Sparks(f rollup.Filter, dim string, span, step time.Duration) rollup.SparksOf {
+	return h.sparks[dim]
 }
 
 func (h *fakeHistory) Recent(f rollup.Filter, dim string, span time.Duration) ([]rollup.Row, time.Duration) {

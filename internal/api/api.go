@@ -38,6 +38,7 @@ type History interface {
 	Pairs(rollup.Filter, string, string, time.Time, time.Time) map[string][]rollup.Row
 	Recent(rollup.Filter, string, time.Duration) ([]rollup.Row, time.Duration)
 	Holders(string, string, time.Time, time.Time) rollup.HoldersOf
+	Sparks(rollup.Filter, string, time.Duration, time.Duration) rollup.SparksOf
 }
 
 // Apps names an app id from the catalog of rules, so a name does not depend
@@ -606,9 +607,10 @@ func (s *server) devices(r *http.Request) (any, error) {
 	cat, rates, totals, active := s.catalog(), s.f.Rates(), s.totals(p), s.active(p.now)
 	out := []deviceJSON{}
 	sec := s.security()
+	spark := s.sparks(rollup.Filter{}, "mac")
 	for _, d := range s.inv.Devices() {
 		j := withSecurity(s.deviceView(d, p, cat, rates, totals, active), sec)
-		j.Recent, j.RecentSec = recent[d.MAC], recentSec
+		j.Recent, j.RecentSec, j.Spark = recent[d.MAC], recentSec, spark(d.MAC)
 		out = append(out, j)
 	}
 	return out, nil

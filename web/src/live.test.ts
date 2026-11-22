@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Live, LivePoint } from "./types";
-import { liveChart, sparkPath, liveSummary, whereText, placeName, layerLabel, connKeys, appsTileSub, cutNote, speedTile } from "./live";
+import { liveChart, sparkPath, hourSpark, liveSummary, whereText, placeName, layerLabel, connKeys, appsTileSub, cutNote, speedTile } from "./live";
 import type { App } from "./types";
 
 const END = Date.parse("2026-11-20T12:00:00Z");
@@ -181,4 +181,19 @@ test("the Speed tile leads with the window's average and shows the last seconds 
     sub: "Mbit/s, average over 3 min · right now ↓ 0 bit/s",
   });
   assert.deepEqual(speedTile(undefined, { down: 1000, up: 0 }, "3 min").sub, "kbit/s, the last few seconds (no average yet)");
+});
+
+test("a list's hour is drawn only from where the router began counting", () => {
+  // Five steps over 120 px: a step is 30 px. The first two were never counted.
+  const s = hourSpark({ stepSec: 120, known: 2, bytes: [0, 0, 0, 120, 240] }, 120, 28);
+  assert.equal(s.d, "M60.0 26.0 L90.0 14.0 L120.0 2.0");
+  assert.equal(s.peak, 2); // bytes per second: 240 B over 120 s
+  assert.equal(s.label, "last hour, peak 16 bit/s");
+  // Nothing counted yet: nothing drawn, and it says so.
+  const none = hourSpark({ stepSec: 120, known: 5, bytes: [0, 0, 0, 0, 0] });
+  assert.equal(none.d, "");
+  assert.equal(none.label, "the router has not counted this hour yet");
+  // A quiet hour is a flat line on the floor, not a missing one.
+  assert.equal(hourSpark({ stepSec: 120, known: 0, bytes: [0, 0, 0] }, 120, 28).d, "M0.0 26.0 L60.0 26.0 L120.0 26.0");
+  assert.equal(hourSpark(undefined).d, "");
 });

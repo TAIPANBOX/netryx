@@ -4,6 +4,7 @@
 import { filterHash } from "../entity";
 import { EntityLink } from "./entity";
 import { ClientLink } from "./entity";
+import { HourSparkline } from "../charts";
 import { h, type ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { windowLabel, type Win } from "../query";
@@ -102,6 +103,7 @@ export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: W
                     {th("Name", "name", "asc")}
                     {th(`Now, ${windowLabel(win)} avg ↓ · ↑`, "now", "desc", true)}
                     {th("24 h ↓ · ↑", "day", "desc", true)}
+                    <th>Last hour</th>
                     <th>App</th>
                     {th("Vendor", "vendor", "asc")}
                     <th>IPv4 · IPv6</th>
@@ -131,6 +133,7 @@ export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: W
                         ↓ {bytes(d.last24h.down)}
                         <br />{" "}↑ {bytes(d.last24h.up)}
                       </td>
+                      <td><HourSparkline s={d.spark} /></td>
                       <td>
                         {d.topApp ? (
                           <span class="app-cell">

@@ -225,3 +225,25 @@ export function speedTile(recent: { down: number; up: number } | undefined, now:
   const p = ratePair(recent.down, recent.up);
   return { value: `↓ ${p.down} · ↑ ${p.up}`, sub: `${p.unit}, average over ${win} · right now ↓ ${rate(now.down)}` };
 }
+
+export interface HourSpark { stepSec: number; known: number; bytes: number[] }
+
+/** A list row's last hour as a path, from the first counted step on, with its peak rate. */
+export function hourSpark(s: HourSpark | undefined, w = 120, h = 28): { d: string; peak: number; label: string } {
+  const v = s?.bytes ?? [];
+  const n = v.length;
+  if (!s || n === 0) return { d: "", peak: 0, label: "" };
+  const known = Math.max(0, s.known);
+  if (known >= n) return { d: "", peak: 0, label: "the router has not counted this hour yet" };
+  const pts = n === 1 ? [v[0], v[0]] : v;
+  const step = w / (pts.length - 1);
+  const from = n === 1 ? 0 : known;
+  const max = Math.max(0, ...pts.slice(from));
+  const span = h - 4;
+  const d = pts
+    .slice(from)
+    .map((x, j) => `${j ? "L" : "M"}${((from + j) * step).toFixed(1)} ${(h - 2 - (max > 0 ? (Math.max(0, x) / max) * span : 0)).toFixed(1)}`)
+    .join(" ");
+  const peak = s.stepSec > 0 ? max / s.stepSec : 0;
+  return { d, peak, label: `last hour, peak ${rate(peak)}` };
+}
