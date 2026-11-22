@@ -5,7 +5,7 @@ import { h, Fragment } from "preact";
 import type { Device, DomainPage, Group, NetworkPage, Range } from "../types";
 import { getJSON, usePoll } from "../api";
 import { RANGES } from "../query";
-import { Header, Card, CC, Status, Loading, Empty, AppIcon, IconContext } from "../ui";
+import { Header, Card, CC, Status, Loading, Empty, AppIcon, IconContext, usePeriod } from "../ui";
 import { Bars } from "../charts";
 import { appName, bytes, countryName, groupName, nameSource, plural } from "../format";
 import { parentsOf } from "../entity";
@@ -18,6 +18,7 @@ const DEST = [{ label: "Destinations", href: "#/destinations" }];
 import { useRules } from "./controls";
 
 const periodOf = (r: Range) => RANGES.find((x) => x.id === r)?.label ?? r;
+const overOf = (r: Range, span: boolean) => (span ? "the stretch" : periodOf(r));
 
 
 function ClientRows({ clients, total, from }: { clients: { mac: string; name: string; down: number; up: number }[]; total: number; from: string }) {
@@ -38,7 +39,8 @@ function ClientRows({ clients, total, from }: { clients: { mac: string; name: st
 }
 
 export function NetworkScreen({ asn, from, range, onRange }: { asn: number; from: string; range: Range; onRange: (r: Range) => void }) {
-  const polled = usePoll((s) => getJSON<NetworkPage>(`/api/networks/${asn}?range=${range}`, s), 15_000, [asn, range]);
+  const per = usePeriod(range);
+  const polled = usePoll((s) => getJSON<NetworkPage>(`/api/networks/${asn}?${per.q}`, s), 15_000, [asn, per.q]);
   const d = polled.data;
   const total = d ? d.down + d.up : 0;
   return (
@@ -55,7 +57,7 @@ export function NetworkScreen({ asn, from, range, onRange }: { asn: number; from
               <div class="card-head">
                 <h1>{d.org || "no organisation"}</h1>
                 <span class="soft small">
-                  AS{d.asn} · ↓ {bytes(d.down)} · ↑ {bytes(d.up)} over {periodOf(range)}
+                  AS{d.asn} · ↓ {bytes(d.down)} · ↑ {bytes(d.up)} over {overOf(range, !!per.span)}
                 </span>
               </div>
               <a class="btn self-start" href={`#/flows?q=&asn=${asn}`}>Show its flows</a>
@@ -93,7 +95,8 @@ export function NetworkScreen({ asn, from, range, onRange }: { asn: number; from
 }
 
 export function DomainScreen({ domain, from, range, onRange }: { domain: string; from: string; range: Range; onRange: (r: Range) => void }) {
-  const polled = usePoll((s) => getJSON<DomainPage>(`/api/domains/${encodeURIComponent(domain)}?range=${range}`, s), 15_000, [domain, range]);
+  const per = usePeriod(range);
+  const polled = usePoll((s) => getJSON<DomainPage>(`/api/domains/${encodeURIComponent(domain)}?${per.q}`, s), 15_000, [domain, per.q]);
   const d = polled.data;
   return (
     <div class="page">
@@ -108,7 +111,7 @@ export function DomainScreen({ domain, from, range, onRange }: { domain: string;
             <Card label="Domain">
               <div class="card-head">
                 <h1 class="mono break">{d.name}</h1>
-                <span class="soft small">↓ {bytes(d.down)} · ↑ {bytes(d.up)} over {periodOf(range)}</span>
+                <span class="soft small">↓ {bytes(d.down)} · ↑ {bytes(d.up)} over {overOf(range, !!per.span)}</span>
               </div>
               <a class="btn self-start" href={`#/flows?q=${encodeURIComponent(d.name)}`}>Show its flows</a>
             </Card>

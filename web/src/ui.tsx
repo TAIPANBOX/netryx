@@ -10,6 +10,7 @@ import { RANGES, WINDOWS, type Win } from "./query";
 import { logout, onNewBuild } from "./api";
 import { isPaused, onPause, setPaused } from "./pause";
 import { time } from "./format";
+import { periodQuery, periodRange, periodStep, setSpan, spanLabel, type Span } from "./span";
 import { appIcon, type IconManifest } from "./icons";
 
 type Section = "overview" | "clients" | "apps" | "destinations" | "flows" | "rules" | "security" | "network";
@@ -26,6 +27,27 @@ const NAV: { id: Section | null; label: string; href?: string }[] = [
   { id: "rules", label: "Rules", href: "#/rules" },
   { id: "network", label: "Network", href: "#/network" },
 ];
+
+/** The stretch of time the address names (picked on a chart), or null. */
+export const SpanContext = createContext<Span | null>(null);
+
+/** What a screen asks the API for its period, the step its series is drawn at, and the period its labels follow. */
+export function usePeriod(range: Range): { q: string; step: number; range: Range; span: Span | null } {
+  const span = useContext(SpanContext);
+  return { q: periodQuery(range, span), step: periodStep(range, span), range: periodRange(range, span), span };
+}
+
+/** The stretch picked on a chart, with the button that goes back to the whole period. */
+export function SpanChip() {
+  const span = useContext(SpanContext);
+  if (!span) return null;
+  return (
+    <span class="pill active span-chip" title="The stretch picked on a chart: the whole screen reads it">
+      {spanLabel(span)}
+      <button type="button" class="btn-x" aria-label="Back to the whole period" onClick={() => setSpan(null)}>×</button>
+    </span>
+  );
+}
 
 /** Who is signed in and what they may do; the page sets it once /api/session has answered. */
 export interface SessionInfo { user: string; canWrite: boolean; noRPC: boolean }
@@ -76,6 +98,7 @@ export function Header(p: {
   win?: Win; onWin?: (w: Win) => void;
 }) {
   const s = useSession();
+  const span = useContext(SpanContext);
   return (
     <Fragment>
     <header class="top">
@@ -99,7 +122,10 @@ export function Header(p: {
       {p.pills ? (
         p.pills
       ) : p.range && p.onRange ? (
-        <Pills label="Period" items={RANGES.map((r) => ({ id: r.id, label: r.label }))} value={p.range} onPick={(v) => p.onRange!(v as Range)} />
+        <Fragment>
+          <Pills label="Period" items={RANGES.map((r) => ({ id: r.id, label: r.label }))} value={span ? "" : p.range} onPick={(v) => { if (span) setSpan(null); p.onRange!(v as Range); }} />
+          <SpanChip />
+        </Fragment>
       ) : p.note ? (
         <span class="muted small">{p.note}</span>
       ) : null}

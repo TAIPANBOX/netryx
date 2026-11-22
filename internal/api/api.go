@@ -241,15 +241,24 @@ func writeError(w http.ResponseWriter, err error) {
 	w.Write(body)
 }
 
-// period is the window a request reads: from now back over its span, and the
-// step its series uses.
+// period is the window a request reads: from back to to (the last instant
+// read, inclusive), the step its series uses, and now, which online and new
+// devices are judged by whatever stretch is read.
 type period struct {
-	now, from time.Time
-	step      time.Duration
+	now, from, to time.Time
+	step          time.Duration
 }
 
+// maxHistory is how far back a stretch may start: the longest range.
+var maxHistory = ranges["30d"].span
+
 func (s *server) period(r *http.Request) (period, error) {
-	name := r.URL.Query().Get("range")
+	q := r.URL.Query()
+	now := s.now()
+	if q.Has("from") || q.Has("to") {
+		return spanOf(q.Get("from"), q.Get("to"), now)
+	}
+	name := q.Get("range")
 	if name == "" {
 		name = "24h"
 	}
@@ -257,14 +266,39 @@ func (s *server) period(r *http.Request) (period, error) {
 	if !ok {
 		return period{}, httpError{http.StatusBadRequest, "range must be 1h, 24h, 7d or 30d"}
 	}
-	now := s.now()
-	return period{now: now, from: now.Add(-spec.span), step: spec.step}, nil
+	return period{now: now, from: now.Add(-spec.span), to: now, step: spec.step}, nil
+}
+
+// spanOf reads a stretch picked on a chart: from up to to (to itself is not
+// part of it), inside the last 30 days, ending at now at the latest. It is
+// read at the step of the shortest range that holds it.
+func spanOf(fromS, toS string, now time.Time) (period, error) {
+	bad := httpError{http.StatusBadRequest, "from and to must be RFC 3339 times, from before to, within the last 30 days"}
+	from, err1 := time.Parse(time.RFC3339, fromS)
+	to, err2 := time.Parse(time.RFC3339, toS)
+	if err1 != nil || err2 != nil {
+		return period{}, bad
+	}
+	from, to = from.UTC(), to.UTC()
+	if to.After(now) {
+		to = now
+	}
+	if !from.Before(to) || from.Before(now.Add(-maxHistory)) {
+		return period{}, bad
+	}
+	step := ranges["30d"].step
+	for _, name := range []string{"7d", "24h", "1h"} {
+		if spec := ranges[name]; to.Sub(from) <= spec.span {
+			step = spec.step
+		}
+	}
+	return period{now: now, from: from, to: to.Add(-time.Nanosecond), step: step}, nil
 }
 
 // day is the fixed 24 hour window the device list shows.
 func (s *server) day() period {
 	now := s.now()
-	return period{now: now, from: now.Add(-24 * time.Hour), step: ranges["24h"].step}
+	return period{now: now, from: now.Add(-24 * time.Hour), to: now, step: ranges["24h"].step}
 }
 
 // splitParam reads the split query. Unset means "none".
@@ -291,7 +325,7 @@ func seriesSplit(v string) string {
 
 // seriesOf reads a series and labels its unsplit key as "total".
 func (s *server) seriesOf(f rollup.Filter, p period, split string) []seriesPoint {
-	points := s.h.Series(f, p.from, p.now.Truncate(p.step), p.step, split)
+	points := s.h.Series(f, p.from, p.to.Truncate(p.step), p.step, split)
 	out := make([]seriesPoint, 0, len(points))
 	for _, pt := range points {
 		step := pt.Step
@@ -314,7 +348,7 @@ func (s *server) seriesOf(f rollup.Filter, p period, split string) []seriesPoint
 // totals is every device's bytes over the period, keyed by MAC.
 func (s *server) totals(p period) map[string]rollup.Bytes {
 	m := map[string]rollup.Bytes{}
-	for _, r := range s.h.Top(rollup.Filter{}, "mac", p.from, p.now, 0) {
+	for _, r := range s.h.Top(rollup.Filter{}, "mac", p.from, p.to, 0) {
 		m[r.Key] = r.Bytes
 	}
 	return m
@@ -368,7 +402,7 @@ func (c appCatalog) ref(id string) *appJSON {
 
 // topApp is the app a device moved the most bytes with, or nil if none.
 func (s *server) topApp(mac string, p period, cat appCatalog) *appJSON {
-	rows := s.h.Top(rollup.Filter{MAC: mac}, "app", p.from, p.now, 1)
+	rows := s.h.Top(rollup.Filter{MAC: mac}, "app", p.from, p.to, 1)
 	if len(rows) == 0 {
 		return nil
 	}
@@ -461,7 +495,7 @@ func (s *server) overview(r *http.Request) (any, error) {
 		names[d.MAC] = d.Name
 	}
 
-	macRows := s.h.Top(rollup.Filter{}, "mac", p.from, p.now, 0)
+	macRows := s.h.Top(rollup.Filter{}, "mac", p.from, p.to, 0)
 
 	topClients := []topClientJSON{}
 	for _, row := range cut(macRows, overviewTop) {
@@ -474,15 +508,15 @@ func (s *server) overview(r *http.Request) (any, error) {
 		if c.Name == "" {
 			c.Name = row.Key
 		}
-		for _, cr := range s.h.Top(rollup.Filter{MAC: row.Key, NotCC: lanCC}, "cc", p.from, p.now, overviewTop) {
+		for _, cr := range s.h.Top(rollup.Filter{MAC: row.Key, NotCC: lanCC}, "cc", p.from, p.to, overviewTop) {
 			c.Countries = append(c.Countries, cr.Key)
 		}
 		topClients = append(topClients, c)
 	}
 
 	topApps := []topAppJSON{}
-	for _, ar := range s.h.Top(rollup.Filter{}, "app", p.from, p.now, overviewTop) {
-		clients := len(s.h.Top(rollup.Filter{App: ar.Key}, "mac", p.from, p.now, 0))
+	for _, ar := range s.h.Top(rollup.Filter{}, "app", p.from, p.to, overviewTop) {
+		clients := len(s.h.Top(rollup.Filter{App: ar.Key}, "mac", p.from, p.to, 0))
 		topApps = append(topApps, topAppJSON{
 			appJSON: cat.value(ar.Key), Clients: clients,
 			Down: ar.Bytes.Down, Up: ar.Bytes.Up,
@@ -493,7 +527,7 @@ func (s *server) overview(r *http.Request) (any, error) {
 	// A country's organisation is the one its dominant place reached: the
 	// rows come sorted by bytes, so the first place seen for a country wins.
 	orgOf, asnOf := map[string]string{}, map[string]string{}
-	for _, pr := range s.h.Top(rollup.Filter{}, "place", p.from, p.now, 0) {
+	for _, pr := range s.h.Top(rollup.Filter{}, "place", p.from, p.to, 0) {
 		cc := pr.Extra["cc"]
 		if _, seen := orgOf[cc]; !seen {
 			orgOf[cc], asnOf[cc] = pr.Extra["org"], pr.Extra["asn"]
@@ -502,7 +536,7 @@ func (s *server) overview(r *http.Request) (any, error) {
 	// Countries are places on the internet: the house's own traffic is not
 	// one, and their shares are taken of what crossed the line.
 	var wanRows []rollup.Row
-	for _, cr := range s.h.Top(rollup.Filter{}, "cc", p.from, p.now, 0) {
+	for _, cr := range s.h.Top(rollup.Filter{}, "cc", p.from, p.to, 0) {
 		if cr.Key != lanCC {
 			wanRows = append(wanRows, cr)
 		}
@@ -579,7 +613,7 @@ func (s *server) deviceView(d inventory.Device, p period, cat appCatalog, rates 
 		Rate:         rateJSON{Up: rate.Up, Down: rate.Down},
 		Last24h:      bytesJSON{Down: t.Down, Up: t.Up},
 		TopApp:       s.topApp(d.MAC, p, cat),
-		CountryCount: realCountries(s.h.Top(rollup.Filter{MAC: d.MAC}, "cc", p.from, p.now, 0)),
+		CountryCount: realCountries(s.h.Top(rollup.Filter{MAC: d.MAC}, "cc", p.from, p.to, 0)),
 	}
 }
 
@@ -684,7 +718,7 @@ func (s *server) apps(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	all := s.h.Top(rollup.Filter{MAC: d.MAC}, "app", p.from, p.now, 0)
+	all := s.h.Top(rollup.Filter{MAC: d.MAC}, "app", p.from, p.to, 0)
 	total := sumBytes(all)
 	out := []appUsageJSON{}
 	for _, ar := range cut(all, maxDeviceApps) {
@@ -695,14 +729,14 @@ func (s *server) apps(r *http.Request) (any, error) {
 			Domains: []domainJSON{}, Places: []placeJSON{},
 			Other: ar.Key == serviceKey, Recent: recent[ar.Key],
 		}
-		for _, dr := range s.h.Top(f, "domain", p.from, p.now, maxDestinations) {
+		for _, dr := range s.h.Top(f, "domain", p.from, p.to, maxDestinations) {
 			u.Domains = append(u.Domains, domainJSON{
 				Name: dr.Key, Src: dr.Extra["src"], Down: dr.Bytes.Down, Up: dr.Bytes.Up,
 				Other: dr.Key == serviceKey,
 			})
 		}
 		// A place is one country and one organisation the app reached.
-		for _, pr := range s.h.Top(f, "place", p.from, p.now, maxDestinations) {
+		for _, pr := range s.h.Top(f, "place", p.from, p.to, maxDestinations) {
 			u.Places = append(u.Places, placeJSON{
 				CC: pr.Extra["cc"], Org: pr.Extra["org"], Down: pr.Bytes.Down, Up: pr.Bytes.Up,
 				Other: pr.Key == serviceKey || pr.Extra["cc"] == serviceCC,
@@ -725,13 +759,13 @@ func (s *server) destinations(r *http.Request) (any, error) {
 	cat := s.catalog()
 	f := rollup.Filter{MAC: d.MAC}
 	out := destinationsJSON{Countries: []destCountryJSON{}, Orgs: []destOrgJSON{}, Domains: []destDomainJSON{}}
-	for _, cr := range s.h.Top(f, "cc", p.from, p.now, maxDestinations) {
+	for _, cr := range s.h.Top(f, "cc", p.from, p.to, maxDestinations) {
 		out.Countries = append(out.Countries, destCountryJSON{CC: cr.Key, Down: cr.Bytes.Down, Up: cr.Bytes.Up, Other: cr.Key == serviceCC})
 	}
-	for _, ar := range s.h.Top(f, "asn", p.from, p.now, maxDestinations) {
+	for _, ar := range s.h.Top(f, "asn", p.from, p.to, maxDestinations) {
 		out.Orgs = append(out.Orgs, destOrgJSON{ASN: ar.Key, Org: ar.Extra["org"], Down: ar.Bytes.Down, Up: ar.Bytes.Up, Other: ar.Key == serviceKey})
 	}
-	for _, dr := range s.h.Top(f, "domain", p.from, p.now, maxDestinations) {
+	for _, dr := range s.h.Top(f, "domain", p.from, p.to, maxDestinations) {
 		out.Domains = append(out.Domains, destDomainJSON{Name: dr.Key, App: cat.ref(dr.Extra["app"]), Down: dr.Bytes.Down, Up: dr.Bytes.Up, Other: dr.Key == serviceKey})
 	}
 	return out, nil

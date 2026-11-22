@@ -10,7 +10,7 @@ import type { App, AppUsage, Live, LiveApp, LiveConn, LivePlace } from "../types
 import { windowLabel, type Win } from "../query";
 import { useFlip, useSteadyRows } from "./table";
 
-import { StackedArea, Legend, type Layer } from "../charts";
+import { TimeChart, type Layer } from "../charts";
 import { Pills, Card, CC, Empty, AppIcon, IconContext } from "../ui";
 import { appName, category, countryName, duration, nameSource, num, plural, rate, ratePair } from "../format";
 import { LAYER_COLORS, OTHER_COLOR, UP_COLOR } from "../view";
@@ -64,20 +64,22 @@ export function LiveTraffic({ l, seen }: { l: Live; seen: Map<string, App> }) {
   const layers: Layer[] = [];
   const layerKeys: (string | undefined)[] = [];
   if (c.other) {
-    layers.push({ label: "others", color: OTHER_COLOR, values: c.otherDown });
+    layers.push({ label: "others", color: OTHER_COLOR, values: c.otherDown, id: "other" });
     layerKeys.push(undefined);
   }
   for (let i = c.keys.length - 1; i >= 0; i--) {
     const k = c.keys[i];
-    layers.push({ label: layerLabel(k, seen, manifest), color: colors[i], values: c.down[k] });
+    layers.push({ label: layerLabel(k, seen, manifest), color: colors[i], values: c.down[k], id: k });
     layerKeys.push(k);
   }
   // A legend entry names its app, and leads to it.
-  const legend: { label: string; color: string; node?: ComponentChildren }[] = layers
-    .map((x, i) => ({ label: x.label, color: x.color, node: layerKeys[i] ? <EntityLink e={{ kind: "app", id: layerKeys[i]! }}>{x.label}</EntityLink> : undefined }))
+  const legend: { label: string; color: string; node?: ComponentChildren; id?: string }[] = layers
+    .map((x, i) => ({ label: x.label, color: x.color, id: x.id, node: layerKeys[i] ? <EntityLink e={{ kind: "app", id: layerKeys[i]! }}>{x.label}</EntityLink> : undefined }))
     .reverse();
   legend.push({ label: "up", color: UP_COLOR });
   const step = Math.round(l.stepSec);
+  // Each column's start, for the crosshair: the chart ends at the newest point.
+  const t = c.up.map((_, i) => new Date(c.end - (c.up.length - i) * c.colSec * 1000).toISOString());
   return (
     <Card label="Live traffic">
       <div class="card-head">
@@ -87,9 +89,8 @@ export function LiveTraffic({ l, seen }: { l: Live; seen: Map<string, App> }) {
       {c.up.length === 0 ? (
         <Empty>The chart appears in a few seconds.</Empty>
       ) : (
-        <StackedArea layers={layers} up={c.up} viewH={220} axis={165} downH={155} upH={50} label="Live traffic chart of the device over 5 minutes" />
+        <TimeChart layers={layers} up={c.up} t={t} stepSec={c.colSec} viewH={220} axis={165} downH={155} upH={50} label="Live traffic chart of the device over 5 minutes" legend={legend} ticks={LIVE_TICKS} />
       )}
-      <Legend items={legend} ticks={LIVE_TICKS} />
     </Card>
   );
 }

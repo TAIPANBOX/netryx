@@ -419,3 +419,21 @@ a.chip:hover { color: var(--link-hover); border-color: var(--link); }
    tighter pills, and the user's name in the Sign out tooltip below 1600 px. */
 .top .pill { padding: 7px 9px; }
 @media (max-width: 1599px) { .who .who-name { display: none; } }
+
+/* charts: crosshair, shared cursor, brush, markers, legend */
+.chart-tip { position: absolute; top: 4px; transform: translateX(10px); min-width: 190px; max-width: 280px; display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; font-size: 12px; background: var(--card, #161d26); border: 1px solid var(--line, #2a3442); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); pointer-events: none; z-index: 5; }
+.chart-tip-left { transform: translateX(calc(-100% - 10px)); }
+.tip-row { display: flex; align-items: center; gap: 6px; }
+.tip-row .right { margin-left: auto; padding-left: 10px; white-space: nowrap; }
+.cursor { stroke: var(--soft); stroke-width: 1; }
+.cursor-shared { stroke-dasharray: 3 3; opacity: 0.7; }
+.brush { fill: rgba(76, 154, 255, 0.18); stroke: rgba(76, 154, 255, 0.6); }
+.layer-dim { opacity: 0.22; }
+.marker { position: absolute; top: 0; width: 0; height: 0; transform: translateX(-5px); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--warn, #f5a623); cursor: help; }
+.marker-blocked_country { border-top-color: var(--bad, #ff5c5c); }
+.marker-new_device, .marker-new_devices { border-top-color: var(--accent, #4C9AFF); }
+.legend-off { opacity: 0.45; }
+.swatch-btn { border: 0; background: none; padding: 2px; margin: -2px; cursor: pointer; display: inline-flex; border-radius: 4px; }
+.swatch-btn:focus-visible { outline: 2px solid var(--accent, #4C9AFF); }
+.span-chip { display: inline-flex; align-items: center; gap: 6px; }
+.btn-x { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 2px; font-size: 14px; line-height: 1; }

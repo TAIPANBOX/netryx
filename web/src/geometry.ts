@@ -104,14 +104,14 @@ export function cumulate(layers: number[][]): number[][] {
   return out;
 }
 
-/** Up to five labels evenly along the series; the last one is "now". */
-export function timeTicks(ts: string[], range: Range): string[] {
+/** Up to five labels evenly along the series; the last one is "now" unless the series ends in the past (a stretch picked on a chart). */
+export function timeTicks(ts: string[], range: Range, endsNow = true): string[] {
   if (ts.length === 0) return [];
   const n = Math.min(5, ts.length);
   const out: string[] = [];
   for (let i = 0; i < n; i++) {
     const idx = n === 1 ? ts.length - 1 : Math.round((i * (ts.length - 1)) / (n - 1));
-    if (i === n - 1) {
+    if (i === n - 1 && endsNow) {
       out.push("now");
     } else if (range === "1h" || range === "24h") {
       out.push(time(ts[idx]));
@@ -224,4 +224,70 @@ export function sankeyLayout(
 export function pickColumn(frac: number, n: number): number {
   if (n <= 1) return 0;
   return Math.min(n - 1, Math.max(0, Math.round(frac * (n - 1))));
+}
+
+export interface CrossRow { label: string; color: string; rate: number }
+
+/**
+ * What the crosshair says at a column: the download of every visible layer
+ * that moved, busiest first, their sum and the upload. Null off the chart.
+ */
+export function crosshairRows(col: number, layers: { label: string; color: string; values: number[] }[], up: number[], hidden: string[]): { down: number; up: number; rows: CrossRow[] } | null {
+  if (col < 0 || col >= up.length) return null;
+  const rows: CrossRow[] = [];
+  let down = 0;
+  for (const l of layers) {
+    const rate = l.values[col] ?? 0;
+    if (hidden.includes(l.label) || rate <= 0) continue;
+    rows.push({ label: l.label, color: l.color, rate });
+    down += rate;
+  }
+  rows.sort((a, b) => b.rate - a.rate);
+  return { down, up: up[col] ?? 0, rows };
+}
+
+/** The column whose step holds the time ms, or -1 when no column does. */
+export function columnOfTime(t: string[], stepSec: number, ms: number): number {
+  if (t.length === 0) return -1;
+  const first = Date.parse(t[0]);
+  const i = Math.floor((ms - first) / (stepSec * 1000));
+  return i >= 0 && i < t.length ? i : -1;
+}
+
+export interface Marker { x: number; text: string; kind: string; at: string }
+
+/** Events on the time axis (0 to 1000 wide, as the charts draw), the ones inside it only. */
+export function markersOn(t: string[], stepSec: number, ev: { at: string; text: string; kind: string }[]): Marker[] {
+  if (t.length === 0) return [];
+  const start = Date.parse(t[0]);
+  const span = t.length * stepSec * 1000;
+  const out: Marker[] = [];
+  for (const e of ev) {
+    const d = Date.parse(e.at) - start;
+    if (Number.isNaN(d) || d < 0 || d >= span) continue;
+    out.push({ x: Math.round((1000 * d) / span), text: e.text, kind: e.kind, at: e.at });
+  }
+  return out;
+}
+
+/**
+ * The hidden layers after a legend click (toggle one) or double click (that
+ * one alone, or all again when it already is). The last visible layer is
+ * never hidden.
+ */
+export function legendAfter(hidden: string[], key: string, how: "toggle" | "isolate", all: string[]): string[] {
+  const others = all.filter((k) => k !== key);
+  if (how === "isolate") {
+    const alone = !hidden.includes(key) && others.every((k) => hidden.includes(k));
+    return alone ? [] : others;
+  }
+  if (hidden.includes(key)) return hidden.filter((k) => k !== key);
+  return others.every((k) => hidden.includes(k)) ? hidden : [...hidden, key];
+}
+
+/** The busiest column, the first of equals; -1 when nothing moved. */
+export function peakColumn(v: number[]): number {
+  let best = -1;
+  for (let i = 0; i < v.length; i++) if (v[i] > 0 && (best < 0 || v[i] > v[best])) best = i;
+  return best;
 }

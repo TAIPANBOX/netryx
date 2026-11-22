@@ -205,9 +205,9 @@ func (s *server) houseApps(r *http.Request) (any, error) {
 		return nil, err
 	}
 	cat, names := s.catalog(), s.names()
-	all := s.h.Top(rollup.Filter{}, "app", p.from, p.now, 0)
+	all := s.h.Top(rollup.Filter{}, "app", p.from, p.to, 0)
 	total := sumBytes(all)
-	clients := s.h.Pairs(rollup.Filter{}, "app", "mac", p.from, p.now)
+	clients := s.h.Pairs(rollup.Filter{}, "app", "mac", p.from, p.to)
 	out := []houseAppJSON{}
 	spark := s.sparks(rollup.Filter{}, "app")
 	for _, ar := range cut(all, maxHouseApps) {
@@ -234,7 +234,7 @@ func (s *server) houseApp(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	all := s.h.Top(rollup.Filter{}, "app", p.from, p.now, 0)
+	all := s.h.Top(rollup.Filter{}, "app", p.from, p.to, 0)
 	var mine rollup.Row
 	seen := false
 	for _, ar := range all {
@@ -254,7 +254,7 @@ func (s *server) houseApp(r *http.Request) (any, error) {
 	}
 	cat := s.catalog()
 	f := rollup.Filter{App: id}
-	macs := s.h.Top(f, "mac", p.from, p.now, 0)
+	macs := s.h.Top(f, "mac", p.from, p.to, 0)
 	out := appDetailJSON{
 		App: cat.value(id), Down: mine.Bytes.Down, Up: mine.Bytes.Up, Flows: mine.Bytes.Flows,
 		Share: share(rowBytes(mine), sumBytes(all)), ClientCount: clientCount(macs),
@@ -262,10 +262,10 @@ func (s *server) houseApp(r *http.Request) (any, error) {
 		Places:  []networkJSON{}, Domains: []domainJSON{},
 		Series: s.seriesOf(f, p, ""),
 	}
-	for _, pr := range s.h.Top(f, "place", p.from, p.now, maxDestinations) {
+	for _, pr := range s.h.Top(f, "place", p.from, p.to, maxDestinations) {
 		out.Places = append(out.Places, networkView(pr))
 	}
-	for _, dr := range s.h.Top(f, "domain", p.from, p.now, maxDestinations) {
+	for _, dr := range s.h.Top(f, "domain", p.from, p.to, maxDestinations) {
 		out.Domains = append(out.Domains, domainJSON{
 			Name: dr.Key, Src: dr.Extra["src"], Down: dr.Bytes.Down, Up: dr.Bytes.Up, Other: dr.Key == serviceKey,
 		})
@@ -283,9 +283,9 @@ func (s *server) houseDestinations(r *http.Request) (any, error) {
 		return nil, err
 	}
 	cat, names := s.catalog(), s.names()
-	ccs := wanOnly(s.h.Top(rollup.Filter{}, "cc", p.from, p.now, 0), func(r rollup.Row) string { return r.Key })
+	ccs := wanOnly(s.h.Top(rollup.Filter{}, "cc", p.from, p.to, 0), func(r rollup.Row) string { return r.Key })
 	total := sumBytes(ccs)
-	clients := s.h.Pairs(rollup.Filter{NotCC: lanCC}, "cc", "mac", p.from, p.now)
+	clients := s.h.Pairs(rollup.Filter{NotCC: lanCC}, "cc", "mac", p.from, p.to)
 	out := houseDestinationsJSON{Countries: []houseCountryJSON{}, Networks: []networkJSON{}, Domains: []destDomainJSON{}}
 	for _, cr := range cut(ccs, maxHouseCountries) {
 		cl := clients[cr.Key]
@@ -294,11 +294,11 @@ func (s *server) houseDestinations(r *http.Request) (any, error) {
 			Clients: clientCount(cl), Top: topRefs(cl, names), Other: cr.Key == serviceCC, Recent: recent[cr.Key],
 		})
 	}
-	places := wanOnly(s.h.Top(rollup.Filter{}, "place", p.from, p.now, 0), func(r rollup.Row) string { return r.Extra["cc"] })
+	places := wanOnly(s.h.Top(rollup.Filter{}, "place", p.from, p.to, 0), func(r rollup.Row) string { return r.Extra["cc"] })
 	for _, pr := range cut(places, maxHouseNetworks) {
 		out.Networks = append(out.Networks, networkView(pr))
 	}
-	for _, dr := range s.h.Top(rollup.Filter{}, "domain", p.from, p.now, maxHouseDomains) {
+	for _, dr := range s.h.Top(rollup.Filter{}, "domain", p.from, p.to, maxHouseDomains) {
 		out.Domains = append(out.Domains, destDomainJSON{
 			Name: dr.Key, App: cat.ref(dr.Extra["app"]), Down: dr.Bytes.Down, Up: dr.Bytes.Up, Other: dr.Key == serviceKey,
 		})
@@ -316,7 +316,7 @@ func (s *server) houseCountry(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	ccs := wanOnly(s.h.Top(rollup.Filter{}, "cc", p.from, p.now, 0), func(r rollup.Row) string { return r.Key })
+	ccs := wanOnly(s.h.Top(rollup.Filter{}, "cc", p.from, p.to, 0), func(r rollup.Row) string { return r.Key })
 	var mine rollup.Row
 	for _, cr := range ccs {
 		if cr.Key == cc {
@@ -326,17 +326,17 @@ func (s *server) houseCountry(r *http.Request) (any, error) {
 	}
 	cat := s.catalog()
 	f := rollup.Filter{CC: cc}
-	macs := s.h.Top(f, "mac", p.from, p.now, 0)
+	macs := s.h.Top(f, "mac", p.from, p.to, 0)
 	out := countryDetailJSON{
 		CC: cc, Down: mine.Bytes.Down, Up: mine.Bytes.Up, Share: share(rowBytes(mine), sumBytes(ccs)),
 		ClientCount: clientCount(macs), Clients: clientRefs(macs, s.names(), maxDetailClients),
 		Apps: []countryAppJSON{}, Networks: []networkJSON{},
 		Series: s.seriesOf(f, p, ""),
 	}
-	for _, ar := range s.h.Top(f, "app", p.from, p.now, maxDestinations) {
+	for _, ar := range s.h.Top(f, "app", p.from, p.to, maxDestinations) {
 		out.Apps = append(out.Apps, countryAppJSON{App: cat.value(ar.Key), Down: ar.Bytes.Down, Up: ar.Bytes.Up, Other: ar.Key == serviceKey})
 	}
-	for _, pr := range s.h.Top(f, "place", p.from, p.now, maxDestinations) {
+	for _, pr := range s.h.Top(f, "place", p.from, p.to, maxDestinations) {
 		out.Networks = append(out.Networks, networkView(pr))
 	}
 	return out, nil

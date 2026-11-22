@@ -82,7 +82,7 @@ func (s *server) network1(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	hd := s.h.Holders("asn", asn, p.from, p.now)
+	hd := s.h.Holders("asn", asn, p.from, p.to)
 	out := networkPageJSON{ASN: asn, Org: hd.Org, Countries: []countryBytesJSON{}, Apps: []countryAppJSON{}}
 	for _, c := range hd.CCs {
 		out.Countries = append(out.Countries, countryBytesJSON{CC: c.Key, Down: c.Bytes.Down, Up: c.Bytes.Up})
@@ -109,7 +109,7 @@ func (s *server) domain1(r *http.Request) (any, error) {
 	}
 	cat := s.catalog()
 	out := domainPageJSON{Name: name, Apps: []domainAppJSON{}}
-	for _, dr := range s.h.Top(rollup.Filter{}, "domain", p.from, p.now, 0) {
+	for _, dr := range s.h.Top(rollup.Filter{}, "domain", p.from, p.to, 0) {
 		if !strings.EqualFold(dr.Key, name) {
 			continue
 		}
@@ -117,6 +117,6 @@ func (s *server) domain1(r *http.Request) (any, error) {
 		out.Down += dr.Bytes.Down
 		out.Up += dr.Bytes.Up
 	}
-	out.Clients = s.clientsOf(s.h.Holders("domain", name, p.from, p.now).MACs)
+	out.Clients = s.clientsOf(s.h.Holders("domain", name, p.from, p.to).MACs)
 	return out, nil
 }

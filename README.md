@@ -35,6 +35,11 @@ camera and a game console, on the real internet. The names, addresses and MACs a
   card. Cmd+K, Ctrl+K or `/` finds any device, app, country, network, domain, group or rule by
   name, address, MAC or AS number. Each row in Clients and Apps draws its last hour, and two or
   three devices can be compared side by side.
+- **Charts you can read with the mouse.** Pointing at a traffic chart says what each device or
+  app moved at that moment, and every chart on the screen marks the same moment. Dragging across
+  a stretch shows the whole screen for that stretch, and Back returns to the full period. The
+  legend hides a layer or shows it alone, alerts sit on the time axis where they happened, and
+  "What made this spike?" opens the busiest moment.
 - **Apps, not ports.** A connection is named by the name the device asked for: the TLS handshake,
   QUIC, and the router's own resolver when the handshake hides it. About 260 apps (TikTok,
   YouTube, Netflix, Steam, WhatsApp...) are told apart, each with its icon.

@@ -773,6 +773,27 @@ enforced, and that is a debt rather than a decision.
   "the comparison lines up what tells devices apart, each name a link" in
   `web/src/compare.test.ts`)
 
+## The promise about the charts
+
+- **A stretch picked on a chart is what the whole screen reads**: the address
+  carries `span=<from>~<to>` (whole RFC 3339 UTC times, from before to), the
+  API takes `from` and `to` in place of the period for the series and every
+  list, reads up to just before `to`, at the step of the shortest range that
+  holds the stretch, and refuses (400, the history unread) a missing half, a
+  time that is not one, an empty or backwards stretch, or one starting more
+  than 30 days back; a stretch past now ends at now. The live tiles keep
+  judging online and new devices by now.
+  (test: `TestASpanReadsOnlyItsStretch`, `TestAWiderSpanTakesTheStepOfTheRangeThatHoldsIt`,
+  `TestASpanMustBeAStretchOfTheLastMonth`; the page: `web/src/span.test.ts`)
+- **The mouse reads a chart without asking the router**: the crosshair names
+  the visible layers that moved at that step, busiest first, with the total
+  and the upload; the moment is shared with every chart of the screen, which
+  draws it only inside its own time; the legend hides, shows and isolates
+  layers and never hides the last; alerts are marks at their moment; "What
+  made this spike?" picks the busiest step as the stretch.
+  (the page: `web/src/cursor.test.ts`; the drawing itself is not enforced by a
+  test, seen in the lab)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's

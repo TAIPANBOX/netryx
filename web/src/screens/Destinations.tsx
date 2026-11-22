@@ -12,7 +12,7 @@ import type { CountryDetail, HouseDestinations, Range } from "../types";
 import { getJSON, usePoll } from "../api";
 import { RANGES, windowLabel, type Win } from "../query";
 import { Bars } from "../charts";
-import { Header, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
+import { Header, Card, CC, Status, Loading, Empty, AppIcon, usePeriod } from "../ui";
 import { bytes, rate, share, num, appName, countryName, clientName, plural } from "../format";
 import { closesHouse, countryHref, domainText, rulesForCountry } from "../house";
 import { BlockCountry, CDN_NOTE, RuleTags, useRuleNames, useRules } from "./controls";
@@ -21,7 +21,8 @@ import { HouseTraffic } from "./Apps";
 const periodOf = (r: Range) => RANGES.find((x) => x.id === r)?.label ?? r;
 
 export function Destinations({ range, onRange, win, onWin }: { range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
-  const polled = usePoll((s) => getJSON<HouseDestinations>(`/api/destinations?range=${range}&window=${win}`, s), 15_000, [range, win]);
+  const per = usePeriod(range);
+  const polled = usePoll((s) => getJSON<HouseDestinations>(`/api/destinations?${per.q}&window=${win}`, s), 15_000, [per.q, win]);
   const { rules } = useRules();
   const names = useRuleNames();
   const d = polled.data;
@@ -150,7 +151,8 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
 }
 
 export function Destination({ cc, range, onRange }: { cc: string; range: Range; onRange: (r: Range) => void }) {
-  const polled = usePoll((s) => getJSON<CountryDetail>(`/api/destinations/${cc}?range=${range}`, s), 15_000, [cc, range]);
+  const per = usePeriod(range);
+  const polled = usePoll((s) => getJSON<CountryDetail>(`/api/destinations/${cc}?${per.q}`, s), 15_000, [cc, per.q]);
   const { rules } = useRules();
   const names = useRuleNames();
   const d = polled.data;
