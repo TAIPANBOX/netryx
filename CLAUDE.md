@@ -600,6 +600,36 @@ enforced, and that is a debt rather than a decision.
   (test: `TestAfterARestartMinuteQuestionsAreAnsweredFromHours`,
   `TestTheMinutesStartWhenTheStoreDoes`, `TestARestartStillAnswersTheLastHourInMinutes`)
 
+## The promise about the house's apps and destinations
+
+- **Apps lists what the house used, Destinations where it went**, over the
+  period picked: each app with its category, bytes and share of the house,
+  each country with its share of what left the house, the networks (country,
+  AS, organisation) and the domains, and for each app or country how many
+  clients and which three moved the most. The house's own traffic is not a
+  destination; only hardware addresses count as clients. The lists stop at 100
+  apps, 100 countries, 50 networks and 50 domains, a detail at 50 clients.
+  (test: `TestTheHouseAppsListNamesTheClientsOfEachApp`, `TestTheHouseAppsCountOnlyClients`,
+  `TestTheHouseAppsListIsBounded`, `TestTheHouseDestinationsLeaveTheHouseOut`)
+- **One app or one country is its clients, places and traffic**: an app's
+  clients, countries with networks, domains and series; a country's clients,
+  apps, networks and series. An id that cannot be one is a 400, an app the
+  catalog does not know and the period never saw a 404, and a country is two
+  letters. (test: `TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries`,
+  `TestAnAppNobodyKnowsIs404AndAMalformedIdIs400`,
+  `TestACountryDetailShowsItsClientsAppsAndNetworks`, `TestACountryCodeMustBeTwoLetters`)
+- **The clients of every row come from one pass over the history**:
+  `Pairs` answers for each app or country what `Top` would answer for it
+  alone, so a list never reads the history once per row.
+  (test: `TestPairsAgreeWithTopForEveryKey`, `TestPairsHonourTheFilter`,
+  `TestPairsRefuseDimensionsKeysDoNotCarry`)
+- **A row says which rules close it**: an app is closed by an app rule
+  naming it or a category rule naming its category, a country by a country
+  rule naming it; each shows its state and leads to Rules, and an open
+  country can be blocked for everyone from its row. (the page: "an app's rules
+  are the ones that name it or its category", "a country's rules are the
+  country rules that name it" in `web/src/house.test.ts`)
+
 ## The promise about the running console
 
 - **The console runs without its data files.** A missing or unreadable

@@ -1206,3 +1206,20 @@ func TestTheLiveViewReadsOneDeviceByOneKey(t *testing.T) {
 		t.Fatalf("the live view read the whole table %d times", fl.liveCalls)
 	}
 }
+
+// Pairs answers as the store does: for each key of dim, Top with that key
+// set, ranked by by.
+func (h *fakeHistory) Pairs(f rollup.Filter, dim, by string, from, to time.Time) map[string][]rollup.Row {
+	out := map[string][]rollup.Row{}
+	for _, k := range h.Top(f, dim, from, to, 0) {
+		g := f
+		switch dim {
+		case "app":
+			g.App = k.Key
+		case "cc":
+			g.CC = k.Key
+		}
+		out[k.Key] = h.Top(g, by, from, to, 0)
+	}
+	return out
+}
