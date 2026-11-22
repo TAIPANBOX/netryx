@@ -13,7 +13,7 @@ import { parseRoute, RANGES, WINDOWS, type Win } from "./query";
 import { nextLogin } from "./rules";
 import { Overview } from "./screens/Overview";
 import { Clients } from "./screens/Clients";
-import { Client } from "./screens/Client";
+import { Client360 } from "./screens/Client360";
 import { Flows } from "./screens/Flows";
 import { FiltersScreen } from "./screens/Filters";
 import { Security } from "./screens/Security";
@@ -22,6 +22,7 @@ import { Login } from "./screens/Login";
 import { Apps, AppScreen } from "./screens/Apps";
 import { Destinations, Destination } from "./screens/Destinations";
 import { Network } from "./screens/Network";
+import { CardsProvider } from "./screens/windows";
 
 // The period is a per-viewer convenience; storage may be missing (a private
 // window, a blocked site), and then the page simply starts at 24 hours.
@@ -128,7 +129,9 @@ function Signed({ info }: { info: SessionInfo }) {
   return (
     <SessionContext.Provider value={info}>
       <IconContext.Provider value={icons}>
-        <Screen />
+        <CardsProvider>
+          <Screen />
+        </CardsProvider>
       </IconContext.Provider>
     </SessionContext.Provider>
   );
@@ -168,7 +171,7 @@ function Screen() {
     case "clients":
       return <Clients win={win} onWin={pickWin} />;
     case "client":
-      return <Client key={route.mac} mac={route.mac} range={range} onRange={pick} win={win} onWin={pickWin} />;
+      return <Client360 key={route.mac} mac={route.mac} range={range} onRange={pick} win={win} onWin={pickWin} />;
     case "flows":
       return <Flows key={route.q} initial={route.q} win={win} onWin={pickWin} />;
     case "rules":

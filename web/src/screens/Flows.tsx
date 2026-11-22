@@ -90,7 +90,7 @@ export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWi
   // journal newest first, each remembered on its own.
   const liveRows = useSteadyRows("flows-live", live ? loaded : [], flowKey, getters, { col: "vol", dir: "desc" });
   const journalRows = useSteadyRows("flows-journal", live ? [] : loaded, flowKey, getters, { col: "end", dir: "desc" });
-  const { rows, sort, pick } = live ? liveRows : journalRows;
+  const { rows, sort, pick, holdProps } = live ? liveRows : journalRows;
   const list = useRef<HTMLDivElement>(null);
   useFlip(list);
   const head = (label: ComponentChildren, col: string, first: "asc" | "desc" = "asc", also?: string[]) => (
@@ -160,7 +160,7 @@ export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWi
         <div class="split">
           <section aria-label="Flows table" class="card card-flush flows-card">
             <div class="scroll-x">
-              <div class="flows-table" ref={list}>
+              <div class="flows-table" ref={list} {...holdProps}>
                 <div class="flows-grid flows-head">
                   {head("End", "end", "desc")}
                   {head("Client", "client")}

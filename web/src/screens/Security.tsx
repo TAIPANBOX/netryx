@@ -2,6 +2,7 @@
 // alerts newest first, then the alert and quarantine switches and how alerts
 // reach the owner. Each control says what it does beside it.
 
+import { ClientLink } from "./entity";
 import { h } from "preact";
 import { useState } from "preact/hooks";
 import { getJSON, mac as enc, sendJSON, usePoll } from "../api";
@@ -70,7 +71,7 @@ export function Security() {
               <p class="small muted">Only the internet and the router's DNS and DHCP, until you approve them.</p>
               {held.length === 0 ? <Empty>No new devices.</Empty> : held.map((d) => (
                 <div key={d.mac} class="row-wrap small-13">
-                  <a class="break" href={`#/client/${enc(d.mac)}`}>{pendingText({ mac: d.mac, hostname: d.hostname, likelySame: d.likelySame }, nameOf)}</a>
+                  <ClientLink mac={d.mac} name={pendingText({ mac: d.mac, hostname: d.hostname, likelySame: d.likelySame }, nameOf)} class="break" />
                   {canWrite && (
                     <span class="row-wrap">
                       <select aria-label="Group" value={pick[d.mac] ?? ""} disabled={busy}

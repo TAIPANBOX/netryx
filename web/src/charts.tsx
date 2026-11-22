@@ -99,25 +99,39 @@ function clip(s: string, n: number): string {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
-/** Client, apps and countries as bands whose width is bytes. */
-export function Sankey({ nodes, links, label }: { nodes: SankeyNode[]; links: SankeyLink[]; label: string }) {
-  const out = sankeyLayout(nodes, links, { height: 300, top: 30, bottom: 20, gap: 14 });
+/**
+ * Bands whose width is bytes, in three columns (client, apps, countries) or
+ * more (the connection map). A node with an href is a link.
+ */
+export function Sankey({ nodes, links, label, cols = 3, width = 600, height = 300, href = {} }: {
+  nodes: SankeyNode[]; links: SankeyLink[]; label: string; cols?: number; width?: number; height?: number; href?: Record<string, string>;
+}) {
+  const out = sankeyLayout(nodes, links, { height, top: 30, bottom: 20, gap: 14 }, cols, width);
   if (out.nodes.length === 0) return <p class="empty">No traffic in this period.</p>;
+  const last = cols - 1;
   return (
-    <svg viewBox="0 0 600 300" role="img" aria-label={label} class="sankey">
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} class="sankey">
       {out.links.map((l, i) => (
         <path key={i} class="sankey-link" d={l.d} stroke={l.color} stroke-width={Math.max(1, l.w).toFixed(1)} />
       ))}
       {out.nodes.map((n) => {
         const icon = n.col === 1 && n.icon;
+        // Three columns label the last on its left; more columns label every
+        // one on its right, where the layout left them room.
         const [tx, ty, anchor] =
-          n.col === 0 ? [n.x, n.y - 8, "start"] : n.col === 1 ? [n.x + (icon ? 36 : 16), n.y + n.h / 2 + 4, "start"] : [n.x - 8, n.y + n.h / 2 + 4, "end"];
-        return (
-          <Fragment key={n.id}>
+          n.col === 0 ? [n.x, n.y - 8, "start"] : n.col === last && cols <= 3 ? [n.x - 8, n.y + n.h / 2 + 4, "end"] : [n.x + (icon ? 36 : 16), n.y + n.h / 2 + 4, "start"];
+        const room = cols > 3 ? 22 : icon ? 23 : 26;
+        const body = (
+          <Fragment>
             <rect x={n.x} y={n.y} width="10" height={Math.max(1, n.h).toFixed(1)} rx="2" fill={n.color} />
             {icon && <SankeyIcon x={n.x + 16} y={n.y + n.h / 2 - 8} id={icon} name={n.name ?? ""} />}
-            <text class="sankey-label" x={tx} y={ty} text-anchor={anchor}>{clip(n.label, icon ? 23 : 26)}</text>
+            <text class={href[n.id] ? "sankey-label sankey-link-label" : "sankey-label"} x={tx} y={ty} text-anchor={anchor}>{clip(n.label, room)}</text>
           </Fragment>
+        );
+        return href[n.id] ? (
+          <a key={n.id} href={href[n.id]} aria-label={n.label}>{body}</a>
+        ) : (
+          <Fragment key={n.id}>{body}</Fragment>
         );
       })}
     </svg>

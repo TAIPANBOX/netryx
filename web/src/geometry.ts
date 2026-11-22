@@ -132,15 +132,26 @@ export interface PlacedLink extends SankeyLink { d: string; w: number; color: st
 const COLS = [20, 280, 560];
 const NODE_W = 10;
 
+/** Where each column stands: the three-column chart as it always was, more columns spread evenly over the width. */
+function columns(cols: number, width: number): number[] {
+  if (cols === 3 && width === 600) return COLS;
+  // Every column but the first labels its nodes on its right, the last too:
+  // it stands far enough in to leave them room.
+  const last = width - 170;
+  return Array.from({ length: cols }, (_, c) => 20 + (c * (last - 20)) / Math.max(1, cols - 1));
+}
+
 /**
- * Lays out a three-column Sankey in a 600-wide box. A node is as tall as the
+ * Lays out a Sankey of `cols` columns (three by default) in a box `width` wide. A node is as tall as the
  * larger of what flows into it and out of it; one scale serves every column,
  * so equal bytes are equal widths anywhere on the chart.
  */
 export function sankeyLayout(
   nodes: SankeyNode[], links: SankeyLink[],
   box: { height: number; top: number; bottom: number; gap: number },
+  cols = 3, width = 600,
 ): { nodes: PlacedNode[]; links: PlacedLink[] } {
+  const COLS = columns(cols, width);
   const live = links.filter((l) => l.value > 0);
   const inSum = new Map<string, number>();
   const outSum = new Map<string, number>();

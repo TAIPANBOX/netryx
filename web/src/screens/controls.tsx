@@ -5,7 +5,7 @@
 // right to write.
 
 import { h, Fragment } from "preact";
-import { useContext, useRef, useState } from "preact/hooks";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import { once } from "../guard";
 import type { Device, Group, LiveConn } from "../types";
 import { getJSON, mac as enc, sendJSON, usePoll } from "../api";
@@ -13,6 +13,7 @@ import { IconContext, useSession } from "../ui";
 import { cutNote, type CutAnswer } from "../live";
 import { countryName, time } from "../format";
 import { ruleNames, ruleTagText } from "../house";
+import { editBody } from "../client360";
 import { activePause, appliesTo, describeRule, pauseBody, stateOf, untilText, type Names, type PauseKind, type Rule, type RuleBody } from "../rules";
 
 export const CDN_NOTE = "a service of this country reached through a CDN in another country is not blocked this way";
@@ -301,5 +302,51 @@ export function DeviceSecurity({ d }: { d: Device }) {
       {(d.isolate || d.quarantined) && d.isolation && <span class="small soft">{d.isolation.text}</span>}
       <Outcome s={x.s} undo={() => void x.undo()} />
     </div>
+  );
+}
+
+/** Rename the device or move it to another group (with the right to write). */
+export function DeviceEdit({ d }: { d: Device }) {
+  const { canWrite } = useSession();
+  const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
+  const [name, setName] = useState(d.label || d.name);
+  const [group, setGroup] = useState(d.group);
+  const [dirty, setDirty] = useState(false);
+  // The form follows the device (an approval, the agent, another tab) until
+  // the owner starts editing it.
+  useEffect(() => {
+    if (dirty) return;
+    setName(d.label || d.name);
+    setGroup(d.group);
+  }, [d.label, d.name, d.group, dirty]);
+  const x = useChange(() => setDirty(false));
+  if (!canWrite) return null;
+  const body = editBody({ name: d.label || d.name, group: d.group }, { name, group });
+  return (
+    <form
+      class="row-wrap dev-edit"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!body) return;
+        void x.run(async () => {
+          await sendJSON("PUT", `/api/devices/${enc(d.mac.toLowerCase())}`, body);
+          return { note: "Saved." };
+        });
+      }}
+    >
+      <label class="field">
+        <span class="muted small">Name</span>
+        <input class="input" value={name} maxLength={64} onInput={(e) => { setDirty(true); setName((e.target as HTMLInputElement).value); }} />
+      </label>
+      <label class="field">
+        <span class="muted small">Group</span>
+        <select class="input" value={group} onChange={(e) => { setDirty(true); setGroup((e.target as HTMLSelectElement).value); }}>
+          <option value="">no group</option>
+          {groups.filter((g) => g.id !== "new").map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+      </label>
+      <button type="submit" class="btn" disabled={!body || x.s.busy}>Save</button>
+      <Outcome s={x.s} undo={() => void x.undo()} />
+    </form>
   );
 }

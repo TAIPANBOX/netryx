@@ -16,7 +16,7 @@ const browser = await chromium.launch();
 const shots = [
   ["overview", "#/", 1440, 1000],
   ["clients", "#/clients", 1440, 900],
-  ["client", "#/client/02:4e:58:00:00:03", 1440, 1100, "24 h"],
+  ["client", "#/client/02:4e:58:00:00:03", 1440, 1400],
   ["flows", "#/flows?q=" + encodeURIComponent('client:"Sam\'s phone"'), 1440, 900],
   ["rules", "#/rules", 1440, 900],
   ["security", "#/security", 1440, 1000],

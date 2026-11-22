@@ -2,9 +2,10 @@
 // ports and who is behind each, Wi-Fi radios and clients with their signal,
 // WireGuard peers and port forwards. What the router does not have is said.
 
+import { ClientLink } from "./entity";
 import { h, Fragment, type ComponentChildren } from "preact";
 import type { NetDevice, NetworkView } from "../types";
-import { getJSON, mac, usePoll } from "../api";
+import { getJSON, usePoll } from "../api";
 import { Header, Card, Status, Loading, Empty } from "../ui";
 import { bytes, duration, plural } from "../format";
 import { apName, forwardTarget, handshakeText, idleNetworks, peerConnected, shortKey, signalText, speedText, wgState } from "../network";
@@ -48,12 +49,12 @@ function Note({ text }: { text: string }) {
 
 function DeviceLink({ d, children }: { d: NetDevice; children?: ComponentChildren }) {
   return (
-    <a href={`#/client/${mac(d.mac)}`} class="net-device">
+    <span class="net-device">
       <span class={d.online ? "dot dot-on" : "dot dot-off"} aria-hidden="true" />
       <span class="sr">{d.online ? "online" : "offline"}</span>
-      <span>{d.name}</span>
+      <ClientLink mac={d.mac} name={d.name} />
       {children}
-    </a>
+    </span>
   );
 }
 
@@ -251,7 +252,7 @@ function Forwards({ d }: { d: NetworkView }) {
             <div class="col-tight">
               <span class="strong">{r.name || `forward ${i + 1}`}</span>
               <span class="small">
-                {r.proto} {r.port} → {r.device ? <a href={`#/client/${mac(r.device.mac)}`}>{forwardTarget(r)}</a> : forwardTarget(r)}
+                {r.proto} {r.port} → {r.device ? <ClientLink mac={r.device.mac} name={forwardTarget(r)} title={r.device.name} /> : forwardTarget(r)}
               </span>
             </div>
             <span class="muted small nowrap">{r.enabled ? `from ${r.from || "wan"}` : "turned off"}</span>

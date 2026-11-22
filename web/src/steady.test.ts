@@ -95,3 +95,11 @@ test("a clear leader moves up even when every neighbour is close", () => {
   s = steadyOrder(s, rows([["c", 121], ["b", 110], ["a", 100]]), T + 60_000, "now:desc");
   assert.deepEqual(s.order, ["c", "b", "a"]);
 });
+
+test("while the pointer is over the table the order holds, and new rows wait at the end", () => {
+  let s: Steady = steadyOrder(null, rows([["a", 100], ["b", 50]]), T, "now:desc");
+  s = steadyOrder(s, rows([["c", 900], ["b", 500], ["a", 100]]), T + 60_000, "now:desc", true);
+  assert.deepEqual(s.order, ["a", "b", "c"], "held: nothing moves under the pointer");
+  s = steadyOrder(s, rows([["c", 900], ["b", 500], ["a", 100]]), T + 61_000, "now:desc");
+  assert.deepEqual(s.order, ["c", "b", "a"], "let go: the order catches up");
+});

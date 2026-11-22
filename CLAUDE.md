@@ -653,6 +653,20 @@ enforced, and that is a debt rather than a decision.
   (test: `TestTheHouseAppsCountOnlyClients`, `TestARowWithoutClientsSaysWhoseTrafficItIs`,
   `TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries`)
 
+## The promise about Client 360
+
+- **A client's name opens its card beside it**: several cards can be open
+  (at most six, the oldest closing first), the newer in front; opening one that
+  is open brings it forward; a card is dragged by its header but never off the
+  screen and closes with its X or Esc (the front one); a click with a modifier
+  follows the link. (the page: `web/src/windows.test.ts`)
+- **The full view at #/client/<mac>** shows identity, where it is connected
+  (with the router's wiring), the connection map (device, apps, domains,
+  networks, countries over the window, every name a link), now, history, rules
+  and limits with where each comes from, and security; each part has its own
+  empty and error state. (the page: `web/src/client360.test.ts`, `web/src/connmap.test.ts`;
+  the layout itself is not enforced by a test, seen in the lab)
+
 ## The promise about calm live figures
 
 - **Now is the average over a sliding window** (1, 3 or 10 minutes, 3 by

@@ -25,9 +25,17 @@ export const MARGIN = 0.12;
  * MIN_GAP_MS has passed since the last move and two rows shown in the wrong
  * order differ by more than MARGIN.
  */
-export function steadyOrder(prev: Steady | null, rows: { key: string; value: number }[], now: number, sortKey: string): Steady {
+export function steadyOrder(prev: Steady | null, rows: { key: string; value: number }[], now: number, sortKey: string, hold = false): Steady {
   const desired = rows.map((r) => r.key);
   if (!prev || prev.sortKey !== sortKey) return { order: desired, at: now, sortKey };
+  if (hold) {
+    // The pointer is over the table: nothing moves under it; a new row waits
+    // at the end and a gone one leaves.
+    const present = new Set(desired);
+    const kept = prev.order.filter((k) => present.has(k));
+    const shown = new Set(kept);
+    return { order: [...kept, ...desired.filter((k) => !shown.has(k))], at: prev.at, sortKey };
+  }
   const rank = new Map(desired.map((k, i) => [k, i]));
   const value = new Map(rows.map((r) => [r.key, r.value]));
   // The rows still there, in the order shown, with each new row put before

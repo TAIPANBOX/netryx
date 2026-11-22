@@ -7,11 +7,15 @@ import { loadSort, nextSort, saveSort, sortRows, steadyOrder, type SortState, ty
 
 /**
  * Rows sorted by the column the viewer picked (remembered per table), in an
- * order that moves at most every 30 s and only for a clear difference.
+ * order that moves at most every 30 s and only for a clear difference, and
+ * not at all while the pointer is over the table (spread holdProps on it).
  */
 export function useSteadyRows<T>(table: string, rows: T[], key: (r: T) => string, get: Record<string, (r: T) => string | number>, fallback: SortState) {
   const [sort, setSort] = useState<SortState>(() => loadSort(table, fallback, Object.keys(get)));
   const steady = useRef<Steady | null>(null);
+  // While the pointer is over the table its order holds, so a click lands on
+  // the row that was under it.
+  const [hold, setHold] = useState(false);
   const sorted = sortRows(rows, key, get, sort);
   const g = get[sort.col];
   steady.current = steadyOrder(
@@ -22,6 +26,7 @@ export function useSteadyRows<T>(table: string, rows: T[], key: (r: T) => string
     }),
     Date.now(),
     `${sort.col}:${sort.dir}`,
+    hold,
   );
   const byKey = new Map(rows.map((r) => [key(r), r]));
   const ordered = steady.current.order.map((k) => byKey.get(k)).filter((r): r is T => r !== undefined);
@@ -30,7 +35,8 @@ export function useSteadyRows<T>(table: string, rows: T[], key: (r: T) => string
     setSort(n);
     saveSort(table, n);
   };
-  return { rows: ordered, sort, pick };
+  const holdProps = { onPointerEnter: () => setHold(true), onPointerLeave: () => setHold(false) };
+  return { rows: ordered, sort, pick, holdProps };
 }
 
 function arrow(sort: SortState, cols: string[]) {
