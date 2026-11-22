@@ -3,11 +3,40 @@
 // screen once the person is in.
 
 import { h } from "preact";
-import { useState } from "preact/hooks";
-import { login } from "../api";
+import { useEffect, useState } from "preact/hooks";
+import { login, onNewBuild, pageBuild, reloadFor, servedBuild } from "../api";
 import { loginWarning } from "../rules";
 
+/**
+ * On the login there is nothing to lose: when the router serves a newer page
+ * (a restart after an upgrade ends the session and lands here) the page
+ * reloads onto it at once, once for each build.
+ */
+function useReloadOntoNewerPage() {
+  useEffect(
+    () =>
+      onNewBuild(() => {
+        let done: string | null = null;
+        try {
+          done = sessionStorage.getItem("netryx.reloadedFor");
+        } catch {
+          // no storage: reload once all the same
+        }
+        const to = reloadFor(pageBuild(), servedBuild(), done);
+        if (!to) return;
+        try {
+          sessionStorage.setItem("netryx.reloadedFor", to);
+        } catch {
+          // not remembered
+        }
+        location.reload();
+      }),
+    [],
+  );
+}
+
 export function Login({ onDone }: { onDone: (user: string, canWrite: boolean) => void }) {
+  useReloadOntoNewerPage();
   const [user, setUser] = useState("root");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);

@@ -796,7 +796,8 @@ enforced, and that is a debt rather than a decision.
 - **A page left open across an upgrade learns of it**: build.sh writes the
   page's build (a digest of its sources) into the bundle and beside it, every
   API answer names the build served (`X-Netryx-Build`), and a page that sees
-  another offers a reload. (test: `TestEveryAnswerNamesTheBuildServed`,
+  another offers a reload; on the login, where nothing is lost (a restart ends
+  the session), it reloads itself, once for each build. (test: `TestEveryAnswerNamesTheBuildServed`,
   `TestTheBuildIsReadFromBesideThePage`; the page: "a page left open across an
   upgrade is told the router serves a newer one" in `web/src/api.test.ts`)
 

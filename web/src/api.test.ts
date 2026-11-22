@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendJSON, setCSRF, onUnauthorized, ApiError, login, getJSON, setBuild, onNewBuild } from "./api";
+import { sendJSON, setCSRF, onUnauthorized, ApiError, login, getJSON, setBuild, onNewBuild, reloadFor } from "./api";
 
 interface Call { url: string; init: RequestInit }
 
@@ -226,4 +226,12 @@ test("a newer build seen before anyone listens is still told to the first listen
   const off = onNewBuild(() => told++);
   off();
   assert.equal(told, 1, "the banner mounts after the first answer and must still learn of it");
+});
+
+test("the login reloads itself onto a newer page once for each build the router serves", () => {
+  assert.equal(reloadFor("dev", "bbbbbbbbbbbb", null), "", "a page built without an id never reloads");
+  assert.equal(reloadFor("aaaaaaaaaaaa", "aaaaaaaaaaaa", null), "", "the same build");
+  assert.equal(reloadFor("aaaaaaaaaaaa", "", null), "", "no build named");
+  assert.equal(reloadFor("aaaaaaaaaaaa", "bbbbbbbbbbbb", null), "bbbbbbbbbbbb", "a newer build: reload, and remember it");
+  assert.equal(reloadFor("aaaaaaaaaaaa", "bbbbbbbbbbbb", "bbbbbbbbbbbb"), "", "already reloaded for it: no loop");
 });

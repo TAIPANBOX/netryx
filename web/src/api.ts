@@ -136,6 +136,7 @@ export async function login(user: string, password: string): Promise<LoginResult
   } catch {
     return { ok: false, text: "The router is not answering." };
   }
+  noteBuild(r);
   if (r.ok) {
     const j = (await r.json()) as { csrf: string; user: string; canWrite: boolean; zone?: string };
     setCSRF(j.csrf || "");
@@ -234,6 +235,7 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
 declare const __NETRYX_BUILD__: string;
 let build = typeof __NETRYX_BUILD__ === "string" ? __NETRYX_BUILD__ : "dev";
 let newBuildTold = false;
+let served = "";
 const newBuildListeners = new Set<() => void>();
 
 /** Sets this page's build (tests). */
@@ -258,8 +260,25 @@ export function onNewBuild(fn: () => void): () => void {
 
 /** Reads the build the router serves from an answer, and tells once when it is not this page's. */
 function noteBuild(r: Response) {
-  const served = r.headers.get("X-Netryx-Build");
-  if (!served || build === "dev" || served === build || newBuildTold) return;
+  const id = r.headers.get("X-Netryx-Build");
+  if (id) served = id;
+  if (!id || build === "dev" || id === build || newBuildTold) return;
   newBuildTold = true;
   for (const fn of newBuildListeners) fn();
 }
+
+/**
+ * The build the login should reload onto: the router's when it is not this
+ * page's, unless the page already reloaded for that one (a browser that kept
+ * the old file must not reload for ever). "" means stay.
+ */
+export function reloadFor(mine: string, served: string, done: string | null): string {
+  if (mine === "dev" || !served || served === mine || served === done) return "";
+  return served;
+}
+
+/** The build the router named on its last answer, "" before one. */
+export const servedBuild = () => served;
+
+/** This page's own build. */
+export const pageBuild = () => build;
