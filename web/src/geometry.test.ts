@@ -103,6 +103,11 @@ test("time ticks span the series and end at now", () => {
   assert.deepEqual(timeTicks([], "1h"), []);
 });
 
+test("a stretch picked in the past ends its axis at its last step, not at now", () => {
+  const t = ["2026-11-20T11:00:00Z", "2026-11-20T11:10:00Z", "2026-11-20T11:20:00Z"];
+  assert.deepEqual(timeTicks(t, "24h", false), ["11:00", "11:10", "11:20"]);
+});
+
 test("a catch-all key is folded into the one other layer, never a layer of its own", () => {
   const s = splitSeries([{ t: "x", down: { other: 900, a: 100, b: 50, c: 10 }, up: {} }], 1, 2, ["other"]);
   assert.deepEqual(s.keys, ["a", "b"]);

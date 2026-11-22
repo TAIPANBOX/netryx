@@ -8,7 +8,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { Range } from "./types";
 import type { IconManifest } from "./icons";
 import { getJSON, getSession, onUnauthorized } from "./api";
-import { IconContext, SessionContext, type SessionInfo } from "./ui";
+import { IconContext, SessionContext, SpanContext, type SessionInfo } from "./ui";
+import { parseSpan } from "./span";
 import { parseRoute, RANGES, WINDOWS, type Win } from "./query";
 import { nextLogin } from "./rules";
 import { Overview } from "./screens/Overview";
@@ -157,8 +158,14 @@ function Screen() {
       setNav((n) => n + 1);
       window.scrollTo(0, 0);
     };
+    // A stretch picked on a chart changes the address without starting the screen afresh.
+    const span = () => setHash(location.hash);
     window.addEventListener("hashchange", on);
-    return () => window.removeEventListener("hashchange", on);
+    window.addEventListener("netryx-span", span);
+    return () => {
+      window.removeEventListener("hashchange", on);
+      window.removeEventListener("netryx-span", span);
+    };
   }, []);
   const [win, setWin] = useState<Win>(savedWindow);
   const pickWin = (w: Win) => {
@@ -178,6 +185,14 @@ function Screen() {
     }
   };
 
+  return (
+    <SpanContext.Provider value={parseSpan(hash)}>
+      <Route hash={hash} nav={nav} range={range} pick={pick} win={win} pickWin={pickWin} />
+    </SpanContext.Provider>
+  );
+}
+
+function Route({ hash, nav, range, pick, win, pickWin }: { hash: string; nav: number; range: Range; pick: (r: Range) => void; win: Win; pickWin: (w: Win) => void }) {
   const route = parseRoute(hash);
   switch (route.name) {
     case "clients":

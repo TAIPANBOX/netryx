@@ -7,14 +7,16 @@
 // the page's CSP refuses inline style.
 
 import { h, Fragment, type ComponentChildren } from "preact";
-import { useContext, useState } from "preact/hooks";
+import { useContext, useEffect, useState } from "preact/hooks";
 import { hourSpark, type HourSpark } from "./live";
-import { areaPath, cumulate, pickColumn, sankeyLayout, type SankeyLink, type SankeyNode } from "./geometry";
-import { rate } from "./format";
+import { areaPath, columnOfTime, crosshairRows, cumulate, legendAfter, peakColumn, pickColumn, sankeyLayout, type Marker, type SankeyLink, type SankeyNode } from "./geometry";
+import { clock, date, dayMonth, rate, time } from "./format";
+import { brushSpan, setSpan } from "./span";
 import { appIcon } from "./icons";
 import { IconContext, brokenIcons, iconBroke } from "./ui";
 
-export interface Layer { label: string; color: string; values: number[] }
+/** id tells layers apart when two share a label (two clients of one name). */
+export interface Layer { label: string; color: string; values: number[]; id?: string }
 
 interface StackedProps {
   /** Download layers, bottom first, in bytes per second. */
@@ -28,54 +30,189 @@ interface StackedProps {
   label: string;
   /** Called with the column clicked, when the chart leads somewhere. */
   onPick?: (column: number) => void;
+  /** Each column's start (RFC 3339) and the seconds it covers: what the crosshair, the shared cursor and the brush read. */
+  t?: string[];
+  stepSec?: number;
+  /** A drag across columns picks that stretch for the whole screen. */
+  brush?: boolean;
+  /** Events drawn on the time axis. */
+  markers?: Marker[];
+  /** Layers the legend hid, and the one it points at. */
+  hidden?: string[];
+  focus?: string;
 }
+
+// The time under the mouse on any chart: every chart of the screen draws a
+// line at it, so a spike on one is seen against the others.
+let cursorMs: number | null = null;
+const cursorSubs = new Set<() => void>();
+function setCursor(ms: number | null) {
+  if (ms === cursorMs) return;
+  cursorMs = ms;
+  cursorSubs.forEach((f) => f());
+}
+function useCursor(): number | null {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const f = () => force((n) => n + 1);
+    cursorSubs.add(f);
+    return () => void cursorSubs.delete(f);
+  }, []);
+  return cursorMs;
+}
+
+const layerId = (l: Layer) => l.id ?? l.label;
+const colX = (i: number, n: number) => (n <= 1 ? 500 : (i * 1000) / (n - 1));
 
 /**
  * Download layers stacked above the axis and the upload area below it. The two
  * sides have their own scales, because upload is usually a tenth of download
  * and would vanish on a shared one; each scale's top is written on the chart.
+ * The mouse shows what each layer moved at that moment; a drag picks a stretch.
  */
 export function StackedArea(p: StackedProps) {
-  const cum = cumulate(p.layers.map((l) => l.values));
+  const hidden = p.hidden ?? [];
+  const shown = p.layers.filter((l) => !hidden.includes(layerId(l)));
+  const cum = cumulate(shown.map((l) => l.values));
   const top = cum[cum.length - 1] ?? [];
   const maxDown = Math.max(0, ...top);
   const maxUp = Math.max(0, ...p.up);
+  const n = p.up.length;
+  const t = p.t ?? [];
+  const step = p.stepSec ?? 0;
+  const [hover, setHover] = useState(-1);
+  const [drag, setDrag] = useState<[number, number] | null>(null);
+  const shared = useCursor();
   const paths = [];
   // Drawn from the full stack down, so each band shows the colour of its layer.
   for (let j = cum.length - 1; j >= 0; j--) {
-    paths.push(<path key={p.layers[j].label} class="layer" d={areaPath(cum[j], maxDown, p.axis, p.downH, -1)} fill={p.layers[j].color} />);
+    const id = layerId(shown[j]);
+    paths.push(<path key={id} class={p.focus && p.focus !== id ? "layer layer-dim" : "layer"} d={areaPath(cum[j], maxDown, p.axis, p.downH, -1)} fill={shown[j].color} />);
   }
+  const colAt = (e: MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return pickColumn((e.clientX - r.left) / r.width, n);
+  };
+  const live = n > 0 && t.length === n && step > 0;
+  // Another chart's cursor, when this one is not under the mouse.
+  const other = hover < 0 && shared !== null && live ? columnOfTime(t, step, shared) : -1;
+  const cross = hover >= 0 && live ? crosshairRows(hover, shown, p.up, []) : null;
+  const x = (i: number) => colX(i, n);
   return (
-    <div class="chart">
-      <svg
-        viewBox={`0 0 1000 ${p.viewH}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={p.label}
-        class={p.onPick ? "chart-svg chart-pick" : "chart-svg"}
-        height={p.viewH}
-        onClick={(e) => {
-          const n = p.up.length;
-          if (!p.onPick || n === 0) return;
-          const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          p.onPick(pickColumn((e.clientX - r.left) / r.width, n));
-        }}
-      >
+    <div
+      class={p.onPick || p.brush ? "chart chart-pick" : "chart"}
+      onMouseMove={(e) => {
+        if (!live) return;
+        const c = colAt(e);
+        setHover(c);
+        setCursor(Date.parse(t[c]));
+        if (drag) setDrag([drag[0], c]);
+      }}
+      onMouseLeave={() => {
+        setHover(-1);
+        setDrag(null);
+        setCursor(null);
+      }}
+      onMouseDown={(e) => {
+        if (e.button === 0 && n > 0) setDrag([colAt(e), colAt(e)]);
+      }}
+      onMouseUp={(e) => {
+        const d = drag;
+        setDrag(null);
+        if (!d || n === 0) return;
+        if (p.brush && live && d[0] !== d[1]) {
+          const sp = brushSpan(t, step, d[0], d[1]);
+          if (sp) setSpan(sp);
+        } else if (p.onPick) p.onPick(colAt(e));
+      }}
+    >
+      <svg viewBox={`0 0 1000 ${p.viewH}`} preserveAspectRatio="none" role="img" aria-label={p.label} class="chart-svg" height={p.viewH}>
         <line class="grid" x1="0" y1={p.axis - p.downH} x2="1000" y2={p.axis - p.downH} />
         <line class="grid" x1="0" y1={p.axis - p.downH / 2} x2="1000" y2={p.axis - p.downH / 2} />
         {paths}
         <path class="up-area" d={areaPath(p.up, maxUp, p.axis, p.upH, 1)} />
         <line class="axis" x1="0" y1={p.axis} x2="1000" y2={p.axis} />
+        {drag && drag[0] !== drag[1] && (
+          <rect class="brush" x={x(Math.min(...drag))} y="0" width={Math.max(1, x(Math.max(...drag)) - x(Math.min(...drag)))} height={p.viewH} />
+        )}
+        {(hover >= 0 || other >= 0) && live && (
+          <line class={hover >= 0 ? "cursor" : "cursor cursor-shared"} x1={x(hover >= 0 ? hover : other)} y1="0" x2={x(hover >= 0 ? hover : other)} y2={p.viewH} vector-effect="non-scaling-stroke" />
+        )}
       </svg>
       <span class="chart-scale chart-scale-down">↓ {rate(maxDown)}</span>
       <span class="chart-scale chart-scale-up">↑ {rate(maxUp)}</span>
+      {(p.markers ?? []).map((m) => (
+        <span key={m.at + m.text} class={`marker marker-${m.kind}`} style={{ left: `${m.x / 10}%` }} title={m.text} aria-label={m.text} role="img" />
+      ))}
+      {cross && (
+        <div class={hover > n / 2 ? "chart-tip chart-tip-left" : "chart-tip"} style={{ left: `${x(hover) / 10}%` }} role="status">
+          <strong>{stepSpan(t[hover], step)}</strong>
+          {cross.rows.slice(0, 6).map((r) => (
+            <span key={r.label} class="tip-row">
+              <Swatch color={r.color} />
+              <span class="ellipsis">{r.label}</span>
+              <span class="right">{rate(r.rate)}</span>
+            </span>
+          ))}
+          {cross.rows.length > 6 && <span class="muted">and {cross.rows.length - 6} more</span>}
+          <span class="tip-row soft">
+            <span>↓ {rate(cross.down)}</span>
+            <span class="right">↑ {rate(cross.up)}</span>
+          </span>
+          {p.brush && <span class="muted">drag to look at a stretch</span>}
+        </div>
+      )}
     </div>
   );
+}
+
+/** "14:20 to 14:30", or a day's date for a day step. */
+function stepSpan(iso: string, stepSec: number): string {
+  if (stepSec >= 86400) return date(iso);
+  if (stepSec < 60) return clock(iso);
+  const end = new Date(Date.parse(iso) + stepSec * 1000).toISOString();
+  return `${stepSec >= 3600 ? dayMonth(iso) + " " : ""}${time(iso)} to ${time(end)}`;
 }
 
 /** One download area and one upload area: the "total" view. */
 export function AreaChart(p: Omit<StackedProps, "layers"> & { down: number[] }) {
   return <StackedArea {...p} layers={[{ label: "down", color: "#4C9AFF", values: p.down }]} />;
+}
+
+/**
+ * A chart and its legend together: a legend entry's swatch hides or shows its
+ * layer, a double click shows it alone (or all again), and pointing at an
+ * entry fades the others. "What made this spike?" picks the busiest step.
+ */
+export function TimeChart(p: StackedProps & { legend: LegendItem[]; ticks?: string[]; spike?: boolean }) {
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [focus, setFocus] = useState("");
+  const ids = p.layers.map(layerId);
+  const t = p.t ?? [];
+  const step = p.stepSec ?? 0;
+  const shown = p.layers.filter((l) => !hidden.includes(layerId(l)));
+  const total = p.up.map((_, i) => shown.reduce((a, l) => a + (l.values[i] ?? 0), 0));
+  const peak = p.spike && p.brush ? peakColumn(total) : -1;
+  return (
+    <Fragment>
+      <StackedArea {...p} hidden={hidden} focus={focus} />
+      <Legend
+        items={p.legend}
+        ticks={p.ticks}
+        hidden={hidden}
+        layers={ids}
+        onToggle={(id, how) => setHidden(legendAfter(hidden, id, how, ids))}
+        onFocus={setFocus}
+        extra={
+          peak >= 0 && t.length > 1 && step > 0 ? (
+            <button type="button" class="link-btn small" onClick={() => { const sp = brushSpan(t, step, peak, peak); if (sp) setSpan(sp); }}>
+              What made this spike? ({stepSpan(t[peak], step)})
+            </button>
+          ) : undefined
+        }
+      />
+    </Fragment>
+  );
 }
 
 /** A small colour square for a legend. */
@@ -102,15 +239,33 @@ export function HourSparkline({ s, color = "var(--accent, #4C9AFF)" }: { s?: Hou
   );
 }
 
-export function Legend({ items, ticks }: { items: { label: string; color: string; node?: ComponentChildren }[]; ticks?: string[] }) {
+export interface LegendItem { label: string; color: string; node?: ComponentChildren; id?: string }
+
+export function Legend({ items, ticks, hidden = [], layers = [], onToggle, onFocus, extra }: {
+  items: LegendItem[]; ticks?: string[]; hidden?: string[]; layers?: string[];
+  onToggle?: (id: string, how: "toggle" | "isolate") => void; onFocus?: (id: string) => void; extra?: ComponentChildren;
+}) {
   return (
     <div class="legend">
-      {items.map((g) => (
-        <span class="legend-item" key={g.label}>
-          <Swatch color={g.color} />
-          {g.node ?? g.label}
-        </span>
-      ))}
+      {items.map((g) => {
+        const id = g.id ?? g.label;
+        const layer = !!onToggle && layers.includes(id);
+        const off = hidden.includes(id);
+        return (
+          <span class={off ? "legend-item legend-off" : "legend-item"} key={id} onMouseEnter={() => layer && onFocus?.(id)} onMouseLeave={() => layer && onFocus?.("")}>
+            {layer ? (
+              <button type="button" class="swatch-btn" aria-pressed={!off} title="Click to hide or show, double click to show it alone"
+                onClick={() => onToggle!(id, "toggle")} onDblClick={() => onToggle!(id, "isolate")}>
+                <Swatch color={g.color} />
+              </button>
+            ) : (
+              <Swatch color={g.color} />
+            )}
+            {g.node ?? g.label}
+          </span>
+        );
+      })}
+      {extra}
       {ticks && ticks.length > 0 && <span class="legend-ticks">{ticks.join(" · ")}</span>}
     </div>
   );

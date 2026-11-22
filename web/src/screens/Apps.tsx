@@ -9,10 +9,10 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { AppDetail, HouseApp, Range } from "../types";
 import { getJSON, usePoll } from "../api";
-import { RANGES, stepOf, windowLabel, type Win } from "../query";
+import { RANGES, windowLabel, type Win } from "../query";
 import { splitSeries, timeTicks } from "../geometry";
-import { AreaChart, Bars, HourSparkline, Legend } from "../charts";
-import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
+import { Bars, HourSparkline, TimeChart } from "../charts";
+import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon, usePeriod } from "../ui";
 import { bytes, rate, share, num, appName, category, countryName, clientName, nameSource, plural } from "../format";
 import { appHref, appsSummary, categoriesIn, closesHouse, domainText, matchApp, rulesForApp } from "../house";
 import { BlockApp, RuleTags, useRuleNames, useRules } from "./controls";
@@ -21,7 +21,8 @@ import { LAYER_COLORS, UP_COLOR } from "../view";
 const periodOf = (r: Range) => RANGES.find((x) => x.id === r)?.label ?? r;
 
 export function Apps({ cat0, q0, range, onRange, win, onWin }: { cat0: string; q0: string; range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
-  const polled = usePoll((s) => getJSON<HouseApp[]>(`/api/apps?range=${range}&window=${win}`, s), 15_000, [range, win]);
+  const per = usePeriod(range);
+  const polled = usePoll((s) => getJSON<HouseApp[]>(`/api/apps?${per.q}&window=${win}`, s), 15_000, [per.q, win]);
   const { rules } = useRules();
   const names = useRuleNames();
   const [q, setQ] = useState(q0);
@@ -143,7 +144,8 @@ export function Apps({ cat0, q0, range, onRange, win, onWin }: { cat0: string; q
 }
 
 export function AppScreen({ id, range, onRange }: { id: string; range: Range; onRange: (r: Range) => void }) {
-  const polled = usePoll((s) => getJSON<AppDetail>(`/api/apps/${encodeURIComponent(id)}?range=${range}`, s), 15_000, [id, range]);
+  const per = usePeriod(range);
+  const polled = usePoll((s) => getJSON<AppDetail>(`/api/apps/${encodeURIComponent(id)}?${per.q}`, s), 15_000, [id, per.q]);
   const { rules } = useRules();
   const names = useRuleNames();
   const d = polled.data;
@@ -225,23 +227,27 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
   );
 }
 
-function Traffic({ d, range }: { d: { series: AppDetail["series"] }; range: Range }) {
-  const s = splitSeries(d.series, stepOf(range), 1);
+export function Traffic({ d, range }: { d: { series: AppDetail["series"] }; range: Range }) {
+  const per = usePeriod(range);
+  const s = splitSeries(d.series, per.step, 1);
   const k = s.keys[0];
   return (
     <Card label="Traffic over the period">
       <div class="card-head">
         <div class="card-titles">
           <h2>Traffic</h2>
-          <span class="muted small">above the axis down, below it up, in bit/s, over {periodOf(range)}</span>
+          <span class="muted small">above the axis down, below it up, in bit/s, over {per.span ? "the stretch" : periodOf(range)}</span>
         </div>
       </div>
       {d.series.length === 0 || !k ? (
         <Empty>No traffic in this period.</Empty>
       ) : (
-        <AreaChart down={s.down[k]} up={s.up} viewH={200} axis={150} downH={140} upH={45} label="Traffic chart for the period" />
+        <TimeChart
+          layers={[{ label: "down", color: LAYER_COLORS[0], values: s.down[k] }]} up={s.up} t={s.t} stepSec={per.step}
+          viewH={200} axis={150} downH={140} upH={45} label="Traffic chart for the period; drag across a stretch to look at it" brush spike
+          legend={[{ label: "down", color: LAYER_COLORS[0] }, { label: "up", color: UP_COLOR }]} ticks={timeTicks(s.t, per.range, !per.span)}
+        />
       )}
-      <Legend items={[{ label: "down", color: LAYER_COLORS[0] }, { label: "up", color: UP_COLOR }]} ticks={timeTicks(s.t, range)} />
     </Card>
   );
 }

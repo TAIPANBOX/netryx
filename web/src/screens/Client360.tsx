@@ -11,7 +11,8 @@ import { useContext, useRef, useState } from "preact/hooks";
 import type { App, AppUsage, Destinations, Device, FlowsPage, Group, Person, Live, NetworkView, Range, SeriesPoint } from "../types";
 import { getJSON, mac as enc, usePoll, type Polled } from "../api";
 import { RANGES, windowLabel, type Win } from "../query";
-import { Header, Pills, Card, Status, Loading, Empty, IconContext } from "../ui";
+import { Header, Pills, Card, Status, Loading, Empty, IconContext, usePeriod } from "../ui";
+import { setSpan } from "../span";
 import { Sankey } from "../charts";
 import { date, time, groupName } from "../format";
 import { alertText, type AlertsState } from "../security";
@@ -180,28 +181,31 @@ function Now({ mac, win, avg }: { mac: string; win: Win; avg?: { down: number; u
 function History({ mac, range, onRange, win }: { mac: string; range: Range; onRange: (r: Range) => void; win: Win }) {
   const [split, setSplit] = useState<SplitKind>("app");
   const base = `/api/devices/${enc(mac)}`;
+  const per = usePeriod(range);
+  const alerts = usePoll((s) => getJSON<AlertsState>("/api/alerts", s), 60_000, []).data;
+  const marks = (alerts?.alerts ?? []).filter((a) => a.mac === mac.toLowerCase());
   const hist = usePoll(
     async (s) => {
       const [traffic, apps, dest] = await Promise.all([
-        getJSON<SeriesPoint[]>(`${base}/traffic?range=${range}&split=${split}`, s),
-        getJSON<AppUsage[]>(`${base}/apps?range=${range}&window=${win}`, s),
-        getJSON<Destinations>(`${base}/destinations?range=${range}`, s),
+        getJSON<SeriesPoint[]>(`${base}/traffic?${per.q}&split=${split}`, s),
+        getJSON<AppUsage[]>(`${base}/apps?${per.q}&window=${win}`, s),
+        getJSON<Destinations>(`${base}/destinations?${per.q}`, s),
       ]);
       return { traffic, apps, dest };
     },
     15_000,
-    [mac, range, split, win],
+    [mac, per.q, split, win],
   );
   return (
     <section aria-label="History" class="col-tight">
       <div class="card-head">
         <h2>History</h2>
-        <Pills label="History period" inset value={range} onPick={(v) => onRange(v as Range)} items={RANGES.map((r) => ({ id: r.id, label: r.label }))} />
+        <Pills label="History period" inset value={per.span ? "" : range} onPick={(v) => { if (per.span) setSpan(null); onRange(v as Range); }} items={RANGES.map((r) => ({ id: r.id, label: r.label }))} />
       </div>
       <Section polled={hist}>
         {(got) => (
           <div class="stack">
-            <Traffic d={got} range={range} split={split} onSplit={setSplit} />
+            <Traffic d={got} step={per.step} range={per.range} span={!!per.span} split={split} onSplit={setSplit} alerts={marks} />
             <Apps apps={got.apps} mac={mac} win={win} />
             <Where dest={got.dest} />
           </div>

@@ -8,10 +8,9 @@ import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { Overview as OverviewData, Range } from "../types";
 import { getJSON, usePoll } from "../api";
-import { stepOf } from "../query";
-import { splitSeries, timeTicks } from "../geometry";
-import { StackedArea, Legend, Bars, type Layer } from "../charts";
-import { Header, Pills, Card, CC, Status, Loading, Empty, LATER, AppIcon } from "../ui";
+import { markersOn, splitSeries, timeTicks } from "../geometry";
+import { TimeChart, Bars, type Layer } from "../charts";
+import { Header, Pills, Card, CC, Status, Loading, Empty, LATER, AppIcon, usePeriod } from "../ui";
 import { blockedTile, type Rule } from "../rules";
 import { BlockCountry } from "./controls";
 import { bytes, ratePair, duration, num, share, plural, appName, category, countryName, newDevices, clientName } from "../format";
@@ -22,7 +21,8 @@ type SplitKind = "mac" | "app" | "none";
 
 export function Overview({ range, onRange }: { range: Range; onRange: (r: Range) => void }) {
   const [split, setSplit] = useState<SplitKind>("mac");
-  const polled = usePoll((s) => getJSON<OverviewData>(`/api/overview?range=${range}&split=${split}`, s), 10_000, [range, split]);
+  const per = usePeriod(range);
+  const polled = usePoll((s) => getJSON<OverviewData>(`/api/overview?${per.q}&split=${split}`, s), 10_000, [per.q, split]);
   const d = polled.data;
   // The Blocked tile reads the rules' own counters; without them (a read
   // that failed) it says there is no data rather than 0.
@@ -39,7 +39,7 @@ export function Overview({ range, onRange }: { range: Range; onRange: (r: Range)
         ) : (
           <div class="stack">
             <Tiles d={d} rules={rules.data} alerts={alerts.data} />
-            <Traffic d={d} range={range} split={split} onSplit={setSplit} />
+            <Traffic d={d} step={per.step} range={per.range} span={!!per.span} split={split} onSplit={setSplit} alerts={alerts.data} />
             <div class="grid-3">
               <TopClients d={d} />
               <TopApps d={d} />
@@ -98,9 +98,9 @@ function Tiles({ d, rules, alerts }: { d: OverviewData; rules?: Rule[]; alerts?:
   );
 }
 
-function Traffic({ d, range, split, onSplit }: { d: OverviewData; range: Range; split: SplitKind; onSplit: (s: SplitKind) => void }) {
+function Traffic({ d, step, range, span, split, onSplit, alerts }: { d: OverviewData; step: number; range: Range; span: boolean; split: SplitKind; onSplit: (s: SplitKind) => void; alerts?: AlertsState }) {
   // The rollup's catch-all key joins the folded rest: one "others" layer, not two.
-  const s = splitSeries(d.series, stepOf(range), split === "none" ? 1 : LAYER_COLORS.length, ["other"]);
+  const s = splitSeries(d.series, step, split === "none" ? 1 : LAYER_COLORS.length, ["other"]);
   const names = new Map<string, string>();
   for (const c of d.topClients) names.set(c.mac, clientName(c));
   for (const a of d.topApps) names.set(a.id, appName(a.name));
@@ -111,22 +111,24 @@ function Traffic({ d, range, split, onSplit }: { d: OverviewData; range: Range; 
   // The key behind each layer, by position: two clients may share a name.
   const layerKeys: (string | undefined)[] = [];
   if (s.other) {
-    layers.push({ label: otherLabel(split, d), color: OTHER_COLOR, values: s.otherDown });
+    layers.push({ label: otherLabel(split, d), color: OTHER_COLOR, values: s.otherDown, id: "other" });
     layerKeys.push(undefined);
   }
   for (let i = s.keys.length - 1; i >= 0; i--) {
-    layers.push({ label: label(s.keys[i]), color: LAYER_COLORS[i], values: s.down[s.keys[i]] });
+    layers.push({ label: label(s.keys[i]), color: LAYER_COLORS[i], values: s.down[s.keys[i]], id: s.keys[i] });
     layerKeys.push(s.keys[i]);
   }
   // A legend entry is a link: a client opens its card, an app its page.
   const legend = layers.map((l, i) => ({ l, k: layerKeys[i] })).reverse().map(({ l, k }) => {
     const node = !k || split === "none" ? undefined : split === "mac" && /^[0-9a-f:]{17}$/i.test(k) ? <ClientLink mac={k} name={l.label} /> : split === "app" ? <EntityLink e={{ kind: "app", id: k }}>{l.label}</EntityLink> : undefined;
-    return { label: l.label, color: l.color, node };
+    return { label: l.label, color: l.color, node, id: l.id };
   });
-  legend.push({ label: split === "none" ? "up" : "up (all)", color: UP_COLOR, node: undefined });
+  legend.push({ label: split === "none" ? "up" : "up (all)", color: UP_COLOR, node: undefined, id: undefined });
+  // The alerts of the period, where they happened on the time axis.
+  const marks = markersOn(s.t, step, (alerts?.alerts ?? []).map((a) => ({ at: a.at, kind: a.kind, text: alertText(a, (m) => names.get(m) ?? "") })));
   // A click on the chart opens the flows of that stretch of time.
   const pick = (i: number) => {
-    const h = s.t[i] ? stretchHref(s.t[i], stepOf(range)) : undefined;
+    const h = s.t[i] ? stretchHref(s.t[i], step) : undefined;
     if (h) location.hash = h;
   };
 
@@ -148,9 +150,12 @@ function Traffic({ d, range, split, onSplit }: { d: OverviewData; range: Range; 
       {d.series.length === 0 ? (
         <Empty>No traffic in this period yet.</Empty>
       ) : (
-        <StackedArea layers={layers} up={s.up} viewH={260} axis={170} downH={160} upH={80} label="WAN traffic chart for the period; click a stretch for its flows" onPick={pick} />
+        <TimeChart
+          layers={layers} up={s.up} t={s.t} stepSec={step} viewH={260} axis={170} downH={160} upH={80}
+          label="WAN traffic chart for the period; click a moment for its flows, drag across a stretch to look at it"
+          onPick={pick} brush spike markers={marks} legend={legend} ticks={timeTicks(s.t, range, !span)}
+        />
       )}
-      <Legend items={legend} ticks={timeTicks(s.t, range)} />
     </Card>
   );
 }

@@ -9,9 +9,10 @@ import { SortHead, useFlip, useSteadyRows } from "./table";
 
 import type { AppUsage, Destinations, Device, FlowsPage, Range, SeriesPoint } from "../types";
 
-import { stepOf, RANGES, windowLabel, type Win } from "../query";
-import { splitSeries, timeTicks } from "../geometry";
-import { StackedArea, Legend, type Layer } from "../charts";
+import { RANGES, windowLabel, type Win } from "../query";
+import { markersOn, splitSeries, timeTicks } from "../geometry";
+import { TimeChart, type Layer } from "../charts";
+import { alertText, type Alert } from "../security";
 import { Pills, Card, CC, Empty, AppIcon } from "../ui";
 import { bytes, rate, share, num, time, appName, category, countryName, nameSource, plural } from "../format";
 import { LAYER_COLORS, OTHER_COLOR, UP_COLOR, isRealCountry } from "../view";
@@ -29,27 +30,28 @@ interface ClientData {
 
 type SplitKind = "app" | "none";
 
-export function Traffic({ d, range, split, onSplit }: { d: Pick<ClientData, "traffic" | "apps">; range: Range; split: SplitKind; onSplit: (s: SplitKind) => void }) {
-  const s = splitSeries(d.traffic, stepOf(range), split === "none" ? 1 : 3, ["other"]);
+export function Traffic({ d, step, range, span, split, onSplit, alerts = [] }: { d: Pick<ClientData, "traffic" | "apps">; step: number; range: Range; span?: boolean; split: SplitKind; onSplit: (s: SplitKind) => void; alerts?: Alert[] }) {
+  const s = splitSeries(d.traffic, step, split === "none" ? 1 : 3, ["other"]);
   const names = new Map(d.apps.map((a) => [a.app.id, appName(a.app.name)]));
   const layers: Layer[] = [];
   const layerKeys: (string | undefined)[] = [];
   if (s.other) {
-    layers.push({ label: "others", color: OTHER_COLOR, values: s.otherDown });
+    layers.push({ label: "others", color: OTHER_COLOR, values: s.otherDown, id: "other" });
     layerKeys.push(undefined);
   }
   const colors = [LAYER_COLORS[0], LAYER_COLORS[2], LAYER_COLORS[1]];
   for (let i = s.keys.length - 1; i >= 0; i--) {
     const k = s.keys[i];
-    layers.push({ label: split === "none" ? "down" : names.get(k) ?? appName(k), color: colors[i], values: s.down[k] });
+    layers.push({ label: split === "none" ? "down" : names.get(k) ?? appName(k), color: colors[i], values: s.down[k], id: k });
     layerKeys.push(split === "none" ? undefined : k);
   }
   // A legend entry names its app, and leads to it.
-  const legend: { label: string; color: string; node?: ComponentChildren }[] = layers
-    .map((l, i) => ({ label: l.label, color: l.color, node: layerKeys[i] ? <EntityLink e={{ kind: "app", id: layerKeys[i]! }}>{l.label}</EntityLink> : undefined }))
+  const legend: { label: string; color: string; node?: ComponentChildren; id?: string }[] = layers
+    .map((l, i) => ({ label: l.label, color: l.color, id: l.id, node: layerKeys[i] ? <EntityLink e={{ kind: "app", id: layerKeys[i]! }}>{l.label}</EntityLink> : undefined }))
     .reverse();
   legend.push({ label: "up", color: UP_COLOR });
-  const period = RANGES.find((r) => r.id === range)?.label ?? range;
+  const period = span ? "the stretch" : RANGES.find((r) => r.id === range)?.label ?? range;
+  const marks = markersOn(s.t, step, alerts.map((a) => ({ at: a.at, kind: a.kind, text: alertText(a, () => "this device") })));
   const peak = s.peakDown.rate > 0 ? ` · peak ${rate(s.peakDown.rate)} at ${time(s.peakDown.at)}` : "";
 
   return (
@@ -67,9 +69,12 @@ export function Traffic({ d, range, split, onSplit }: { d: Pick<ClientData, "tra
       {d.traffic.length === 0 ? (
         <Empty>No traffic in this period.</Empty>
       ) : (
-        <StackedArea layers={layers} up={s.up} viewH={220} axis={160} downH={150} upH={55} label="Client traffic chart for the period" />
+        <TimeChart
+          layers={layers} up={s.up} t={s.t} stepSec={step} viewH={220} axis={160} downH={150} upH={55}
+          label="Client traffic chart for the period; drag across a stretch to look at it"
+          brush spike markers={marks} legend={legend} ticks={timeTicks(s.t, range, !span)}
+        />
       )}
-      <Legend items={legend} ticks={timeTicks(s.t, range)} />
     </Card>
   );
 }

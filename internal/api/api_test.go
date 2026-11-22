@@ -75,6 +75,13 @@ type fakeHistory struct {
 	spans   []time.Duration
 	// sparks answers Sparks by dimension.
 	sparks map[string]rollup.SparksOf
+	// tops records every Top asked for.
+	tops []topCall
+}
+
+type topCall struct {
+	dim      string
+	from, to time.Time
 }
 
 func (h *fakeHistory) Sparks(f rollup.Filter, dim string, span, step time.Duration) rollup.SparksOf {
@@ -103,6 +110,7 @@ func (h *fakeHistory) Series(f rollup.Filter, from, to time.Time, step time.Dura
 }
 
 func (h *fakeHistory) Top(f rollup.Filter, dim string, from, to time.Time, n int) []rollup.Row {
+	h.tops = append(h.tops, topCall{dim: dim, from: from, to: to})
 	rows := h.top[topKey(dim, f)]
 	if n > 0 && len(rows) > n {
 		rows = rows[:n]
