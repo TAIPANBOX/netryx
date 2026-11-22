@@ -85,7 +85,7 @@ export function Apps({ range, onRange }: { range: Range; onRange: (r: Range) => 
                         </td>
                         <td class="num small">
                           ↓ {bytes(a.down)}
-                          <br />↑ {bytes(a.up)}
+                          <br />{" "}↑ {bytes(a.up)}
                         </td>
                         <td class="small">{a.other ? "" : <RuleTags rules={rulesForApp(rules, a.app)} />}</td>
                       </tr>

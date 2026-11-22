@@ -40,6 +40,7 @@ import (
 	"netryx/internal/icons"
 	"netryx/internal/inventory"
 	"netryx/internal/neigh"
+	"netryx/internal/netview"
 	"netryx/internal/rollup"
 	"netryx/internal/rules"
 	"netryx/internal/wan"
@@ -401,7 +402,12 @@ func buildConsole(o Options) (*console, error) {
 		conf:    o.RulesConfig,
 		bridges: o.LAN, oui: oui, every: 30 * time.Second,
 	}
-	apiOpts := []api.Option{api.OnLivePoll(c.livePolled)}
+	apiOpts := []api.Option{
+		api.OnLivePoll(c.livePolled),
+		// The Network screen reads the router's wiring only: ubus, sysfs,
+		// the UCI files and `wg show`, never a key or a password.
+		api.WithNetwork(&netview.Source{FS: o.FS, Run: netview.Runner(o.Run), Bridges: o.LAN, WAN: wanNames(o.WAN), Now: o.Now}),
+	}
 	if c.rules != nil {
 		// The console writes the config the agent writes, and the engine
 		// reads it back: names and rules from the page and from Hermes are
@@ -414,6 +420,14 @@ func buildConsole(o Options) (*console, error) {
 	}
 	c.api = api.New(c.table, c.store, c.inv, c.wan, c.apps, o.Now, c, apiOpts...)
 	return c, nil
+}
+
+// wanNames is the configured WAN as a list, empty when none was given.
+func wanNames(wan string) []string {
+	if wan == "" {
+		return nil
+	}
+	return []string{wan}
 }
 
 // mount puts the console on a mux: the API under /api/ and the page at /.
@@ -1586,9 +1600,11 @@ func serveMux(c *console, snap func() export.Snapshot) *http.ServeMux {
 }
 
 // serveHandler is the order every request meets: the Host check first, so a
-// rebound name reaches nothing, the login gate next, then the routes.
+// rebound name reaches nothing, the login gate next, then the routes. Every
+// answer past the Host check names the page build served, the session's and
+// the login's too, so an open page learns of an upgrade on its next poll.
 func (c *console) serveHandler(mux http.Handler, g *auth.Gate) http.Handler {
-	return c.guard(g.Wrap(mux))
+	return c.guard(web.WithBuild(web.Build(), g.Wrap(mux)))
 }
 
 // loopbackListen reports whether addr listens on loopback only.

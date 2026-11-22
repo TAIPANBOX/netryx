@@ -21,6 +21,7 @@ import { Rules } from "./screens/Rules";
 import { Login } from "./screens/Login";
 import { Apps, AppScreen } from "./screens/Apps";
 import { Destinations, Destination } from "./screens/Destinations";
+import { Network } from "./screens/Network";
 
 // The period is a per-viewer convenience; storage may be missing (a private
 // window, a blocked site), and then the page simply starts at 24 hours.
@@ -162,6 +163,8 @@ function Screen() {
       return <AppScreen key={route.id} id={route.id} range={range} onRange={pick} />;
     case "destinations":
       return <Destinations range={range} onRange={pick} />;
+    case "network":
+      return <Network />;
     case "destination":
       return <Destination key={route.cc} cc={route.cc} range={range} onRange={pick} />;
     default:

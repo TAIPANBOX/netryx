@@ -638,6 +638,39 @@ enforced, and that is a debt rather than a decision.
   (test: `TestTheHouseAppsCountOnlyClients`, `TestARowWithoutClientsSaysWhoseTrafficItIs`,
   `TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries`)
 
+## The promise about the Network screen
+
+- **Network shows how the router is wired, and only reads it**: netifd's
+  networks (loopback left out, the one with a default route marked as the
+  internet) with sysfs counters, the house bridges' wired ports (radios are
+  not ports) with link, speed and the hardware switch, the devices the
+  inventory learned behind each port and access point, Wi-Fi radios and
+  networks from `/etc/config/wireless` and hostapd, WireGuard from the
+  network config and one `wg show all dump`, and the firewall's DNAT
+  redirects. No name from a config is passed to a program.
+  (test: `TestInterfacesAreReadFromNetifd`, `TestTheViewIsReadFromTheRouter`,
+  `TestWirelessConfigNamesRadiosAndNetworks`, `TestPortForwardsAreTheFirewallsDNATRedirects`,
+  `TestWgIsAskedOnceForEveryInterface`, `TestTheNetworkViewNamesTheDevicesBehindEachPortAndAccessPoint`)
+- **No secret reaches the page**: a WireGuard private or preshared key and a
+  Wi-Fi key are never read into the view, though `wg` prints the first two.
+  (test: `TestWireGuardPeersCarryNamesHandshakesAndTrafficButNoSecret`, `TestTheNetworkViewNeverCarriesASecret`)
+- **What the router lacks is said**: no Wi-Fi radio, Wi-Fi configured but no
+  access point running, no WireGuard, no wg tool, no forwards, netifd not
+  answering; a console without the source answers 503.
+  (test: `TestWhatTheRouterLacksIsSaid`, `TestTheNetworkViewSaysWhatTheRouterLacks`,
+  `TestWithoutANetworkSourceTheViewIsUnavailable`)
+- **The router is asked at most every 5 s** however often the page polls,
+  and one reading is bounded to 5 s, under its own deadline: viewers asking
+  at once share one reading, one who leaves stops waiting and never leaves a
+  cut-short reading in the cache. (test: `TestTheViewIsCachedForAFewSeconds`,
+  `TestViewersShareOneRead`, `TestAReadIsNotCutShortByTheViewerLeaving`, `TestAWaitingViewerCanLeave`)
+- **A config that cannot be read is said so**, never shown as a router
+  without Wi-Fi, WireGuard or forwards; a `package` line reads as libuci
+  reads it. (test: `TestAConfigThatCannotBeReadIsSaidSo`, `TestPackageLinesAreRead`)
+- **The internet line is the configured WAN**, up or down, or another
+  network with a default route; a tunnel's default route is not.
+  (test: `TestTheWANIsTheConfiguredLineAndNotATunnel`)
+
 ## The promise about the running console
 
 - **The console runs without its data files.** A missing or unreadable
@@ -738,6 +771,13 @@ enforced, and that is a debt rather than a decision.
   its address was learned on (read from `brforward`, no tool needed), a Wi-Fi
   one its network's name from hostapd, and the bridge's own addresses are
   not clients. (test: `TestClientsShowTheirPortOrTheirNetwork`)
+
+- **A page left open across an upgrade learns of it**: build.sh writes the
+  page's build (a digest of its sources) into the bundle and beside it, every
+  API answer names the build served (`X-Netryx-Build`), and a page that sees
+  another offers a reload. (test: `TestEveryAnswerNamesTheBuildServed`,
+  `TestTheBuildIsReadFromBesideThePage`; the page: "a page left open across an
+  upgrade is told the router serves a newer one" in `web/src/api.test.ts`)
 
 ## The promise about icons and the live view
 

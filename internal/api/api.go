@@ -129,6 +129,8 @@ type server struct {
 	// the would-be result, write it, reload.
 	wr  Rules
 	wmu sync.Mutex
+	// net reads the router's wiring for the Network screen; nil answers 503.
+	net Network
 }
 
 // Option configures the API beyond what every caller passes.
@@ -158,6 +160,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/live", s.route(s.live))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
 	s.houseRoutes(mux)
+	mux.HandleFunc("/api/network", s.route(s.network))
 	// Without this the mux would answer an unknown path in plain text.
 	mux.HandleFunc("/api/", s.route(func(*http.Request) (any, error) {
 		return nil, httpError{http.StatusNotFound, "no such route"}
