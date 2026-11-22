@@ -80,10 +80,10 @@ export function SearchBox() {
 
   if (!open) return null;
   const hits = searchHits(q, index ?? []);
-  const go = (h: Hit | undefined) => {
-    if (!h) return;
+  const go = (hit: Hit | undefined) => {
+    if (!hit) return;
     setOpen(false);
-    location.hash = h.href;
+    location.hash = hit.href;
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -121,12 +121,12 @@ export function SearchBox() {
           {error && <li class="bad-text small">The router is not answering: {error}.</li>}
           {!error && !index && <li class="muted small">Loading…</li>}
           {!error && index && q.trim() && hits.length === 0 && <li class="muted small">Nothing found.</li>}
-          {hits.map((h, i) => (
-            <li key={h.href} role="option" aria-selected={i === sel} class={i === sel ? "search-hit active" : "search-hit"} onMouseEnter={() => setSel(i)} onClick={() => go(h)}>
-              <span class="tag">{KIND_TEXT[h.kind] ?? h.kind}</span>
+          {hits.map((hit, i) => (
+            <li key={hit.href} role="option" aria-selected={i === sel} class={i === sel ? "search-hit active" : "search-hit"} onMouseEnter={() => setSel(i)} onClick={() => go(hit)}>
+              <span class="tag">{KIND_TEXT[hit.kind] ?? hit.kind}</span>
               <span class="col-tight">
-                <span class="strong ellipsis">{h.label}</span>
-                <span class="muted small ellipsis">{h.sub}</span>
+                <span class="strong ellipsis">{hit.label}</span>
+                <span class="muted small ellipsis">{hit.sub}</span>
               </span>
             </li>
           ))}

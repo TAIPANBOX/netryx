@@ -392,3 +392,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .search-hit .tag { justify-self: start; }
 .search-help { margin: 0; }
 kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--edge); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+
+/* The card a name shows under a resting mouse. */
+.hover-card { position: fixed; z-index: 55; background: var(--card); border: 1px solid var(--edge); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; cursor: default; }
+.hover-card.pinned { border-color: var(--accent); }
+.hover-line { margin: 0; }

@@ -25,6 +25,7 @@ import { Network } from "./screens/Network";
 import { NetworkScreen, DomainScreen, GroupScreen } from "./screens/Entities";
 import { CardsProvider } from "./screens/windows";
 import { SearchBox } from "./screens/Search";
+import { HoverCards } from "./screens/HoverCards";
 
 // The period is a per-viewer convenience; storage may be missing (a private
 // window, a blocked site), and then the page simply starts at 24 hours.
@@ -134,6 +135,7 @@ function Signed({ info }: { info: SessionInfo }) {
         <CardsProvider>
           <Screen />
           <SearchBox />
+          <HoverCards />
         </CardsProvider>
       </IconContext.Provider>
     </SessionContext.Provider>

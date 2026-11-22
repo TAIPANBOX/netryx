@@ -730,6 +730,13 @@ enforced, and that is a debt rather than a decision.
   word's start, inside it, then what else identifies it; at most 12; folded
   rows and unknowns are never things. (the page: `web/src/search.test.ts`)
 
+- **A name shows a card after 400 ms of a resting mouse**: the thing is read
+  from the link's own address (a screen that is not one thing has none), its
+  facts from that thing's own read over the last day, kept 30 s; a click on the
+  card keeps it until its X, Esc, a click elsewhere or another screen; touch
+  shows none. (the page: `web/src/hover.test.ts`; the timing itself is not
+  enforced by a test, seen in the lab)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's

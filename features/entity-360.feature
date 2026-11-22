@@ -25,3 +25,11 @@ Feature: every thing in the console can be found and seen in place
     #  "an address, a MAC, a hostname or an AS number finds its thing too",
     #  "a rule is found by what it names, and folded rows are not things",
     #  "the list is short and says what kind each thing is" in web/src/search.test.ts)
+
+  Scenario: a name shows a short card before it is opened
+    Given a name of a client, app, category, country, network, domain, group or rule
+    When the owner rests the mouse on it for a moment
+    Then a small card shows a few facts about it over the last day and a link to open it
+    And a click on the card keeps it open until it is closed, Esc is pressed or the owner moves elsewhere
+    # (the card: "a link's address says which thing its card shows, and where to read it",
+    #  "a card says the few things worth knowing before opening it" in web/src/hover.test.ts)
