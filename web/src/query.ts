@@ -18,7 +18,8 @@ export type Route =
   | { name: "network" }
   | { name: "asn"; asn: number; from: string }
   | { name: "domain"; domain: string; from: string }
-  | { name: "group"; id: string; from: string };
+  | { name: "group"; id: string; from: string }
+  | { name: "compare"; macs: string[] };
 
 /** Only the keys that carry a value: a route without filters stays as it was. */
 function some<T extends object>(r: T, extra: Record<string, string | null>): T {
@@ -74,6 +75,13 @@ export function parseRoute(hash: string): Route {
     case "domain": {
       const d = part(1);
       return d && d.length <= 253 && /^[A-Za-z0-9_.-]+$/.test(d) && !d.includes("..") ? { name: "domain", domain: d, from: qs.get("from") ?? "" } : { name: "destinations" };
+    }
+    case "compare": {
+      const macs: string[] = [];
+      for (const m of qs.getAll("mac").map((x) => x.toLowerCase())) {
+        if (/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/.test(m) && !macs.includes(m) && macs.length < 3) macs.push(m);
+      }
+      return { name: "compare", macs };
     }
     case "group": {
       const id = part(1);

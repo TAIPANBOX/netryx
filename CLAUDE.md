@@ -744,6 +744,10 @@ enforced, and that is a debt rather than a decision.
   (the page: "a thing's view names what it belongs to, each a link" in
   `web/src/entity.test.ts`)
 
+- **Two or three clients compare side by side** at `#/compare?mac=..`: at
+  most three, each MAC once, nothing that is not a MAC; a fourth tick is
+  refused rather than pushing one out unseen. (the page: `web/src/compare.test.ts`)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's

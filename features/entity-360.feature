@@ -44,3 +44,12 @@ Feature: every thing in the console can be found and seen in place
     #  "the breadcrumbs name the path the owner took" in web/src/entity.test.ts)
     # -> TestANetworkPageNamesItsCountriesClientsAndApps
     # -> TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries
+
+  Scenario: two or three clients are compared side by side
+    Given the client list
+    When the owner ticks two or three clients and presses Compare
+    Then their state, speed now, last day, busiest app, countries, group, connection and last hour stand side by side
+    And the comparison has its own address that can be shared, and a fourth client cannot be ticked
+    # (the comparison: "two or three clients are compared side by side, from a shareable address",
+    #  "picking clients to compare stops at three and a second pick takes one back",
+    #  "the comparison lines up what tells devices apart" in web/src/compare.test.ts)

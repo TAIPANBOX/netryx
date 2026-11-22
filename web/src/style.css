@@ -406,3 +406,6 @@ a.chip:hover { color: var(--link-hover); border-color: var(--link); }
 .chip-sep { color: var(--muted); }
 .chip-note { margin-left: 8px; }
 .chip-parent { color: var(--soft); }
+
+.compare-bar { gap: 12px; }
+.compare-table th:first-child { text-align: left; white-space: nowrap; }

@@ -5,6 +5,7 @@ import { filterHash } from "../entity";
 import { EntityLink } from "./entity";
 import { ClientLink } from "./entity";
 import { HourSparkline } from "../charts";
+import { COMPARE_MAX, compareHash, pickCompare } from "../compare";
 import { h, type ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { windowLabel, type Win } from "../query";
@@ -44,6 +45,7 @@ export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: W
   const groupsPolled = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []);
   const groups = groupsPolled.data ?? [];
   const [q, setQ] = useState(q0);
+  const [sel, setSel] = useState<string[]>([]);
   // The search is kept in the address (without a new history entry per key),
   // so Back and a shared link keep it.
   useEffect(() => {
@@ -91,6 +93,13 @@ export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: W
             <input id="clients-q" type="search" class="input" value={q} placeholder="name, IP, MAC, vendor, group" onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
           </div>
         </div>
+        {sel.length > 0 && (
+          <div class="toolbar compare-bar" role="status">
+            <span class="small">{sel.length} of {COMPARE_MAX} picked to compare</span>
+            {sel.length >= 2 ? <a class="btn" href={compareHash(sel)}>Compare</a> : <span class="muted small">pick one more</span>}
+            <button type="button" class="btn-mini" onClick={() => setSel([])}>Clear</button>
+          </div>
+        )}
         {!polled.data ? (
           <Loading />
         ) : (
@@ -99,6 +108,7 @@ export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: W
               <table class="table clients-table">
                 <thead>
                   <tr>
+                    <th><span class="sr">Compare</span></th>
                     {th("State", "state")}
                     {th("Name", "name", "asc")}
                     {th(`Now, ${windowLabel(win)} avg ↓ · ↑`, "now", "desc", true)}
@@ -117,6 +127,15 @@ export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: W
                 <tbody ref={body} {...holdProps}>
                   {rows.map((d) => (
                     <tr key={d.mac} data-key={d.mac}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={`Compare ${deviceName(d)}`}
+                          checked={sel.includes(d.mac)}
+                          disabled={!sel.includes(d.mac) && sel.length >= COMPARE_MAX}
+                          onChange={() => setSel((s) => pickCompare(s, d.mac))}
+                        />
+                      </td>
                       <td>
                         <span class={d.online ? "dot dot-on" : "dot dot-off"} aria-hidden="true" />
                         <span class="sr">{d.online ? "online" : "offline"}</span>
