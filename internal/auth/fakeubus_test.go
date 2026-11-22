@@ -41,6 +41,7 @@ type fakeSession struct {
 	user    string
 	grants  map[string]bool
 	expires time.Time
+	timeout time.Duration
 }
 
 func newFakeUbus(now func() time.Time) *fakeUbus {
@@ -160,10 +161,16 @@ func (f *fakeUbus) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for k, v := range f.grants[u] {
 			g[k] = v
 		}
-		f.sessions[id] = &fakeSession{user: u, grants: g, expires: f.now().Add(f.timeout)}
+		// rpcd takes the session's timeout from the login, as LuCI asks for
+		// its sessiontime; without one it is rpcd's default.
+		timeout := f.timeout
+		if t, ok := args["timeout"].(float64); ok && t > 0 {
+			timeout = time.Duration(t) * time.Second
+		}
+		f.sessions[id] = &fakeSession{user: u, grants: g, expires: f.now().Add(timeout), timeout: timeout}
 		f.last = id
 		answer(map[string]any{"result": []any{0, map[string]any{
-			"ubus_rpc_session": id, "timeout": int(f.timeout / time.Second),
+			"ubus_rpc_session": id, "timeout": int(timeout / time.Second),
 			"expires": int(f.timeout/time.Second) - 1, "acls": map[string]any{},
 			"data": map[string]any{"username": u},
 		}}})
@@ -173,7 +180,7 @@ func (f *fakeUbus) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			denied()
 			return
 		}
-		s.expires = f.now().Add(f.timeout) // rpcd touches a session on use
+		s.expires = f.now().Add(s.timeout) // rpcd touches a session on use
 		scope, _ := args["scope"].(string)
 		o, _ := args["object"].(string)
 		fn, _ := args["function"].(string)

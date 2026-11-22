@@ -234,3 +234,20 @@ func TestAFailedWriteRemovesNothingInADirectoryOthersCanWrite(t *testing.T) {
 		t.Errorf("the file left there was loaded: %d", rec.Code)
 	}
 }
+
+// The console asks rpcd for LuCI's session time, so a viewer who steps away
+// for longer than rpcd's default five minutes is still signed in.
+func TestASessionLastsTheSessionTimeAsked(t *testing.T) {
+	r := newRig(t)
+	r.gate.RPC = NewRPC(r.gate.RPC.(*rpcClient).url, r.gate.RPC.(*rpcClient).c, SessionTime(time.Hour))
+	r.h = r.gate.Wrap(nextOf(r))
+	sid, _ := r.login("root", adminPW, lan)
+	r.clock.Add(50 * time.Minute)
+	if rec := r.do(http.MethodGet, "/api/overview", lan, "", withCookie(sid)); rec.Code != http.StatusOK {
+		t.Fatalf("after 50 quiet minutes of an hour's session: %d", rec.Code)
+	}
+	r.clock.Add(61 * time.Minute)
+	if rec := r.do(http.MethodGet, "/api/overview", lan, "", withCookie(sid)); rec.Code != http.StatusUnauthorized {
+		t.Errorf("after more than an hour without a request: %d, want 401", rec.Code)
+	}
+}

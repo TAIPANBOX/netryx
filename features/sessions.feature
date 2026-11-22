@@ -31,3 +31,10 @@ Feature: a restart of netryx signs nobody out
     # -> TestAFailedWriteLeavesNoStaleSessions
     # -> TestAFailedWriteRemovesNothingOutsideItsOwnDirectory
     # -> TestAFailedWriteRemovesNothingInADirectoryOthersCanWrite
+
+  Scenario: stepping away for a while does not sign the owner out
+    Given LuCI's sessions last an hour, or what luci.sauth.sessiontime says
+    When the owner signs in to the console and leaves it quiet for longer than five minutes
+    Then the session is still there, as long as a LuCI session would be
+    # -> TestASessionLastsTheSessionTimeAsked
+    # -> TestTheSessionsLastAsLongAsLuCIs
