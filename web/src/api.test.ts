@@ -213,3 +213,17 @@ test("a page left open across an upgrade is told the router serves a newer one",
     off();
   }
 });
+
+test("a newer build seen before anyone listens is still told to the first listener", async () => {
+  setBuild("cccccccccccc");
+  const g = fakeFetch(200, { ok: true }, { "X-Netryx-Build": "dddddddddddd" });
+  try {
+    await getJSON("/api/session-like");
+  } finally {
+    g.restore();
+  }
+  let told = 0;
+  const off = onNewBuild(() => told++);
+  off();
+  assert.equal(told, 1, "the banner mounts after the first answer and must still learn of it");
+});

@@ -235,8 +235,16 @@ export function setBuild(id: string) {
   newBuildTold = false;
 }
 
-/** Calls fn once when the router answers with a newer page than this one. */
+/**
+ * Calls fn once when the router answers with a newer page than this one; at
+ * once if that answer came before fn listened (the session is read before the
+ * header that shows the notice is drawn).
+ */
 export function onNewBuild(fn: () => void): () => void {
+  if (newBuildTold) {
+    fn();
+    return () => {};
+  }
   newBuildListeners.add(fn);
   return () => newBuildListeners.delete(fn);
 }

@@ -284,4 +284,5 @@ Feature: the console shows what each client did, by app and by place
     Then it says the router now serves a newer console and offers a reload
     # -> TestEveryAnswerNamesTheBuildServed
     # -> TestTheBuildIsReadFromBesideThePage
-    # (the page: "a page left open across an upgrade is told the router serves a newer one" in web/src/api.test.ts)
+    # (the page: "a page left open across an upgrade is told the router serves a newer one" and
+    # "a newer build seen before anyone listens is still told to the first listener" in web/src/api.test.ts)
