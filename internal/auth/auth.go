@@ -67,8 +67,10 @@ const (
 var rpcTimeout = 5 * time.Second
 
 // Gate is the login in front of the console. Secret must be random and at
-// least 32 bytes (NewSecret); it signs the CSRF tokens and changes with
-// every start, so a token never outlives the process.
+// least 32 bytes (NewSecret); it signs the CSRF tokens. With Store set, the
+// sessions and the secret they were issued under are kept in that file and
+// read back at the next start, so a restart signs nobody out while rpcd keeps
+// their sessions; without it, both live and die with the process.
 type Gate struct {
 	RPC    RPC
 	Now    func() time.Time
@@ -86,6 +88,8 @@ type Gate struct {
 	// Zone is the IANA zone the router runs in (the -zone flag); the console
 	// shows every time in it. Empty means UTC.
 	Zone string
+	// Store keeps the sessions in a file across a restart; empty keeps them in memory only.
+	Store string
 
 	noRPC atomic.Bool
 }
@@ -146,9 +150,43 @@ func (g *Gate) Wrap(next http.Handler) http.Handler {
 	if len(g.Secret) < 32 {
 		panic("auth: Gate.Secret must be at least 32 random bytes")
 	}
-	return &gate{
+	s := &gate{
 		g: g, next: next, lim: newLimiter(),
 		kept: map[keptKey]time.Time{}, handles: map[string]*list.Element{}, order: list.New(),
+	}
+	if g.Store != "" {
+		secret, kept, why := loadStore(g.Store)
+		switch {
+		case why != "":
+			s.logf("sessions from %s are not trusted, so every viewer signs in again: %s", g.Store, why)
+		case secret != nil:
+			// The tokens of the kept sessions were signed with the secret
+			// they were issued under.
+			g.Secret = secret
+			for i := range kept {
+				si := kept[i]
+				s.handles[si.handle] = s.order.PushBack(&si)
+			}
+		}
+	}
+	return s
+}
+
+// persist writes the table of sessions to the store, when there is one. The
+// caller holds no lock: it takes the table as it is now.
+func (s *gate) persist() {
+	if s.g.Store == "" {
+		return
+	}
+	s.mu.Lock()
+	all := make([]signedIn, 0, s.order.Len())
+	for e := s.order.Front(); e != nil; e = e.Next() {
+		all = append(all, *e.Value.(*signedIn))
+	}
+	err := saveStore(s.g.Store, s.g.Secret, all)
+	s.mu.Unlock()
+	if err != nil {
+		s.logf("sessions not kept in %s, so a restart signs everyone out: %v", s.g.Store, err)
 	}
 }
 
@@ -367,13 +405,15 @@ func (s *gate) forget(sid string) {
 // drop removes a handle; the session behind it is a login from then on.
 func (s *gate) drop(handle string) (signedIn, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	e, ok := s.handles[handle]
 	if !ok {
+		s.mu.Unlock()
 		return signedIn{}, false
 	}
 	delete(s.handles, handle)
 	s.order.Remove(e)
+	s.mu.Unlock()
+	s.persist()
 	return *e.Value.(*signedIn), true
 }
 
@@ -381,7 +421,6 @@ func (s *gate) drop(handle string) (signedIn, bool) {
 // oldest, whose session is returned to be ended.
 func (s *gate) add(si *signedIn) (evicted *signedIn) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.order.Len() >= maxHandles {
 		old := s.order.Front()
 		evicted = old.Value.(*signedIn)
@@ -389,6 +428,8 @@ func (s *gate) add(si *signedIn) (evicted *signedIn) {
 		delete(s.handles, evicted.handle)
 	}
 	s.handles[si.handle] = s.order.PushBack(si)
+	s.mu.Unlock()
+	s.persist()
 	return evicted
 }
 

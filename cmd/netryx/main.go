@@ -26,6 +26,9 @@ import (
 	"netryx/internal/sni"
 )
 
+// sessionsFile keeps the console's sessions across a restart of netryx.
+const sessionsFile = "/tmp/netryx/sessions.json"
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -443,6 +446,9 @@ func main() {
 		// name. Behind it, the LuCI login: every view needs a session.
 		rpc := auth.NewRPC(*f.ubusURL, nil)
 		gate := con.newGate(rpc, *f.metricsToken)
+		// Sessions outlive a restart of netryx in RAM only: /tmp is gone
+		// with a reboot, and rpcd still decides on every request.
+		gate.Store = sessionsFile
 		listen := con.armListen(*addr, gate, time.Sleep, stop)
 		tlsConf := tlsFor(listen, *f.cert, *f.key)
 		srv := &http.Server{
