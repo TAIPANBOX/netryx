@@ -8,7 +8,7 @@
 
 import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useState } from "preact/hooks";
-import { areaPath, cumulate, sankeyLayout, type SankeyLink, type SankeyNode } from "./geometry";
+import { areaPath, cumulate, pickColumn, sankeyLayout, type SankeyLink, type SankeyNode } from "./geometry";
 import { rate } from "./format";
 import { appIcon } from "./icons";
 import { IconContext, brokenIcons, iconBroke } from "./ui";
@@ -57,7 +57,7 @@ export function StackedArea(p: StackedProps) {
           const n = p.up.length;
           if (!p.onPick || n === 0) return;
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          p.onPick(Math.min(n - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * n))));
+          p.onPick(pickColumn((e.clientX - r.left) / r.width, n));
         }}
       >
         <line class="grid" x1="0" y1={p.axis - p.downH} x2="1000" y2={p.axis - p.downH} />

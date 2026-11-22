@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -1219,6 +1220,52 @@ func TestTheLiveViewReadsOneDeviceByOneKey(t *testing.T) {
 
 // Pairs answers as the store does: for each key of dim, Top with that key
 // set, ranked by by.
+// Holders is what Top answers under each device's and each app's filter, as
+// the store's one pass answers it.
+func (h *fakeHistory) Holders(dim, key string, from, to time.Time) rollup.HoldersOf {
+	var out rollup.HoldersOf
+	sum := func(f rollup.Filter) (rollup.Bytes, bool) {
+		var b rollup.Bytes
+		ok := false
+		for _, r := range h.Top(f, dim, from, to, 0) {
+			if strings.EqualFold(r.Key, key) {
+				b.Down, b.Up, ok = b.Down+r.Bytes.Down, b.Up+r.Bytes.Up, true
+				if r.Extra["org"] != "" {
+					out.Org = r.Extra["org"]
+				}
+			}
+		}
+		return b, ok
+	}
+	for _, m := range h.Top(rollup.Filter{}, "mac", from, to, 0) {
+		if b, ok := sum(rollup.Filter{MAC: m.Key}); ok {
+			out.MACs = append(out.MACs, rollup.Row{Key: m.Key, Bytes: b})
+		}
+	}
+	for _, a := range h.Top(rollup.Filter{}, "app", from, to, 0) {
+		if b, ok := sum(rollup.Filter{App: a.Key}); ok {
+			out.Apps = append(out.Apps, rollup.Row{Key: a.Key, Bytes: b})
+		}
+	}
+	if dim == "asn" {
+		for _, p := range h.Top(rollup.Filter{}, "place", from, to, 0) {
+			if p.Extra["asn"] == key {
+				out.CCs = append(out.CCs, rollup.Row{Key: p.Extra["cc"], Bytes: p.Bytes})
+				if out.Org == "" {
+					out.Org = p.Extra["org"]
+				}
+			}
+		}
+	}
+	sort.SliceStable(out.MACs, func(i, j int) bool {
+		return out.MACs[i].Bytes.Down+out.MACs[i].Bytes.Up > out.MACs[j].Bytes.Down+out.MACs[j].Bytes.Up
+	})
+	sort.SliceStable(out.Apps, func(i, j int) bool {
+		return out.Apps[i].Bytes.Down+out.Apps[i].Bytes.Up > out.Apps[j].Bytes.Down+out.Apps[j].Bytes.Up
+	})
+	return out
+}
+
 func (h *fakeHistory) Pairs(f rollup.Filter, dim, by string, from, to time.Time) map[string][]rollup.Row {
 	out := map[string][]rollup.Row{}
 	for _, k := range h.Top(f, dim, from, to, 0) {

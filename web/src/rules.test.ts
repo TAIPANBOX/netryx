@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   describeRule, ruleFromForm, nextLogin, daysText, stateOf, pauseBody, pauseUntil, blockedTile, appliesTo, manifestName, appChoices, isPause, formProblem, formFromRule,
-  liveAllows, allowText, activePause, loginWarning, usageText, usageLabel,
+  liveAllows, allowText, activePause, loginWarning, usageText, usageLabel, ruleVerb,
   type Rule, type RuleForm,
 } from "./rules";
 
@@ -210,4 +210,11 @@ test("a limit's usage names the apps that were used, with their minutes", () => 
   assert.equal(usageLabel(u, name), "Social media (TikTok 40 min, Instagram 20 min)");
   assert.equal(usageLabel({ ...u, apps: [] }, name), "Social media");
   assert.equal(usageLabel({ ...u, what: "app", targets: ["tiktok"], apps: [{ app: "tiktok", used: 40 }] }, name), "TikTok");
+});
+
+test("a rule's links say what it does: blocks, limits, or pauses the whole internet", () => {
+  assert.equal(ruleVerb(rule()), "blocks");
+  assert.equal(ruleVerb(rule({ action: "limit", minutes: 60 })), "limits to 60 min a day");
+  assert.equal(ruleVerb(rule({ action: "limit", minutes: 1 })), "limits to 1 min a day");
+  assert.equal(ruleVerb(rule({ what: "all", targets: [] })), "blocks the whole internet");
 });

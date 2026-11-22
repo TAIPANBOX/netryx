@@ -136,7 +136,7 @@ export function Flows({ initial, from = "", to = "", asn = "", win, onWin }: { i
           <Pills label="Presets" items={PRESETS} value={preset} onPick={setPreset} />
           <span class="muted small push">
             {live ? "live connection table" : "journal"} · showing {num(rows.length)}
-            {(from || to) && ` · from ${from ? dateTime(from) : "the start"} to ${to ? dateTime(to) : "now"}`}
+            {!live && (from || to) && ` · from ${from ? dateTime(from) : "the start"} to ${to ? dateTime(to) : "now"}`}
             {asn && ` · network AS${asn}`}
           </span>
         </div>

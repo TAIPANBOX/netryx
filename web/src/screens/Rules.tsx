@@ -10,7 +10,7 @@ import { getJSON, sendJSON, usePoll } from "../api";
 import { Header, Status, Loading, Empty, Pills, useSession, IconContext } from "../ui";
 import { time, BLOCKABLE_CATEGORIES, category } from "../format";
 import {
-  DAYS, describeRule, formFromRule, formProblem, fromAgent, appChoices, isPause, manifestName, ruleFromForm, stateOf, liveAllows, allowText,
+  DAYS, describeRule, formFromRule, formProblem, fromAgent, appChoices, isPause, manifestName, ruleFromForm, stateOf, liveAllows, allowText, ruleVerb,
   type AppChoice, type Names, type Rule, type RuleForm,
 } from "../rules";
 import { CDN_NOTE } from "./controls";
@@ -325,10 +325,10 @@ function RuleLinks({ r, names }: { r: Rule; names: Names }) {
   const who =
     r.who === "group" ? <EntityLink e={{ kind: "group", id: r.group }}>{names.group ? names.group(r.group) : r.group}</EntityLink>
     : r.who === "device" ? r.members.map((m) => <EntityLink key={m} e={{ kind: "client", mac: m }}>{names.device ? names.device(m) : m}</EntityLink>)
-    : <span>everyone</span>;
+    : <span>all devices</span>;
   return (
     <div class="row-wrap small rule-links">
-      {targets.length > 0 && <span class="muted">blocks</span>}
+      <span class="muted">{ruleVerb(r)}</span>
       {targets}
       <span class="muted">for</span>
       {who}

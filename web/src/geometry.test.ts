@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { SeriesPoint } from "./types";
-import { areaPath, splitSeries, cumulate, sankeyLayout, timeTicks } from "./geometry";
+import { areaPath, splitSeries, cumulate, sankeyLayout, timeTicks, pickColumn } from "./geometry";
 
 test("an area runs from the axis through every point and back", () => {
   assert.equal(areaPath([0, 30, 60], 60, 170, 160, -1), "M0 170 L0.0 170.0 L500.0 90.0 L1000.0 10.0 L1000 170 Z");
@@ -132,4 +132,15 @@ test("a point is divided by the seconds it covers, never by the range's usual st
   // Totals are bytes, whatever the steps.
   assert.equal(s.totalDown, 3600 * 5 + 300);
   assert.deepEqual(s.peakDown, { rate: 5, at: "2026-11-20T10:00:00Z" });
+});
+
+test("a click on a chart picks the point drawn nearest to it", () => {
+  // Points sit at i/(n-1) of the width, the first at the left edge and the last at the right.
+  assert.equal(pickColumn(0, 5), 0);
+  assert.equal(pickColumn(1, 5), 4);
+  assert.equal(pickColumn(0.15, 5), 1); // x=0.15 is nearer the point at 0.25 than the one at 0
+  assert.equal(pickColumn(0.6, 5), 2); // x=0.6 is nearer the point at 0.5 than the one at 0.75
+  assert.equal(pickColumn(0.5, 1), 0);
+  assert.equal(pickColumn(-0.1, 5), 0);
+  assert.equal(pickColumn(1.2, 5), 4);
 });

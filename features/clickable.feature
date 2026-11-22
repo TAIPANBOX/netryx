@@ -16,7 +16,9 @@ Feature: every name in the console leads somewhere
     Given a network the house reached
     When the owner opens it
     Then it shows the network's organisation, the countries it was reached in, the clients and the apps that reached it, and a link to its flows
+    And every client and app that reached it is counted, not only the busiest
     # -> TestANetworkPageNamesItsCountriesClientsAndApps
+    # -> TestHoldersAgreeWithTopPerDeviceAndApp
     # -> TestFlowsCanBeAskedForOneNetwork
 
   Scenario: a domain's page
@@ -36,8 +38,16 @@ Feature: every name in the console leads somewhere
     Given the house's traffic chart
     When the owner clicks a stretch of it
     Then the flows of that stretch of time open
+    And the stretch is the one drawn nearest the click
     # -> TestFlowsCanBeAskedForAStretchOfTimeAndANetwork
-    # (the stretch: "a click on a stretch of a chart asks the flows of that stretch" in web/src/entity.test.ts)
+    # (the stretch: "a click on a stretch of a chart asks the flows of that stretch" in web/src/entity.test.ts,
+    #  "a click on a chart picks the point drawn nearest to it" in web/src/geometry.test.ts)
+
+  Scenario: the line's tile opens the line
+    Given the WAN, Speed or Line quality tile on the overview
+    When the owner clicks it
+    Then a card shows the line's state, addresses, uptime, speed and quality, read without the history
+    # -> TestTheLineCardAsksOnlyForTheLine
 
   Scenario: a detail says how the owner got there
     Given the owner went from an app to one of its clients

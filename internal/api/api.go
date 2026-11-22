@@ -37,6 +37,7 @@ type History interface {
 	Top(rollup.Filter, string, time.Time, time.Time, int) []rollup.Row
 	Pairs(rollup.Filter, string, string, time.Time, time.Time) map[string][]rollup.Row
 	Recent(rollup.Filter, string, time.Duration) ([]rollup.Row, time.Duration)
+	Holders(string, string, time.Time, time.Time) rollup.HoldersOf
 }
 
 // Apps names an app id from the catalog of rules, so a name does not depend
@@ -164,6 +165,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/networks/{asn}", s.route(s.network1))
 	mux.HandleFunc("/api/domains/{name}", s.route(s.domain1))
 	mux.HandleFunc("/api/network", s.route(s.network))
+	mux.HandleFunc("/api/wan", s.route(func(*http.Request) (any, error) { return wanView(s.w.Status()), nil }))
 	// Without this the mux would answer an unknown path in plain text.
 	mux.HandleFunc("/api/", s.route(func(*http.Request) (any, error) {
 		return nil, httpError{http.StatusNotFound, "no such route"}

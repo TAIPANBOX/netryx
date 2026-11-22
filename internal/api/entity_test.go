@@ -88,3 +88,20 @@ func strings100() string {
 	}
 	return string(b)
 }
+
+// The line's card asks only for the line: its state, address and quality,
+// without reading the history the overview reads.
+func TestTheLineCardAsksOnlyForTheLine(t *testing.T) {
+	fl, h, inv, w, ap := fixture()
+	rec := get(t, New(fl, h, inv, w, ap, clock, nil), http.MethodGet, "/api/wan")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	body := decode(t, rec)
+	if str(field(body, "ipv4")) != "198.51.100.7" || num(field(body, "rxRate")) != 1000 || str(field(body, "device")) != "eth1" {
+		t.Errorf("line %v", body)
+	}
+	if len(h.series) != 0 {
+		t.Errorf("the line card read the history %d times", len(h.series))
+	}
+}

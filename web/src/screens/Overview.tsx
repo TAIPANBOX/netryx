@@ -108,15 +108,18 @@ function Traffic({ d, range, split, onSplit }: { d: OverviewData; range: Range; 
 
   // Bottom of the stack first: "the rest", then the smaller top keys, the largest on top.
   const layers: Layer[] = [];
-  if (s.other) layers.push({ label: otherLabel(split, d), color: OTHER_COLOR, values: s.otherDown });
+  // The key behind each layer, by position: two clients may share a name.
+  const layerKeys: (string | undefined)[] = [];
+  if (s.other) {
+    layers.push({ label: otherLabel(split, d), color: OTHER_COLOR, values: s.otherDown });
+    layerKeys.push(undefined);
+  }
   for (let i = s.keys.length - 1; i >= 0; i--) {
     layers.push({ label: label(s.keys[i]), color: LAYER_COLORS[i], values: s.down[s.keys[i]] });
+    layerKeys.push(s.keys[i]);
   }
   // A legend entry is a link: a client opens its card, an app its page.
-  const keyOf = new Map<string, string>();
-  for (const k of s.keys) keyOf.set(label(k), k);
-  const legend = [...layers].reverse().map((l) => {
-    const k = keyOf.get(l.label);
+  const legend = layers.map((l, i) => ({ l, k: layerKeys[i] })).reverse().map(({ l, k }) => {
     const node = !k || split === "none" ? undefined : split === "mac" && /^[0-9a-f:]{17}$/i.test(k) ? <ClientLink mac={k} name={l.label} /> : split === "app" ? <EntityLink e={{ kind: "app", id: k }}>{l.label}</EntityLink> : undefined;
     return { label: l.label, color: l.color, node };
   });
@@ -305,8 +308,8 @@ function Now({ d }: { d: OverviewData }) {
 
 /** The internet line in a card: its address, uptime, speed and quality, polled while open. */
 function LineCard() {
-  const polled = usePoll((s) => getJSON<OverviewData>("/api/overview?range=1h&split=none", s), 10_000, []);
-  const w = polled.data?.wan;
+  const polled = usePoll((s) => getJSON<OverviewData["wan"]>("/api/wan", s), 10_000, []);
+  const w = polled.data;
   if (!w) return polled.error ? <p class="bad-text small">The router is not answering: {polled.error}.</p> : <Loading />;
   const r = ratePair(w.rxRate, w.txRate);
   const q = lineQuality(w);

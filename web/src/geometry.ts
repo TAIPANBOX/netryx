@@ -219,3 +219,9 @@ export function sankeyLayout(
   });
   return { nodes: placed, links: out };
 }
+
+/** The column a click at frac (0 left, 1 right) of a chart lands nearest to. */
+export function pickColumn(frac: number, n: number): number {
+  if (n <= 1) return 0;
+  return Math.min(n - 1, Math.max(0, Math.round(frac * (n - 1))));
+}

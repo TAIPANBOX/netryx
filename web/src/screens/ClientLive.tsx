@@ -168,9 +168,15 @@ export function LiveConns({ mac, conns, flows }: { mac: string; conns: LiveConn[
               {c.name ? <EntityLink e={{ kind: "domain", name: c.name }}>{label}</EntityLink> : <EntityLink e={{ kind: "network", asn: c.asn }}>{label}</EntityLink>}
               {c.org && c.name && <span class="muted"> · <EntityLink e={{ kind: "network", asn: c.asn }}>{c.org}</EntityLink></span>}
             </span>
-            <a title={placeName(c)} href={entityHref({ kind: "country", cc: c.cc })} class="entity-link">
-              <CC cc={c.cc} />
-            </a>
+            {entityHref({ kind: "country", cc: c.cc }) ? (
+              <a title={placeName(c)} href={entityHref({ kind: "country", cc: c.cc })} class="entity-link">
+                <CC cc={c.cc} />
+              </a>
+            ) : (
+              <span title={placeName(c)}>
+                <CC cc={c.cc} />
+              </span>
+            )}
             <span class="nowrap live-conn-rate">
               ↓ {p.down} <span class="muted">↑ {p.up}</span> <span class="muted small">{p.unit}</span>
             </span>

@@ -113,7 +113,7 @@ export function DomainScreen({ domain, from, range, onRange }: { domain: string;
       <Header section="destinations" range={range} onRange={onRange} />
       <main class="main">
         <Status polled={polled} />
-        <Crumbs from={from} last={domain} />
+        <Crumbs from={from || "dest-root"} last={domain} />
         {!d ? (
           <Loading />
         ) : (
