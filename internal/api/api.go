@@ -161,6 +161,8 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/live", s.route(s.live))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
 	s.houseRoutes(mux)
+	mux.HandleFunc("/api/networks/{asn}", s.route(s.network1))
+	mux.HandleFunc("/api/domains/{name}", s.route(s.domain1))
 	mux.HandleFunc("/api/network", s.route(s.network))
 	// Without this the mux would answer an unknown path in plain text.
 	mux.HandleFunc("/api/", s.route(func(*http.Request) (any, error) {
@@ -755,6 +757,27 @@ func (s *server) flows(r *http.Request) (any, error) {
 		}
 		mac = hw.String()
 	}
+	var from, to time.Time
+	for _, t := range []struct {
+		name string
+		at   *time.Time
+	}{{"from", &from}, {"to", &to}} {
+		if v := q.Get(t.name); v != "" {
+			at, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				return nil, httpError{http.StatusBadRequest, t.name + " must be a time like 2026-11-22T20:00:00Z"}
+			}
+			*t.at = at
+		}
+	}
+	var asn uint32
+	if v := q.Get("asn"); v != "" {
+		n, err := strconv.ParseUint(v, 10, 32)
+		if err != nil || n == 0 {
+			return nil, httpError{http.StatusBadRequest, "asn must be a network number"}
+		}
+		asn = uint32(n)
+	}
 	live := q.Get("live") == "1"
 	var window time.Duration
 	if live && q.Get("window") != "" {
@@ -767,6 +790,7 @@ func (s *server) flows(r *http.Request) (any, error) {
 	rows, next := s.f.Query(flows.Query{
 		MAC: mac, App: q.Get("app"), CC: q.Get("cc"), Text: q.Get("q"),
 		Dir: dir, Live: live, Limit: limit, Cursor: q.Get("cursor"), Window: window,
+		From: from, To: to, ASN: asn,
 	})
 
 	clients := map[string]string{}

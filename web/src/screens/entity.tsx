@@ -3,19 +3,21 @@
 // client's full view. A click with a modifier, or a middle click, follows the
 // link as a link does.
 
-import { h } from "preact";
-import type { AppUsage, Device, NetworkView } from "../types";
+import { h, Fragment, type ComponentChildren } from "preact";
+import { entityHref, withFrom, type Entity } from "../entity";
+import type { AppUsage, ClientRef, Device, NetworkView } from "../types";
+import { clientsLine } from "../house";
 import { getJSON, mac as enc, usePoll } from "../api";
 import { AppIcon, Empty, Loading } from "../ui";
-import { appName, bytes, date, rate, time, groupName } from "../format";
+import { appName, bytes, clientName, date, rate, time, groupName } from "../format";
 import { whereConnected } from "../client360";
 import { useCards } from "./windows";
 import type { Group } from "../types";
 
 /** The link that opens a client's card. */
-export function ClientLink({ mac, name, title, class: cls }: { mac: string; name: string; title?: string; class?: string }) {
+export function ClientLink({ mac, name, title, from = "", class: cls }: { mac: string; name: string; title?: string; from?: string; class?: string }) {
   const { open } = useCards();
-  const href = `#/client/${enc(mac)}`;
+  const href = withFrom(`#/client/${enc(mac)}`, from);
   return (
     <a
       href={href}
@@ -83,5 +85,34 @@ export function ClientCard({ mac }: { mac: string }) {
         <a class="btn" href={`#/flows?q=${encodeURIComponent("mac:" + mac)}`}>Show flows</a>
       </div>
     </div>
+  );
+}
+
+/**
+ * Any name as a link to its screen (a client's opens its card): no underline
+ * until hovered or focused. A name that leads nowhere stays text.
+ */
+export function EntityLink({ e, children, from = "", class: cls }: { e: Entity; children: ComponentChildren; from?: string; class?: string }) {
+  if (e.kind === "client") return <ClientLink mac={e.mac} name={String(children)} from={from} class={cls} />;
+  const href = entityHref(e);
+  if (!href) return <span class={cls}>{children}</span>;
+  return <a class={cls ? `entity-link ${cls}` : "entity-link"} href={withFrom(href, from)}>{children}</a>;
+}
+
+/** The first clients of a row by name, each opening its card, and how many more. */
+export function ClientNames({ n, top, from = "" }: { n: number; top: ClientRef[]; from?: string }) {
+  const named = top.filter((c) => !c.other);
+  if (n === 0 || named.length === 0) return <span class="soft">{clientsLine(n, top)}</span>;
+  const rest = n - named.length;
+  return (
+    <span class="soft">
+      {named.map((c, i) => (
+        <Fragment key={c.mac}>
+          {i > 0 && ", "}
+          <ClientLink mac={c.mac} name={clientName(c)} from={from} />
+        </Fragment>
+      ))}
+      {rest > 0 && ` and ${rest} more`}
+    </span>
   );
 }

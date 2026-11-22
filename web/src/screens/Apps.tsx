@@ -1,9 +1,11 @@
 // Apps: every app the house used in the period, and one app across the
 // house: who used it, where it went, how it was named, when it moved.
 
+import { filterHash } from "../entity";
+import { EntityLink, ClientNames } from "./entity";
 import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { AppDetail, HouseApp, Range } from "../types";
 import { getJSON, usePoll } from "../api";
@@ -12,18 +14,27 @@ import { splitSeries, timeTicks } from "../geometry";
 import { AreaChart, Bars, Legend } from "../charts";
 import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
 import { bytes, rate, share, num, appName, category, countryName, clientName, nameSource, plural } from "../format";
-import { appHref, appsSummary, categoriesIn, clientsLine, closesHouse, countryHref, domainText, matchApp, rulesForApp } from "../house";
+import { appHref, appsSummary, categoriesIn, closesHouse, domainText, matchApp, rulesForApp } from "../house";
 import { BlockApp, RuleTags, useRuleNames, useRules } from "./controls";
 import { LAYER_COLORS, UP_COLOR } from "../view";
 
 const periodOf = (r: Range) => RANGES.find((x) => x.id === r)?.label ?? r;
 
-export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
+export function Apps({ cat0, q0, range, onRange, win, onWin }: { cat0: string; q0: string; range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
   const polled = usePoll((s) => getJSON<HouseApp[]>(`/api/apps?range=${range}&window=${win}`, s), 15_000, [range, win]);
   const { rules } = useRules();
   const names = useRuleNames();
-  const [q, setQ] = useState("");
-  const [cat, setCat] = useState("");
+  const [q, setQ] = useState(q0);
+  const [cat] = useState(cat0);
+  // The search and the category are kept in the address, so Back and a
+  // shared link keep them; a category is a step of its own in the history.
+  useEffect(() => {
+    const h = filterHash("apps", { cat, q });
+    if (location.hash !== h) history.replaceState(null, "", h);
+  }, [q]);
+  const pickCat = (c: string) => {
+    location.hash = filterHash("apps", { cat: c, q });
+  };
   const all = polled.data ?? [];
   const cats = categoriesIn(all);
   const found = all.filter((a) => (!cat || a.app.category === cat) && matchApp(a, q));
@@ -67,7 +78,7 @@ export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r
           </div>
         </div>
         {cats.length > 1 && (
-          <Pills label="Category" value={cat} onPick={setCat} items={[{ id: "", label: "All" }, ...cats.map((c) => ({ id: c, label: category(c) }))]} />
+          <Pills label="Category" value={cat} onPick={pickCat} items={[{ id: "", label: "All" }, ...cats.map((c) => ({ id: c, label: category(c) }))]} />
         )}
         {!polled.data ? (
           <Loading />
@@ -98,9 +109,9 @@ export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r
                             {href ? <a href={href} class="strong">{name}</a> : <span class="strong">{name}</span>}
                           </span>
                         </td>
-                        <td class="soft">{a.other ? "folded rows" : category(a.app.category) || "-"}</td>
+                        <td class="soft">{a.other ? "folded rows" : <EntityLink e={{ kind: "category", id: a.app.category }}>{category(a.app.category) || "-"}</EntityLink>}</td>
                         <td class="small">
-                          {a.clients > 0 && <span class="strong">{num(a.clients)} </span>}<span class="soft">{clientsLine(a.clients, a.top)}</span>
+                          {a.clients > 0 && <span class="strong">{num(a.clients)} </span>}<ClientNames n={a.clients} top={a.top} />
                         </td>
                         <td class="share-cell">
                           <Bars thin parts={[{ pct: a.share * 100, kind: "down" }]} />
@@ -168,7 +179,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
                 {d.clients.map((c) => (
                   <div key={c.mac} class="row-item">
                     <div class="row-between">
-                      <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
+                      <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} from={`app:${d.app.id}`} />}</span>
                       <span class="soft small nowrap">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>
                     </div>
                     {c.other && c.mac !== "other" && <div class="muted small">{c.mac === "router" ? "the router's own traffic" : "no hardware address"}</div>}
@@ -179,14 +190,17 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
               <Card label="Where the app goes" title="Countries and networks">
                 {d.places.length === 0 && <Empty>No places in this period.</Empty>}
                 {d.places.map((p) => (
-                  <a key={p.cc + p.asn} href={countryHref(p.cc)} class="country-row row-link">
+                  <div key={p.cc + p.asn} class="country-row">
                     <CC cc={p.cc} />
                     <div class="col-tight">
-                      <span>{p.other ? "unknown or others" : countryName(p.cc)}</span>
-                      <span class="muted small">{p.org || "no organisation"}{p.asn && p.asn !== "0" ? ` · AS${p.asn}` : ""}</span>
+                      <EntityLink e={{ kind: "country", cc: p.other ? "--" : p.cc }}>{p.other ? "unknown or others" : countryName(p.cc)}</EntityLink>
+                      <span class="muted small">
+                        <EntityLink e={{ kind: "network", asn: p.asn }} from={`app:${d.app.id}`}>{p.org || "no organisation"}</EntityLink>
+                        {p.asn && p.asn !== "0" ? ` · AS${p.asn}` : ""}
+                      </span>
                     </div>
                     <span class="soft small right nowrap">↓ {bytes(p.down)}<br />↑ {bytes(p.up)}</span>
-                  </a>
+                  </div>
                 ))}
               </Card>
               <Card label="Domains of the app" title="Domains">
@@ -194,7 +208,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
                 {d.domains.map((dm) => (
                   <div key={dm.name} class="row-between domain-row">
                     <div class="col-tight">
-                      <span class="mono small break">{domainText(dm)}</span>
+                      <EntityLink e={{ kind: "domain", name: dm.other ? "" : dm.name }} from={`app:${d.app.id}`} class="mono small break">{domainText(dm)}</EntityLink>
                       {!dm.other && <span class="muted small">{nameSource(dm.src)}</span>}
                     </div>
                     <span class="soft small right nowrap">↓ {bytes(dm.down)}<br />↑ {bytes(dm.up)}</span>

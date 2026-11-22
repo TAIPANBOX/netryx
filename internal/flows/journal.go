@@ -18,6 +18,8 @@ type Query struct {
 	// Window, with Live, ranks the live flows by the bytes each moved over
 	// the last minutes (WinUp and WinDown) instead of newest first.
 	Window time.Duration
+	// ASN, when not zero, keeps the flows to that network.
+	ASN uint32
 }
 
 const (
@@ -168,6 +170,9 @@ func (m matcher) match(f *Flow) bool {
 		return false
 	}
 	if q.Dir != "" && f.Dir != q.Dir {
+		return false
+	}
+	if q.ASN != 0 && f.Geo.ASN != q.ASN {
 		return false
 	}
 	// A flow overlaps the window if it started before the window ends and

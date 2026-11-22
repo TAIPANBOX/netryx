@@ -2,6 +2,7 @@
 // period, who went there and which rules close them; and one country: its
 // clients, apps and networks over the period.
 
+import { EntityLink, ClientNames } from "./entity";
 import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
@@ -12,7 +13,7 @@ import { RANGES, windowLabel, type Win } from "../query";
 import { Bars } from "../charts";
 import { Header, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
 import { bytes, rate, share, num, appName, countryName, clientName, plural } from "../format";
-import { clientsLine, closesHouse, countryHref, domainText, rulesForCountry } from "../house";
+import { closesHouse, countryHref, domainText, rulesForCountry } from "../house";
 import { BlockCountry, CDN_NOTE, RuleTags, useRuleNames, useRules } from "./controls";
 import { HouseTraffic } from "./Apps";
 
@@ -83,7 +84,7 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
                             </span>
                           </td>
                           <td class="small">
-                            {c.clients > 0 && <span class="strong">{num(c.clients)} </span>}<span class="soft">{clientsLine(c.clients, c.top)}</span>
+                            {c.clients > 0 && <span class="strong">{num(c.clients)} </span>}<ClientNames n={c.clients} top={c.top} from={`dest:${c.cc}`} />
                           </td>
                           <td class="share-cell">
                             <Bars thin parts={[{ pct: c.share * 100, kind: "down" }]} />
@@ -113,14 +114,17 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
               <Card label="Networks" title="Networks" aside={<span class="muted small">the organisation behind each address, by country</span>}>
                 {d.networks.length === 0 && <Empty>No networks in this period.</Empty>}
                 {d.networks.map((n) => (
-                  <a key={n.cc + n.asn} href={countryHref(n.cc)} class="country-row row-link">
+                  <div key={n.cc + n.asn} class="country-row">
                     <CC cc={n.cc} />
                     <div class="col-tight">
-                      <span>{n.other ? "other networks" : n.org || "no organisation"}</span>
-                      <span class="muted small">{countryName(n.cc)}{n.asn && n.asn !== "0" ? ` · AS${n.asn}` : ""}</span>
+                      <EntityLink e={{ kind: "network", asn: n.other ? 0 : n.asn }}>{n.other ? "other networks" : n.org || "no organisation"}</EntityLink>
+                      <span class="muted small">
+                        <EntityLink e={{ kind: "country", cc: n.cc }}>{countryName(n.cc)}</EntityLink>
+                        {n.asn && n.asn !== "0" ? ` · AS${n.asn}` : ""}
+                      </span>
                     </div>
                     <span class="soft small right nowrap">↓ {bytes(n.down)}<br />↑ {bytes(n.up)}</span>
-                  </a>
+                  </div>
                 ))}
               </Card>
               <Card label="Domains" title="Domains" aside={<span class="muted small">the names the house's apps asked for</span>}>
@@ -129,8 +133,8 @@ export function Destinations({ range, onRange, win, onWin }: { range: Range; onR
                   <div key={(dm.app?.id ?? "") + "|" + dm.name} class="app-row">
                     <AppIcon id={dm.app?.id ?? "unknown"} name={appName(dm.app?.name ?? "")} size={24} />
                     <div class="col-tight">
-                      <span class="mono small break">{domainText(dm)}</span>
-                      <span class="muted small">{dm.app ? appName(dm.app.name) : "app unknown"}</span>
+                      <EntityLink e={{ kind: "domain", name: dm.other ? "" : dm.name }} class="mono small break">{domainText(dm)}</EntityLink>
+                      <span class="muted small">{dm.app ? <EntityLink e={{ kind: "app", id: dm.app.id }}>{appName(dm.app.name)}</EntityLink> : "app unknown"}</span>
                     </div>
                     <span class="soft small right nowrap">↓ {bytes(dm.down)}<br />↑ {bytes(dm.up)}</span>
                   </div>
@@ -184,7 +188,7 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
                 {d.clients.map((c) => (
                   <div key={c.mac} class="row-item">
                     <div class="row-between">
-                      <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} />}</span>
+                      <span class="strong">{c.other ? (c.mac === "other" ? "other devices" : clientName(c)) : <ClientLink mac={c.mac} name={clientName(c)} from={`dest:${d.cc}`} />}</span>
                       <span class="soft small nowrap">↓ {bytes(c.down)} · ↑ {bytes(c.up)}</span>
                     </div>
                     {c.other && c.mac !== "other" && <div class="muted small">{c.mac === "router" ? "the router's own traffic" : "no hardware address"}</div>}
@@ -197,11 +201,11 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
                 {d.apps.map((a) => {
                   const name = a.other ? "other apps" : appName(a.app.name);
                   return (
-                    <a key={a.app.id} href={a.other ? undefined : `#/app/${encodeURIComponent(a.app.id)}`} class="app-row row-link">
+                    <div key={a.app.id} class="app-row">
                       <AppIcon id={a.other ? "other" : a.app.id} name={name} size={28} />
-                      <span class="strong ellipsis">{name}</span>
+                      <EntityLink e={{ kind: "app", id: a.other ? "other" : a.app.id }} class="strong ellipsis">{name}</EntityLink>
                       <span class="soft small right nowrap">↓ {bytes(a.down)}<br />↑ {bytes(a.up)}</span>
-                    </a>
+                    </div>
                   );
                 })}
               </Card>
@@ -210,7 +214,7 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
                 {d.networks.map((n) => (
                   <div key={n.asn} class="row-between domain-row">
                     <div class="col-tight">
-                      <span>{n.other ? "other networks" : n.org || "no organisation"}</span>
+                      <EntityLink e={{ kind: "network", asn: n.other ? 0 : n.asn }} from={`dest:${d.cc}`}>{n.other ? "other networks" : n.org || "no organisation"}</EntityLink>
                       {n.asn && n.asn !== "0" && <span class="muted small">AS{n.asn}</span>}
                     </div>
                     <span class="soft small right nowrap">↓ {bytes(n.down)}<br />↑ {bytes(n.up)}</span>

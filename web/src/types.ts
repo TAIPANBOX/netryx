@@ -153,3 +153,17 @@ export interface NetworkView {
   wireguard: { why: string; note: string; interfaces: NetWG[] };
   forwards: { why: string; rules: NetForward[] };
 }
+
+// GET /api/networks/{asn} and /api/domains/{name}, mirrored from internal/api/entity.go.
+export interface EntityClient { mac: string; name: string; down: number; up: number }
+export interface NetworkPage {
+  asn: string; org: string; down: number; up: number;
+  countries: { cc: string; down: number; up: number }[];
+  clients: EntityClient[];
+  apps: ({ app: App; down: number; up: number } & Row)[];
+}
+export interface DomainPage {
+  name: string; down: number; up: number;
+  apps: { app: App; src: string; down: number; up: number }[];
+  clients: EntityClient[];
+}

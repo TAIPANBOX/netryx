@@ -100,3 +100,19 @@ func TestAReusedKeyStartsItsWindowEmpty(t *testing.T) {
 		t.Fatalf("the new connection on the old key %+v: its window must hold only its own bytes", rows)
 	}
 }
+
+// The journal and the live table can be asked for one network's flows.
+func TestFlowsCanBeAskedForOneNetwork(t *testing.T) {
+	f := newFakes()
+	tb := NewTable(f.options())
+	tb.Sync(nil, t0)
+	tb.Apply(event(ct.New, 1, phone, 51001, youtube, 443, 0, 0), t0)
+	tb.Sync([]ct.Event{watch(1, 0, 100)}, t0.Add(30*time.Second))
+	rows, _ := tb.Query(Query{Live: true, ASN: 15169})
+	if len(rows) != 1 {
+		t.Fatalf("the flow to AS15169: %+v", rows)
+	}
+	if rows, _ := tb.Query(Query{Live: true, ASN: 2906}); len(rows) != 0 {
+		t.Errorf("a flow to another network: %+v", rows)
+	}
+}

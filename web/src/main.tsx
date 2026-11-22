@@ -22,6 +22,7 @@ import { Login } from "./screens/Login";
 import { Apps, AppScreen } from "./screens/Apps";
 import { Destinations, Destination } from "./screens/Destinations";
 import { Network } from "./screens/Network";
+import { NetworkScreen, DomainScreen, GroupScreen } from "./screens/Entities";
 import { CardsProvider } from "./screens/windows";
 
 // The period is a per-viewer convenience; storage may be missing (a private
@@ -169,25 +170,31 @@ function Screen() {
   const route = parseRoute(hash);
   switch (route.name) {
     case "clients":
-      return <Clients win={win} onWin={pickWin} />;
+      return <Clients key={route.q ?? ""} q0={route.q ?? ""} win={win} onWin={pickWin} />;
     case "client":
-      return <Client360 key={route.mac} mac={route.mac} range={range} onRange={pick} win={win} onWin={pickWin} />;
+      return <Client360 key={route.mac} mac={route.mac} from={route.from ?? ""} range={range} onRange={pick} win={win} onWin={pickWin} />;
     case "flows":
-      return <Flows key={route.q} initial={route.q} win={win} onWin={pickWin} />;
+      return <Flows key={hash} initial={route.q} from={route.from ?? ""} to={route.to ?? ""} asn={new URLSearchParams(hash.split("?")[1] ?? "").get("asn") ?? ""} win={win} onWin={pickWin} />;
     case "rules":
-      return <Rules />;
+      return <Rules focus={route.rule ?? ""} />;
     case "filters":
       return <FiltersScreen />;
     case "security":
       return <Security />;
     case "apps":
-      return <Apps range={range} onRange={pick} win={win} onWin={pickWin} />;
+      return <Apps key={route.cat ?? ""} cat0={route.cat ?? ""} q0={route.q ?? ""} range={range} onRange={pick} win={win} onWin={pickWin} />;
     case "app":
       return <AppScreen key={route.id} id={route.id} range={range} onRange={pick} />;
     case "destinations":
       return <Destinations range={range} onRange={pick} win={win} onWin={pickWin} />;
     case "network":
       return <Network />;
+    case "asn":
+      return <NetworkScreen key={route.asn} asn={route.asn} from={route.from} range={range} onRange={pick} />;
+    case "domain":
+      return <DomainScreen key={route.domain} domain={route.domain} from={route.from} range={range} onRange={pick} />;
+    case "group":
+      return <GroupScreen key={route.id} id={route.id} />;
     case "destination":
       return <Destination key={route.cc} cc={route.cc} range={range} onRange={pick} />;
     default:

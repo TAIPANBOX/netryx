@@ -221,7 +221,8 @@ function WireGuard({ d }: { d: NetworkView }) {
                 <div key={p.publicKey || `peer-${n}`} class="row-between domain-row">
                   <div class="col-tight">
                     <span>
-                      <span class={peerConnected(p.handshake, now) ? "dot dot-on" : "dot dot-off"} aria-hidden="true" /> {p.name || shortKey(p.publicKey)}
+                      <span class={peerConnected(p.handshake, now) ? "dot dot-on" : "dot dot-off"} aria-hidden="true" />{" "}
+                      {(p.allowedIps ?? [])[0] ? <a class="entity-link" href={`#/flows?q=${encodeURIComponent((p.allowedIps ?? [])[0].split("/")[0])}`}>{p.name || shortKey(p.publicKey)}</a> : p.name || shortKey(p.publicKey)}
                     </span>
                     <span class="muted small mono">{[p.endpoint, (p.allowedIps ?? []).join(", ")].filter(Boolean).join(" · ") || "-"}</span>
                     <span class="muted small">last handshake {handshakeText(p.handshake, now)}</span>

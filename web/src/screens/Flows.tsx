@@ -33,11 +33,12 @@ function target(f: FlowRow): string {
 
 const DIR_TEXT: Record<string, string> = { out: "outgoing (from the house)", in: "incoming (from the internet)", local: "local" };
 
-export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWin: (w: Win) => void }) {
+export function Flows({ initial, from = "", to = "", asn = "", win, onWin }: { initial: string; from?: string; to?: string; asn?: string; win: Win; onWin: (w: Win) => void }) {
   const [text, setText] = useState(initial);
   const [applied, setApplied] = useState(initial);
   const [preset, setPreset] = useState("");
-  const [live, setLive] = useState(true);
+  // A stretch of time is the journal; otherwise the live table.
+  const [live, setLive] = useState(!from && !to);
   const [selKey, setSelKey] = useState("");
   const lastSeen = useRef<FlowRow | null>(null);
   const lastSeenAt = useRef(0);
@@ -61,7 +62,7 @@ export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWi
   const keyNow = useRef(key);
   keyNow.current = key + (live ? "|live" : "");
 
-  const polled = usePoll((s) => getJSON<FlowsPage>(flowsPath(filter, { live, limit: LIMIT, window: win }), s), live ? 5_000 : 0, [key, live, win]);
+  const polled = usePoll((s) => getJSON<FlowsPage>(flowsPath(filter, { live, limit: LIMIT, window: win, from, to, asn }), s), live ? 5_000 : 0, [key, live, win]);
   useEffect(() => {
     setMore(null);
     setSelKey("");
@@ -113,7 +114,7 @@ export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWi
     const asked = keyNow.current;
     setMoreState({ busy: true, error: "" });
     try {
-      const page = await getJSON<FlowsPage>(flowsPath(filter, { live: false, limit: LIMIT, cursor: next }));
+      const page = await getJSON<FlowsPage>(flowsPath(filter, { live: false, limit: LIMIT, cursor: next, from, to, asn }));
       // A page for a search that has since changed belongs to nobody.
       if (keyNow.current !== asked) return;
       setMore((m) => ({ rows: [...(m?.rows ?? []), ...page.rows], next: page.next }));
@@ -135,6 +136,8 @@ export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWi
           <Pills label="Presets" items={PRESETS} value={preset} onPick={setPreset} />
           <span class="muted small push">
             {live ? "live connection table" : "journal"} · showing {num(rows.length)}
+            {(from || to) && ` · from ${from ? dateTime(from) : "the start"} to ${to ? dateTime(to) : "now"}`}
+            {asn && ` · network AS${asn}`}
           </span>
         </div>
         <div class="toolbar">

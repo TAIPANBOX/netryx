@@ -2,8 +2,9 @@
 // works now; a rule is added or changed in three steps (what, who, when). The
 // router is the only judge of a rule: what it refuses is shown beside the form.
 
+import { EntityLink } from "./entity";
 import { h, Fragment } from "preact";
-import { useContext, useState } from "preact/hooks";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import type { Device, Overview, Group } from "../types";
 import { getJSON, sendJSON, usePoll } from "../api";
 import { Header, Status, Loading, Empty, Pills, useSession, IconContext } from "../ui";
@@ -18,7 +19,7 @@ import { deviceName } from "./Clients";
 
 const EMPTY: RuleForm = { what: "app", targets: "", who: "all", members: [], group: "", days: [], from: "", to: "" };
 
-export function Rules() {
+export function Rules({ focus = "" }: { focus?: string }) {
   const { canWrite } = useSession();
   const [n, setN] = useState(0);
   const rules = usePoll((s) => getJSON<Rule[]>("/api/rules", s), 10_000, [n]);
@@ -87,7 +88,7 @@ export function Rules() {
                     cancel={() => setEditing("")}
                   />
                 ) : (
-                  <RuleCard r={r} names={names} now={now} canWrite={canWrite} onEdit={() => setEditing(r.id)} refresh={refresh} />
+                  <RuleCard r={r} names={names} now={now} canWrite={canWrite} onEdit={() => setEditing(r.id)} refresh={refresh} focused={r.id === focus} />
                 )}
               </Fragment>
             ))}
@@ -98,7 +99,12 @@ export function Rules() {
   );
 }
 
-function RuleCard({ r, names, now, canWrite, onEdit, refresh }: { r: Rule; names: Names; now: number; canWrite: boolean; onEdit: () => void; refresh: () => void }) {
+function RuleCard({ r, names, now, canWrite, onEdit, refresh, focused }: { r: Rule; names: Names; now: number; canWrite: boolean; onEdit: () => void; refresh: () => void; focused?: boolean }) {
+  const box = useRef<HTMLElement>(null);
+  // A link to one rule brings it into view and marks it.
+  useEffect(() => {
+    if (focused) box.current?.scrollIntoView({ block: "center" });
+  }, [focused]);
   const st = stateOf(r, now);
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
@@ -128,7 +134,7 @@ function RuleCard({ r, names, now, canWrite, onEdit, refresh }: { r: Rule; names
     });
 
   return (
-    <section class={st.kind === "active" ? "card rule rule-active" : "card rule"} aria-label={`Rule ${r.id}`}>
+    <section ref={box} class={`card rule${st.kind === "active" ? " rule-active" : ""}${focused ? " rule-focused" : ""}`} aria-label={`Rule ${r.id}`}>
       <div class="rule-head">
         <span class="strong break">{describeRule(r, names)}</span>
         <span class={`state state-${st.kind}`}>
@@ -136,6 +142,7 @@ function RuleCard({ r, names, now, canWrite, onEdit, refresh }: { r: Rule; names
           {st.text}
         </span>
       </div>
+      <RuleLinks r={r} names={names} />
       <div class="row-wrap small soft">
         {fromAgent(r) && <span class="tag">by the agent</span>}
         {isPause(r) && <span class="tag">pause</span>}
@@ -304,5 +311,27 @@ function RuleEditor(p: {
         <button type="button" class="btn btn-ghost" onClick={() => (p.cancel ? p.cancel() : p.done())}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+/** What a rule names, each a link: its targets, and whom it reaches. */
+function RuleLinks({ r, names }: { r: Rule; names: Names }) {
+  const targets = r.targets.map((t) =>
+    r.what === "country" ? <EntityLink key={t} e={{ kind: "country", cc: t }}>{t}</EntityLink>
+    : r.what === "app" ? <EntityLink key={t} e={{ kind: "app", id: t }}>{names.app ? names.app(t) : t}</EntityLink>
+    : r.what === "category" ? <EntityLink key={t} e={{ kind: "category", id: t }}>{t}</EntityLink>
+    : <span key={t}>{t}</span>,
+  );
+  const who =
+    r.who === "group" ? <EntityLink e={{ kind: "group", id: r.group }}>{names.group ? names.group(r.group) : r.group}</EntityLink>
+    : r.who === "device" ? r.members.map((m) => <EntityLink key={m} e={{ kind: "client", mac: m }}>{names.device ? names.device(m) : m}</EntityLink>)
+    : <span>everyone</span>;
+  return (
+    <div class="row-wrap small rule-links">
+      {targets.length > 0 && <span class="muted">blocks</span>}
+      {targets}
+      <span class="muted">for</span>
+      {who}
+    </div>
   );
 }
