@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -137,4 +138,36 @@ func (h *handler) asset(w http.ResponseWriter, r *http.Request, name string) {
 	// ServeContent sets Content-Type from the extension, which nosniff
 	// requires to be right for scripts and styles.
 	http.ServeContent(w, r, name, time.Time{}, rs)
+}
+
+// buildID is what build.sh writes to dist/build.txt: a short hex digest of
+// the page's sources.
+var buildID = regexp.MustCompile(`^[0-9a-f]{8,64}$`)
+
+// Build is the page this binary serves, "" when it carries none.
+func Build() string { return buildOf(embedded()) }
+
+func buildOf(files fs.FS) string {
+	b, err := fs.ReadFile(files, "build.txt")
+	if err != nil {
+		return ""
+	}
+	id := strings.TrimSpace(string(b))
+	if !buildID.MatchString(id) {
+		return ""
+	}
+	return id
+}
+
+// WithBuild has every answer of h name the page build the router serves now
+// (X-Netryx-Build), so a page left open across an upgrade can tell it is the
+// old one and offer a reload. An empty build names nothing.
+func WithBuild(build string, h http.Handler) http.Handler {
+	if build == "" {
+		return h
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Netryx-Build", build)
+		h.ServeHTTP(w, r)
+	})
 }

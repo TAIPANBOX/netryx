@@ -207,3 +207,12 @@ func TestParseReadsBackslashesAsLibuciDoes(t *testing.T) {
 		t.Fatalf("a backslash ending the file: %v", err)
 	}
 }
+
+// libuci accepts a package line at the top of a file (uci export writes it);
+// it names the file and is no section.
+func TestPackageLinesAreRead(t *testing.T) {
+	secs, err := Parse(strings.NewReader("package firewall\n\nconfig redirect\n\toption name 'x'\n"))
+	if err != nil || len(secs) != 1 || secs[0].Type != "redirect" {
+		t.Fatalf("Parse = %+v, %v", secs, err)
+	}
+}

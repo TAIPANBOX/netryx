@@ -70,7 +70,7 @@ export function Destinations({ range, onRange }: { range: Range; onRange: (r: Ra
                           </td>
                           <td class="num small">
                             ↓ {bytes(c.down)}
-                            <br />↑ {bytes(c.up)}
+                            <br />{" "}↑ {bytes(c.up)}
                           </td>
                           <td class="small">
                             <RuleTags rules={closing} />

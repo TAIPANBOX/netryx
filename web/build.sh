@@ -35,7 +35,14 @@ if [ -d "$data/v2fly/data" ] && [ -d "$data/simple-icons/icons" ] && [ -f "$bran
 else
 	echo "icons: no data/v2fly or data/simple-icons (run scripts/fetch-data.sh data); every app is a letter tile"
 fi
+# The page's build: a digest of its sources, compiled into the bundle and
+# written beside it, where the binary reads it to name the page it serves on
+# every API answer. A page left open across an upgrade sees the difference
+# and offers a reload.
+build=$(find src -type f ! -name '*.test.ts' | LC_ALL=C sort | xargs cat | sha256sum | cut -c1-12)
+printf '%s\n' "$build" >"$out/build.txt"
 npx esbuild src/main.tsx --bundle --minify --format=esm --target=es2020 \
+	--define:__NETRYX_BUILD__="\"$build\"" \
 	--jsx-factory=h --jsx-fragment=Fragment --legal-comments=none \
 	--log-level=warning --outfile="$out/app.js"
 cp src/index.html src/style.css "$out/"

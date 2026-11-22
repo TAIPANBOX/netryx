@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { speedText, signalText, handshakeText, peerConnected, forwardTarget, shortKey } from "./network";
+import { speedText, signalText, handshakeText, peerConnected, forwardTarget, shortKey, idleNetworks, wgState, apName } from "./network";
 import { parseRoute } from "./query";
 
 test("a port's speed in the unit a person reads", () => {
@@ -46,4 +46,22 @@ test("a public key is shortened, never a secret shown whole", () => {
 
 test("the network route", () => {
   assert.deepEqual(parseRoute("#/network"), { name: "network" });
+});
+
+test("a network not running is an access point the router does not run, never a client uplink", () => {
+  const ap = (name: string, ssid: string, mode: string, disabled = false) => ({ name, radio: "radio1", ssid, mode, network: "lan", disabled });
+  const live = [{ iface: "phy1-ap0", ssid: "Home", band: "5 GHz", channel: 36, clients: [] }];
+  const idle = idleNetworks([ap("a", "Home", "ap"), ap("b", "Guests", "ap", true), ap("c", "Upstream", "sta"), ap("d", "Mesh", "mesh"), ap("e", "Old", "")], live);
+  assert.deepEqual(idle.map((a) => a.name), ["b", "e"]);
+});
+
+test("an access point hostapd did not name is shown by its interface", () => {
+  assert.equal(apName({ iface: "phy1-ap0", ssid: "Home" }), "Home");
+  assert.equal(apName({ iface: "phy1-ap0", ssid: "" }), "phy1-ap0 (name not reported)");
+});
+
+test("a WireGuard interface the kernel does not run says so", () => {
+  assert.equal(wgState({ up: true }, ""), "");
+  assert.equal(wgState({ up: false }, ""), "not running: the kernel has no such interface");
+  assert.equal(wgState({ up: false }, "wireguard-tools is not installed"), "", "without wg nothing is known of the kernel's side");
 });

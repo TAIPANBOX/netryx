@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendJSON, setCSRF, onUnauthorized, ApiError, login } from "./api";
+import { sendJSON, setCSRF, onUnauthorized, ApiError, login, getJSON, setBuild, onNewBuild } from "./api";
 
 interface Call { url: string; init: RequestInit }
 
@@ -176,5 +176,40 @@ test("a failed session refresh after a 403 is not a logout", async () => {
   } finally {
     off2();
     f.restore();
+  }
+});
+
+test("a login without the netryx grant says how rpcd wants it written", async () => {
+  const real = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+  try {
+    const r = await login("lab", "x");
+    assert.equal(r.ok, false);
+    assert.match(!r.ok ? r.text : "", /list read 'netryx'/);
+    assert.match(!r.ok ? r.text : "", /option/);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test("a page left open across an upgrade is told the router serves a newer one", async () => {
+  setBuild("aaaaaaaaaaaa");
+  let told = 0;
+  const off = onNewBuild(() => told++);
+  const f = fakeFetch(200, { ok: true }, { "X-Netryx-Build": "aaaaaaaaaaaa" });
+  try {
+    await getJSON("/api/overview");
+    assert.equal(told, 0, "the same build is not news");
+  } finally {
+    f.restore();
+  }
+  const g = fakeFetch(200, { ok: true }, { "X-Netryx-Build": "bbbbbbbbbbbb" });
+  try {
+    await getJSON("/api/overview");
+    await getJSON("/api/overview");
+    assert.equal(told, 1, "a newer build is told once");
+  } finally {
+    g.restore();
+    off();
   }
 });

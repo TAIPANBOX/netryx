@@ -660,7 +660,16 @@ enforced, and that is a debt rather than a decision.
   (test: `TestWhatTheRouterLacksIsSaid`, `TestTheNetworkViewSaysWhatTheRouterLacks`,
   `TestWithoutANetworkSourceTheViewIsUnavailable`)
 - **The router is asked at most every 5 s** however often the page polls,
-  and one reading is bounded to 5 s. (test: `TestTheViewIsCachedForAFewSeconds`)
+  and one reading is bounded to 5 s, under its own deadline: viewers asking
+  at once share one reading, one who leaves stops waiting and never leaves a
+  cut-short reading in the cache. (test: `TestTheViewIsCachedForAFewSeconds`,
+  `TestViewersShareOneRead`, `TestAReadIsNotCutShortByTheViewerLeaving`, `TestAWaitingViewerCanLeave`)
+- **A config that cannot be read is said so**, never shown as a router
+  without Wi-Fi, WireGuard or forwards; a `package` line reads as libuci
+  reads it. (test: `TestAConfigThatCannotBeReadIsSaidSo`, `TestPackageLinesAreRead`)
+- **The internet line is the configured WAN**, up or down, or another
+  network with a default route; a tunnel's default route is not.
+  (test: `TestTheWANIsTheConfiguredLineAndNotATunnel`)
 
 ## The promise about the running console
 
@@ -762,6 +771,13 @@ enforced, and that is a debt rather than a decision.
   its address was learned on (read from `brforward`, no tool needed), a Wi-Fi
   one its network's name from hostapd, and the bridge's own addresses are
   not clients. (test: `TestClientsShowTheirPortOrTheirNetwork`)
+
+- **A page left open across an upgrade learns of it**: build.sh writes the
+  page's build (a digest of its sources) into the bundle and beside it, every
+  API answer names the build served (`X-Netryx-Build`), and a page that sees
+  another offers a reload. (test: `TestEveryAnswerNamesTheBuildServed`,
+  `TestTheBuildIsReadFromBesideThePage`; the page: "a page left open across an
+  upgrade is told the router serves a newer one" in `web/src/api.test.ts`)
 
 ## The promise about icons and the live view
 

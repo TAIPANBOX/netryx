@@ -2,7 +2,7 @@
 // WireGuard handshakes and where a forward leads. No DOM here, so node tests
 // cover it.
 
-import type { NetForward } from "./types";
+import type { NetAP, NetForward, NetLiveAP } from "./types";
 
 /** A port's link speed: 1000 is "1 Gbit/s"; 0 (no link, or unknown) is "". */
 export function speedText(mbps: number): string {
@@ -42,4 +42,24 @@ export function forwardTarget(f: Pick<NetForward, "destIp" | "destPort" | "devic
 /** A public key, shortened to its ends for recognising it. */
 export function shortKey(k: string): string {
   return k.length > 12 ? `${k.slice(0, 8)}…${k.slice(-4)}` : k;
+}
+
+/**
+ * The configured access points the router does not run now: turned off, or
+ * not among hostapd's. A client uplink (sta) or a mesh link is not an access
+ * point, so it is never listed as not running.
+ */
+export function idleNetworks(aps: NetAP[], live: Pick<NetLiveAP, "ssid">[]): NetAP[] {
+  const running = new Set(live.map((a) => a.ssid));
+  return aps.filter((a) => (a.mode === "ap" || a.mode === "") && (a.disabled || !running.has(a.ssid)));
+}
+
+/** A running access point's name: its SSID, or its interface when hostapd did not report one. */
+export function apName(a: Pick<NetLiveAP, "iface" | "ssid">): string {
+  return a.ssid || `${a.iface} (name not reported)`;
+}
+
+/** Why a configured WireGuard interface shows no peers' side: the kernel does not run it. */
+export function wgState(i: { up: boolean }, note: string): string {
+  return !i.up && !note ? "not running: the kernel has no such interface" : "";
 }

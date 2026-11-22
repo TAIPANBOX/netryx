@@ -99,6 +99,7 @@ func (s *server) network(r *http.Request) (any, error) {
 	if s.net == nil {
 		return nil, httpError{http.StatusServiceUnavailable, "the router's network view is not available"}
 	}
+	// The reading has its own deadline; this one bounds the wait for it.
 	ctx, cancel := context.WithTimeout(r.Context(), netReadTimeout)
 	defer cancel()
 	v := s.net.View(ctx)

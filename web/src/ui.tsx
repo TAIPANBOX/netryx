@@ -3,11 +3,11 @@
 // is not answering.
 
 import { h, Fragment, createContext, type ComponentChildren } from "preact";
-import { useContext, useState } from "preact/hooks";
+import { useContext, useEffect, useState } from "preact/hooks";
 import type { Range } from "./types";
 import type { Polled } from "./api";
 import { RANGES } from "./query";
-import { logout } from "./api";
+import { logout, onNewBuild } from "./api";
 import { time } from "./format";
 import { appIcon, type IconManifest } from "./icons";
 
@@ -42,6 +42,19 @@ function Logo() {
       <circle cx="12" cy="21" r="2" />
       <path d="M6 7l4 3M18 7l-4 3M12 15v4" />
     </svg>
+  );
+}
+
+/** Shown once the router serves a newer page than the one open: the open one may not match its API. */
+function NewBuild() {
+  const [newer, setNewer] = useState(false);
+  useEffect(() => onNewBuild(() => setNewer(true)), []);
+  if (!newer) return null;
+  return (
+    <p class="banner banner-top" role="status">
+      The router now serves a newer console.{" "}
+      <button type="button" class="btn-mini" onClick={() => location.reload()}>Reload</button>
+    </p>
   );
 }
 
@@ -82,6 +95,7 @@ export function Header(p: { section: Section; range?: Range; onRange?: (r: Range
         </span>
       )}
     </header>
+    <NewBuild />
     {s.noRPC && (
       <p class="banner banner-top" role="status">
         Sign-in unavailable: rpcd is not answering. Read only, from the router itself.

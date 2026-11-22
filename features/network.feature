@@ -8,8 +8,9 @@ Feature: the console shows how the router is wired
     Given the router runs a LAN, a WAN and perhaps more networks
     When the owner opens Network
     Then each network shows its state, protocol, device, addresses, gateway, uptime and traffic
-    And the network holding the default route is marked as the internet, and loopback is not listed
+    And the configured WAN, or another network holding a default route, is marked as the internet, a tunnel is not, and loopback is not listed
     # -> TestInterfacesAreReadFromNetifd
+    # -> TestTheWANIsTheConfiguredLineAndNotATunnel
 
   Scenario: the ports and who is behind each
     Given devices are plugged into the house bridge's ports
@@ -47,7 +48,10 @@ Feature: the console shows how the router is wired
     Given a router without Wi-Fi, WireGuard, forwards or the wg tool
     When the owner opens Network
     Then each section says what is missing instead of showing an empty box
+    And a config that is there but cannot be read is said so, never taken for a missing feature
     # -> TestWhatTheRouterLacksIsSaid
+    # -> TestAConfigThatCannotBeReadIsSaidSo
+    # -> TestPackageLinesAreRead
     # -> TestTheNetworkViewSaysWhatTheRouterLacks
     # -> TestWithoutANetworkSourceTheViewIsUnavailable
 
@@ -55,4 +59,8 @@ Feature: the console shows how the router is wired
     Given the page asks for the network view every ten seconds
     When it is asked again within a few seconds
     Then the router is not asked again
+    And viewers asking at once share one reading, and one who leaves neither waits nor cuts the reading short
     # -> TestTheViewIsCachedForAFewSeconds
+    # -> TestViewersShareOneRead
+    # -> TestAReadIsNotCutShortByTheViewerLeaving
+    # -> TestAWaitingViewerCanLeave

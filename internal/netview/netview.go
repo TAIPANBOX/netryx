@@ -7,9 +7,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,12 +29,15 @@ const (
 	NoWgTool      = "wireguard-tools is not installed, so handshakes and traffic are not shown"
 	NoForwards    = "no port forwards are configured"
 	NoNetifd      = "netifd did not answer, so the networks are not shown"
+	NotYet        = "the router has not answered yet"
 )
 
 const (
 	// cacheFor is how long one reading answers: the page polls, the router
 	// is asked at most this often.
 	cacheFor = 5 * time.Second
+	// readTimeout bounds one reading of the router.
+	readTimeout = 5 * time.Second
 	// The lists are bounded: a home router has a handful of each.
 	maxIfaces   = 64
 	maxPorts    = 64
@@ -170,31 +175,64 @@ type Source struct {
 	FS      fs.FS
 	Run     Runner
 	Bridges []string
-	Now     func() time.Time
+	// WAN names the networks the service was told are the internet line.
+	WAN []string
+	Now func() time.Time
 
-	mu     sync.Mutex
-	cached View
-	has    bool
+	mu      sync.Mutex
+	cached  View
+	has     bool
+	reading chan struct{} // closed when the running reading ends
 }
 
-// View returns the router's view, read at most every cacheFor.
+// View returns the router's view, read at most every cacheFor. The reading
+// runs under its own deadline, never the viewer's: a viewer who leaves does
+// not leave a cut-short reading in the cache. Viewers who ask while a reading
+// runs wait for that one; one who leaves while waiting is answered with the
+// last reading.
 func (s *Source) View(ctx context.Context) View {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	now := s.Now()
 	if s.has && now.Sub(s.cached.At) < cacheFor && !now.Before(s.cached.At) {
-		return s.cached
+		v := s.cached
+		s.mu.Unlock()
+		return v
 	}
-	v := s.read(ctx)
-	v.At = now
-	s.cached, s.has = v, true
+	if ch := s.reading; ch != nil {
+		s.mu.Unlock()
+		select {
+		case <-ch:
+		case <-ctx.Done():
+		}
+		s.mu.Lock()
+		v, has := s.cached, s.has
+		s.mu.Unlock()
+		if !has {
+			v = View{IfacesWhy: NotYet, Interfaces: []Iface{}, Ports: []Port{},
+				WiFi: WiFi{Why: NotYet}, WireGuard: WireGuard{Why: NotYet}, Forwards: Forwards{Why: NotYet}}
+		}
+		return v
+	}
+	ch := make(chan struct{})
+	s.reading = ch
+	s.mu.Unlock()
+
+	rctx, cancel := context.WithTimeout(context.Background(), readTimeout)
+	v := s.read(rctx)
+	cancel()
+	v.At = s.Now()
+
+	s.mu.Lock()
+	s.cached, s.has, s.reading = v, true, nil
+	s.mu.Unlock()
+	close(ch)
 	return v
 }
 
 func (s *Source) read(ctx context.Context) View {
 	v := View{Interfaces: []Iface{}, Ports: []Port{}}
 	if out, err := s.Run(ctx, "ubus", "call", "network.interface", "dump"); err == nil {
-		if ifs := ParseInterfaces(out); ifs != nil {
+		if ifs := ParseInterfaces(out, s.WAN); ifs != nil {
 			v.Interfaces = ifs
 		}
 	}
@@ -212,13 +250,35 @@ func (s *Source) read(ctx context.Context) View {
 	v.WiFi = s.wifi(ctx)
 	v.WireGuard = s.wireguard(ctx)
 	v.Forwards = Forwards{Rules: []Forward{}}
-	if b, err := fs.ReadFile(s.FS, "etc/config/firewall"); err == nil {
-		v.Forwards.Rules = ParseForwards(b)
+	b, err := s.config("firewall")
+	if err == nil && b != nil {
+		var rules []Forward
+		if rules, err = ParseForwards(b); err == nil {
+			v.Forwards.Rules = rules
+		}
 	}
-	if len(v.Forwards.Rules) == 0 {
+	switch {
+	case err != nil:
+		v.Forwards.Why = unreadable("firewall", err)
+	case len(v.Forwards.Rules) == 0:
 		v.Forwards.Why = NoForwards
 	}
 	return v
+}
+
+// config reads /etc/config/<name>: nil and no error when there is none.
+func (s *Source) config(name string) ([]byte, error) {
+	b, err := fs.ReadFile(s.FS, "etc/config/"+name)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return b, err
+}
+
+// unreadable says a config is there but could not be read, so the page does
+// not take it for a router without the feature.
+func unreadable(name string, err error) string {
+	return fmt.Sprintf("could not read /etc/config/%s: %v", name, err)
 }
 
 func (s *Source) sysfs(path string) string {
@@ -276,8 +336,17 @@ func (s *Source) isRadio(port string) bool {
 
 func (s *Source) wifi(ctx context.Context) WiFi {
 	w := WiFi{Radios: []Radio{}, APs: []AP{}, Live: []LiveAP{}}
-	if b, err := fs.ReadFile(s.FS, "etc/config/wireless"); err == nil {
-		w.Radios, w.APs = ParseWireless(b)
+	b, err := s.config("wireless")
+	if err == nil && b != nil {
+		var radios []Radio
+		var aps []AP
+		if radios, aps, err = ParseWireless(b); err == nil {
+			w.Radios, w.APs = radios, aps
+		}
+	}
+	if err != nil {
+		w.Why = unreadable("wireless", err)
+		return w
 	}
 	if out, err := s.Run(ctx, "ubus", "list", "hostapd.*"); err == nil {
 		for _, obj := range strings.Fields(string(out)) {
@@ -310,8 +379,16 @@ func (s *Source) wifi(ctx context.Context) WiFi {
 
 func (s *Source) wireguard(ctx context.Context) WireGuard {
 	w := WireGuard{Interfaces: []WGIface{}}
-	if b, err := fs.ReadFile(s.FS, "etc/config/network"); err == nil {
-		w.Interfaces = ParseWireGuardConfig(b)
+	b, err := s.config("network")
+	if err == nil && b != nil {
+		var ifs []WGIface
+		if ifs, err = ParseWireGuardConfig(b); err == nil {
+			w.Interfaces = ifs
+		}
+	}
+	if err != nil {
+		w.Why = unreadable("network", err)
+		return w
 	}
 	if len(w.Interfaces) == 0 {
 		w.Why = NoWireGuard
@@ -345,12 +422,15 @@ func BandOf(freq int) string {
 	}
 }
 
+// tunnel are the protocols whose default route is a VPN's, not the line's.
+var tunnel = map[string]bool{"wireguard": true, "openvpn": true, "vpnc": true, "pptp": true, "l2tp": true, "gre": true}
+
 var bands = map[string]string{"2g": "2.4 GHz", "5g": "5 GHz", "6g": "6 GHz", "60g": "60 GHz"}
 
 // ParseInterfaces reads `ubus call network.interface dump`. Loopback is left
 // out; a network holding a default route is the WAN. A reply that does not
 // parse is nil.
-func ParseInterfaces(js []byte) []Iface {
+func ParseInterfaces(js []byte, wan []string) []Iface {
 	type addr struct {
 		Address string `json:"address"`
 		Mask    int    `json:"mask"`
@@ -400,10 +480,14 @@ func ParseInterfaces(js []byte) []Iface {
 				f.IPv6 = append(f.IPv6, fmt.Sprintf("%s/%d", a.Local.Address, a.Local.Mask))
 			}
 		}
+		// The WAN is the line the service was told about, up or down, and
+		// any other network holding a default route, except a tunnel: a
+		// WireGuard client that routes everything is not the internet line.
+		f.WAN = slices.Contains(wan, i.Interface)
 		for _, r := range i.Route {
-			if r.Mask == 0 && (r.Target == "0.0.0.0" || r.Target == "::") {
+			if r.Mask == 0 && (r.Target == "0.0.0.0" || r.Target == "::") && !tunnel[i.Proto] {
 				f.WAN = true
-				if r.Target == "0.0.0.0" && f.Gateway == "" {
+				if r.Target == "0.0.0.0" && f.Gateway == "" && r.Nexthop != "0.0.0.0" {
 					f.Gateway = r.Nexthop
 				}
 			}
@@ -413,12 +497,8 @@ func ParseInterfaces(js []byte) []Iface {
 	return out
 }
 
-func uci(b []byte) []uciconf.Section {
-	secs, err := uciconf.Parse(bytes.NewReader(b))
-	if err != nil {
-		return nil
-	}
-	return secs
+func uci(b []byte) ([]uciconf.Section, error) {
+	return uciconf.Parse(bytes.NewReader(b))
 }
 
 func opt(s uciconf.Section, k string) string {
@@ -432,9 +512,13 @@ func off(s uciconf.Section) bool { return opt(s, "disabled") == "1" }
 
 // ParseWireless reads /etc/config/wireless: the radios and the networks they
 // offer. Keys and passwords are never read.
-func ParseWireless(b []byte) ([]Radio, []AP) {
+func ParseWireless(b []byte) ([]Radio, []AP, error) {
 	radios, aps := []Radio{}, []AP{}
-	for _, s := range uci(b) {
+	secs, err := uci(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, s := range secs {
 		switch s.Type {
 		case "wifi-device":
 			if len(radios) < maxRadios {
@@ -450,14 +534,17 @@ func ParseWireless(b []byte) ([]Radio, []AP) {
 			}
 		}
 	}
-	return radios, aps
+	return radios, aps, nil
 }
 
 // ParseWireGuardConfig reads the WireGuard interfaces of /etc/config/network
 // and their peers (sections of type wireguard_<interface>). Private and
 // preshared keys are never read.
-func ParseWireGuardConfig(b []byte) []WGIface {
-	secs := uci(b)
+func ParseWireGuardConfig(b []byte) ([]WGIface, error) {
+	secs, err := uci(b)
+	if err != nil {
+		return nil, err
+	}
 	out := []WGIface{}
 	at := map[string]int{}
 	for _, s := range secs {
@@ -482,7 +569,7 @@ func ParseWireGuardConfig(b []byte) []WGIface {
 		}
 		out[i].Peers = append(out[i].Peers, p)
 	}
-	return out
+	return out, nil
 }
 
 // ApplyWireGuardDump adds what `wg show all dump` says to the interfaces of
@@ -527,9 +614,13 @@ func ApplyWireGuardDump(ifs []WGIface, dump []byte) {
 
 // ParseForwards reads the DNAT redirects of /etc/config/firewall: a port on
 // the outside led to a device inside.
-func ParseForwards(b []byte) []Forward {
+func ParseForwards(b []byte) ([]Forward, error) {
 	out := []Forward{}
-	for _, s := range uci(b) {
+	secs, err := uci(b)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range secs {
 		if s.Type != "redirect" || len(out) >= maxForwards {
 			continue
 		}
@@ -549,7 +640,7 @@ func ParseForwards(b []byte) []Forward {
 		}
 		out = append(out, f)
 	}
-	return out
+	return out, nil
 }
 
 var ifaceName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._@-]{0,14}$`)

@@ -138,6 +138,20 @@ through SSH, `ssh -L 8788:127.0.0.1:8788 root@192.168.1.1`, then <http://127.0.0
 `netryx.main.listen` to the router's LAN address. Everything else is in `/etc/config/netryx`, each
 option explained where it stands.
 
+A login other than root needs the netryx grant in `/etc/config/rpcd`, written as `list` lines:
+
+```
+config login
+	option username 'family'
+	option password '$p$family'
+	list read 'netryx'
+	list write 'netryx'
+```
+
+`list read` lets the login see the console, `list write` lets it change rules. Written as
+`option read 'netryx'`, rpcd does not take it as a grant, and the console answers that this user
+has no access to netryx.
+
 Architectures: `aarch64_cortex-a53`, `aarch64_generic`, `x86_64`, `arm_cortex-a7`/`a9` and `mips`
 build from the same script (`build.sh` maps the OpenWrt name to Go's).
 

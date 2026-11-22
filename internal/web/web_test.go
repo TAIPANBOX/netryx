@@ -162,3 +162,33 @@ func TestTheEmbeddedUIAgreesWithItself(t *testing.T) {
 		t.Errorf("Built() is false but / answered %d", r.StatusCode)
 	}
 }
+
+// The page's build is the one build.sh wrote beside it; a tree without one
+// (go test, a binary built without the page) has none.
+func TestTheBuildIsReadFromBesideThePage(t *testing.T) {
+	if got := buildOf(fstest.MapFS{"build.txt": {Data: []byte("3f2a9c01b7de\n")}}); got != "3f2a9c01b7de" {
+		t.Errorf("build %q", got)
+	}
+	if got := buildOf(fstest.MapFS{}); got != "" {
+		t.Errorf("no build.txt gave %q", got)
+	}
+	if got := buildOf(fstest.MapFS{"build.txt": {Data: []byte("<script>\n")}}); got != "" {
+		t.Errorf("a build that is not a short hex id gave %q", got)
+	}
+}
+
+// Every API answer says which page the router serves now, so a page left open
+// across an upgrade can tell that it is the old one.
+func TestEveryAnswerNamesTheBuildServed(t *testing.T) {
+	h := WithBuild("3f2a9c01b7de", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/overview", nil))
+	if got := rec.Header().Get("X-Netryx-Build"); got != "3f2a9c01b7de" {
+		t.Errorf("header %q", got)
+	}
+	rec = httptest.NewRecorder()
+	WithBuild("", http.NotFoundHandler()).ServeHTTP(rec, httptest.NewRequest("GET", "/api/x", nil))
+	if _, ok := rec.Header()["X-Netryx-Build"]; ok {
+		t.Errorf("a binary without a page build named one")
+	}
+}

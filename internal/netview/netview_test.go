@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -24,7 +25,7 @@ func read(t *testing.T, name string) []byte {
 // device, addresses and uptime; the WAN is the one holding a default route,
 // and loopback is not a network of the house.
 func TestInterfacesAreReadFromNetifd(t *testing.T) {
-	got := ParseInterfaces(read(t, "vm-interface-dump.json"))
+	got := ParseInterfaces(read(t, "vm-interface-dump.json"), nil)
 	if len(got) != 3 {
 		t.Fatalf("%d interfaces, want lan, wan and wan6: %+v", len(got), got)
 	}
@@ -45,7 +46,7 @@ func TestInterfacesAreReadFromNetifd(t *testing.T) {
 	if !wan6.WAN || len(wan6.IPv6) != 1 {
 		t.Errorf("wan6 %+v", wan6)
 	}
-	if ParseInterfaces([]byte("not json")) != nil {
+	if ParseInterfaces([]byte("not json"), nil) != nil {
 		t.Errorf("a reply that does not parse is no interfaces")
 	}
 }
@@ -53,7 +54,10 @@ func TestInterfacesAreReadFromNetifd(t *testing.T) {
 // Wi-Fi as the config sets it up: radios with band, channel and width, and
 // the networks each one offers; a password is never read.
 func TestWirelessConfigNamesRadiosAndNetworks(t *testing.T) {
-	radios, aps := ParseWireless(read(t, "wireless.uci"))
+	radios, aps, err := ParseWireless(read(t, "wireless.uci"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(radios) != 3 || radios[0].Band != "2.4 GHz" || radios[1].Channel != "36" || radios[1].Width != "HE80" || !radios[2].Disabled {
 		t.Errorf("radios %+v", radios)
 	}
@@ -70,7 +74,10 @@ func TestWirelessConfigNamesRadiosAndNetworks(t *testing.T) {
 // says of each peer now. Neither a private key nor a preshared key is ever
 // read into the view.
 func TestWireGuardPeersCarryNamesHandshakesAndTrafficButNoSecret(t *testing.T) {
-	ifs := ParseWireGuardConfig(read(t, "network.uci"))
+	ifs, err := ParseWireGuardConfig(read(t, "network.uci"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(ifs) != 1 || ifs[0].Name != "wg0" || ifs[0].ListenPort != 51820 || len(ifs[0].Peers) != 2 {
 		t.Fatalf("wireguard %+v", ifs)
 	}
@@ -99,7 +106,10 @@ func TestWireGuardPeersCarryNamesHandshakesAndTrafficButNoSecret(t *testing.T) {
 // outside port, protocol and where they lead; other redirects are not
 // forwards.
 func TestPortForwardsAreTheFirewallsDNATRedirects(t *testing.T) {
-	fw := ParseForwards(read(t, "firewall.uci"))
+	fw, err := ParseForwards(read(t, "firewall.uci"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(fw) != 2 {
 		t.Fatalf("forwards %+v, want the two DNAT redirects", fw)
 	}
@@ -248,5 +258,115 @@ func TestWgIsAskedOnceForEveryInterface(t *testing.T) {
 	s.View(context.Background())
 	if len(asked) != 1 || asked[0] != "show all dump" {
 		t.Errorf("wg asked %q, want once: show all dump", asked)
+	}
+}
+
+// A viewer who leaves mid-read does not cut the reading short: the router is
+// read under its own deadline, and what is cached is a whole reading.
+func TestAReadIsNotCutShortByTheViewerLeaving(t *testing.T) {
+	dump := read(t, "vm-interface-dump.json")
+	s := &Source{FS: fstest.MapFS{}, Run: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if name == "ubus" && len(args) > 1 && args[1] == "network.interface" {
+			return dump, nil
+		}
+		return nil, errors.New("no")
+	}, Now: time.Now}
+	gone, cancel := context.WithCancel(context.Background())
+	cancel()
+	if v := s.View(gone); len(v.Interfaces) != 3 || v.IfacesWhy != "" {
+		t.Fatalf("a cancelled viewer got %+v", v)
+	}
+}
+
+// Viewers asking at once share one reading; nobody queues up a second.
+func TestViewersShareOneRead(t *testing.T) {
+	release := make(chan struct{})
+	var mu sync.Mutex
+	reads := 0
+	s := &Source{FS: fstest.MapFS{}, Run: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		if name == "ubus" && len(args) > 1 && args[1] == "network.interface" {
+			mu.Lock()
+			reads++
+			mu.Unlock()
+			<-release
+		}
+		return nil, errors.New("no")
+	}, Now: time.Now}
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); s.View(context.Background()) }()
+	}
+	time.Sleep(100 * time.Millisecond)
+	close(release)
+	wg.Wait()
+	if reads != 1 {
+		t.Errorf("%d readings for four viewers at once, want 1", reads)
+	}
+}
+
+// A viewer that waits for someone else's reading stops waiting when it
+// leaves, and is answered with what is known.
+func TestAWaitingViewerCanLeave(t *testing.T) {
+	release := make(chan struct{})
+	defer close(release)
+	s := &Source{FS: fstest.MapFS{}, Run: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		if name == "ubus" && len(args) > 1 && args[1] == "network.interface" {
+			<-release
+		}
+		return nil, errors.New("no")
+	}, Now: time.Now}
+	go s.View(context.Background())
+	time.Sleep(50 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	done := make(chan struct{})
+	var got View
+	go func() { got = s.View(ctx); close(done) }()
+	select {
+	case <-done:
+		if got.IfacesWhy != NotYet {
+			t.Errorf("a viewer who left before the first reading got %q, want %q", got.IfacesWhy, NotYet)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a viewer that left was still waiting")
+	}
+}
+
+// A config that is there but cannot be read is said so, never shown as a
+// router without that feature.
+func TestAConfigThatCannotBeReadIsSaidSo(t *testing.T) {
+	bad := []byte("config redirect\n\toption name 'x\n")
+	fsys := fstest.MapFS{"etc/config/firewall": {Data: bad}, "etc/config/network": {Data: bad}, "etc/config/wireless": {Data: bad}}
+	v := (&Source{FS: fsys, Run: fakeRun{}.run, Now: time.Now}).View(context.Background())
+	for what, why := range map[string]string{"forwards": v.Forwards.Why, "wireguard": v.WireGuard.Why, "wifi": v.WiFi.Why} {
+		if !strings.HasPrefix(why, "could not read /etc/config/") {
+			t.Errorf("%s says %q, want that its config could not be read", what, why)
+		}
+	}
+}
+
+// The WAN is the network the service was told is the WAN even while it is
+// down, and a tunnel that carries a default route is not the internet line.
+func TestTheWANIsTheConfiguredLineAndNotATunnel(t *testing.T) {
+	dump := []byte(`{"interface":[
+	 {"interface":"wan","up":false,"proto":"dhcp","device":"eth1","route":[]},
+	 {"interface":"vpn","up":true,"proto":"wireguard","l3_device":"vpn","route":[{"target":"0.0.0.0","mask":0,"nexthop":"0.0.0.0"}]},
+	 {"interface":"wwan","up":true,"proto":"dhcp","l3_device":"wlan0","route":[{"target":"0.0.0.0","mask":0,"nexthop":"192.0.2.1"}]}]}`)
+	by := map[string]Iface{}
+	for _, i := range ParseInterfaces(dump, []string{"wan"}) {
+		by[i.Name] = i
+	}
+	if !by["wan"].WAN {
+		t.Errorf("the configured WAN, down, lost its mark: %+v", by["wan"])
+	}
+	if by["vpn"].WAN || by["vpn"].Gateway != "" {
+		t.Errorf("a WireGuard tunnel's default route made it the internet: %+v", by["vpn"])
+	}
+	if !by["wwan"].WAN || by["wwan"].Gateway != "192.0.2.1" {
+		t.Errorf("a second uplink with a default route: %+v", by["wwan"])
 	}
 }

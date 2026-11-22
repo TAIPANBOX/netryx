@@ -68,6 +68,9 @@ func Parse(r io.Reader) ([]Section, error) {
 			continue
 		}
 		switch words[0] {
+		case "package":
+			// libuci reads it (uci export writes it): it names the file.
+			continue
 		case "config":
 			if len(words) < 2 || len(words) > 3 {
 				return nil, fmt.Errorf("uci: line %d: config needs a type and an optional name", n)

@@ -43,6 +43,7 @@ async function failure(r: Response): Promise<ApiError> {
 /** GET a same-origin JSON route. Nothing is ever fetched from anywhere else. */
 export async function getJSON<T>(path: string, signal?: AbortSignal): Promise<T> {
   const r = await fetch(path, { signal, cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json" } });
+  noteBuild(r);
   if (!r.ok) {
     if (r.status === 401) sessionGone();
     throw await failure(r);
@@ -106,6 +107,7 @@ export interface Session { user: string; csrf: string; canWrite: boolean; noRPC?
 /** The session behind the cookie, or null when there is none. Keeps its token for the writes. */
 export async function getSession(): Promise<Session | null> {
   const r = await fetch("/api/session", { cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json" } });
+  noteBuild(r);
   if (r.status === 401) return null;
   if (!r.ok) throw await failure(r);
   const s = (await r.json()) as Session;
@@ -143,7 +145,10 @@ export async function login(user: string, password: string): Promise<LoginResult
     case 401:
       return { ok: false, text: "Wrong user name or password." };
     case 403:
-      return { ok: false, text: "This user has no access to netryx." };
+      return {
+        ok: false,
+        text: "This user has no access to netryx. In /etc/config/rpcd its login needs list read 'netryx' (and list write 'netryx' to change things); an option line is not read as a grant.",
+      };
     case 429: {
       const s = parseInt(r.headers.get("Retry-After") || "", 10);
       return { ok: false, text: s > 0 ? `Too many attempts. Try again in ${s} s.` : "Too many attempts. Try again a little later." };
@@ -215,4 +220,31 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
   }, [everyMs, ...deps]);
 
   return state;
+}
+
+// The build of this page, written in by build.sh; "dev" in tests and in a
+// bundle built without it.
+declare const __NETRYX_BUILD__: string;
+let build = typeof __NETRYX_BUILD__ === "string" ? __NETRYX_BUILD__ : "dev";
+let newBuildTold = false;
+const newBuildListeners = new Set<() => void>();
+
+/** Sets this page's build (tests). */
+export function setBuild(id: string) {
+  build = id;
+  newBuildTold = false;
+}
+
+/** Calls fn once when the router answers with a newer page than this one. */
+export function onNewBuild(fn: () => void): () => void {
+  newBuildListeners.add(fn);
+  return () => newBuildListeners.delete(fn);
+}
+
+/** Reads the build the router serves from an answer, and tells once when it is not this page's. */
+function noteBuild(r: Response) {
+  const served = r.headers.get("X-Netryx-Build");
+  if (!served || build === "dev" || served === build || newBuildTold) return;
+  newBuildTold = true;
+  for (const fn of newBuildListeners) fn();
 }

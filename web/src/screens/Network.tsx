@@ -7,7 +7,7 @@ import type { NetDevice, NetworkView } from "../types";
 import { getJSON, mac, usePoll } from "../api";
 import { Header, Card, Status, Loading, Empty } from "../ui";
 import { bytes, duration, plural } from "../format";
-import { forwardTarget, handshakeText, peerConnected, shortKey, signalText, speedText } from "../network";
+import { apName, forwardTarget, handshakeText, idleNetworks, peerConnected, shortKey, signalText, speedText, wgState } from "../network";
 
 export function Network() {
   const polled = usePoll((s) => getJSON<NetworkView>("/api/network", s), 10_000, []);
@@ -103,7 +103,7 @@ function Interfaces({ d }: { d: NetworkView }) {
                   <td class="soft small">{i.up ? duration(i.uptimeSec) : "-"}</td>
                   <td class="num small">
                     ↓ {bytes(i.rxBytes)}
-                    <br />↑ {bytes(i.txBytes)}
+                    <br />{" "}↑ {bytes(i.txBytes)}
                   </td>
                 </tr>
               ))}
@@ -148,8 +148,7 @@ function Ports({ d }: { d: NetworkView }) {
 
 function WiFi({ d }: { d: NetworkView }) {
   const w = d.wifi;
-  const running = new Set(w.live.map((a) => a.ssid));
-  const idle = w.aps.filter((a) => a.disabled || !running.has(a.ssid));
+  const idle = idleNetworks(w.aps, w.live);
   return (
     <Card label="Wi-Fi" title="Wi-Fi" aside={w.why ? undefined : <span class="muted small">{plural(w.live.reduce((n, a) => n + a.clients.length, 0), "client", "clients")} on {plural(w.live.length, "access point", "access points")}</span>}>
       {w.why ? (
@@ -173,7 +172,7 @@ function WiFi({ d }: { d: NetworkView }) {
             {w.live.map((a) => (
               <div key={a.iface} class="ap">
                 <div class="row-between">
-                  <span class="strong">{a.ssid || "(hidden)"}</span>
+                  <span class="strong">{apName(a)}</span>
                   <span class="muted small">{[a.band, a.channel ? `ch ${a.channel}` : ""].filter(Boolean).join(" · ")}</span>
                 </div>
                 <span class="muted small mono">{a.iface}</span>
@@ -215,9 +214,10 @@ function WireGuard({ d }: { d: NetworkView }) {
                   {[i.listenPort ? `port ${i.listenPort}` : "", i.addresses.join(", "), i.publicKey ? `key ${shortKey(i.publicKey)}` : ""].filter(Boolean).join(" · ")}
                 </span>
               </div>
+              {wgState(i, w.note) && <span class="small bad-text">{wgState(i, w.note)}</span>}
               {i.peers.length === 0 && <span class="muted small">no peers</span>}
-              {i.peers.map((p) => (
-                <div key={p.publicKey} class="row-between domain-row">
+              {i.peers.map((p, n) => (
+                <div key={p.publicKey || `peer-${n}`} class="row-between domain-row">
                   <div class="col-tight">
                     <span>
                       <span class={peerConnected(p.handshake, now) ? "dot dot-on" : "dot dot-off"} aria-hidden="true" /> {p.name || shortKey(p.publicKey)}

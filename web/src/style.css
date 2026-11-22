@@ -302,7 +302,7 @@ select.input { padding-right: 8px; }
 }
 
 /* the house's Apps and Destinations */
-.house-table { min-width: 860px; }
+.house-table { min-width: 680px; }
 .share-cell { min-width: 120px; }
 .share-cell .bars { margin: 4px 0 2px; }
 .head-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -327,3 +327,16 @@ select.input { padding-right: 8px; }
 .ap { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); }
 .wg { gap: 6px; }
 .is-off { opacity: 0.6; }
+
+/* below 720 px a house table (and the networks) is a list of rows, each a small card: no
+   sideways scrolling to reach the Rules column */
+@media (max-width: 720px) {
+  .house-table, .net-table { min-width: 0; }
+  .house-table thead, .net-table thead { display: none; }
+  .house-table, .house-table tbody, .house-table tr, .house-table td,
+  .net-table, .net-table tbody, .net-table tr, .net-table td { display: block; width: 100%; }
+  .house-table tr, .net-table tr { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
+  .house-table td, .net-table td { border: 0; padding: 2px 0; }
+  .house-table td.num, .net-table td.num { text-align: left; }
+  .house-table td.num br, .net-table td.num br { display: none; }
+}
