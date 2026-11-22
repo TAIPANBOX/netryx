@@ -38,6 +38,7 @@ Feature: the console behaves on a real router
     Then the connection is still ended, and the page says it may come back and why, instead of a plain "Cut."
     # -> TestACutThatIsNotHeldSaysSo
     # -> TestACutAnswerSaysWhetherItIsHeld
+    # -> TestACutThatCannotBeMadeIsNotHeld
 
   Scenario: turning flow offloading on under a running console is noticed
     Given netryx in forward mode, started with flow offloading off, and an app rule held only by names

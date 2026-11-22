@@ -178,13 +178,22 @@ func addr(ip net.IP) netip.Addr {
 
 // keyOf names the flow an event is about. Loopback is no flow: it never
 // leaves the router, and an SSH tunnel polling the console from 127.0.0.1
-// must not become a client.
+// must not become a client. Nor is a flow with an unspecified, broadcast or
+// multicast end: a DHCP discover from 0.0.0.0 to 255.255.255.255 has no
+// device, and once made 255.255.255.255 a row of its own.
 func keyOf(e ct.Event) (key, bool) {
 	k := key{
 		id: e.ID, src: addr(e.Orig.SrcIP), dst: addr(e.Orig.DstIP),
 		sport: e.Orig.SrcPort, dport: e.Orig.DstPort, proto: e.Orig.Proto,
 	}
-	return k, k.src.IsValid() && k.dst.IsValid() && !k.src.IsLoopback() && !k.dst.IsLoopback()
+	return k, isEnd(k.src) && isEnd(k.dst)
+}
+
+var limitedBroadcast = netip.AddrFrom4([4]byte{255, 255, 255, 255})
+
+// isEnd says whether an address can be one end of a device's flow.
+func isEnd(a netip.Addr) bool {
+	return a.IsValid() && !a.IsLoopback() && !a.IsUnspecified() && !a.IsMulticast() && a != limitedBroadcast
 }
 
 // Apply folds in a NEW or a DESTROY from the watcher.

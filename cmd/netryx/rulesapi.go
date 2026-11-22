@@ -377,11 +377,23 @@ func (r *rulesAPI) AlertsState() api.AlertsState {
 	if r.alerts != nil {
 		st.Alerts = r.alerts.List()
 	}
-	_, why := alerts.ReadBot(alerts.HermesConfig, os.Stat)
-	if r.eng.Alerts().Channel == "console" {
-		why = "alerts stay in the console, as configured"
-	}
-	st.TelegramReady, st.TelegramProblem = why == "", why
+	st.TelegramReady, st.TelegramProblem = telegramState(r.eng.Alerts().Channel, func() (alerts.Bot, string) {
+		return alerts.ReadBot(alerts.HermesConfig, os.Stat)
+	})
 	st.QuarantineActive, st.GraceEnds, st.QuarantineProblem = r.eng.QuarantineState()
 	return st
+}
+
+// telegramState says whether alerts go out through Telegram and, when they do
+// not, why. With the console chosen it still says whether Hermes's bot was
+// found, so the owner knows what choosing Telegram would do.
+func telegramState(channel string, readBot func() (alerts.Bot, string)) (bool, string) {
+	_, why := readBot()
+	if channel != "console" {
+		return why == "", why
+	}
+	if why == "" {
+		return false, "alerts stay in the console, as configured; Hermes's bot is ready if you choose Telegram"
+	}
+	return false, "alerts stay in the console, as configured; for Telegram: " + why
 }
