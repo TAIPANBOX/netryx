@@ -30,6 +30,11 @@ camera and a game console, on the real internet. The names, addresses and MACs a
   radios and clients with their signal, WireGuard peers and port forwards, read only.
 - **The whole house at a glance.** Every app the house used and every country, network and domain
   it reached, with the clients behind each and the rules that close it.
+- **Find and see anything in place.** Every name is a link to its own view, and the chips at
+  the top say how you got there and what it belongs to. Resting the mouse on a name shows a short
+  card. Cmd+K, Ctrl+K or `/` finds any device, app, country, network, domain, group or rule by
+  name, address, MAC or AS number. Each row in Clients and Apps draws its last hour, and two or
+  three devices can be compared side by side.
 - **Apps, not ports.** A connection is named by the name the device asked for: the TLS handshake,
   QUIC, and the router's own resolver when the handshake hides it. About 260 apps (TikTok,
   YouTube, Netflix, Steam, WhatsApp...) are told apart, each with its icon.
@@ -60,7 +65,7 @@ camera and a game console, on the real internet. The names, addresses and MACs a
 
 ![The router's wiring: its networks with addresses and traffic, the ports with the device behind each, a router without Wi-Fi saying so, WireGuard peers with their last handshake, and two port forwards](docs/images/network.png)
 
-![Every device: its address, MAC, connection, group, traffic now and over 24 hours, its top app and how many countries it talked to](docs/images/clients.png)
+![Every device: its address, MAC, connection, group, traffic now, over the last hour and over 24 hours, its top app and how many countries it talked to](docs/images/clients.png)
 
 ## How it sees traffic without copying it
 

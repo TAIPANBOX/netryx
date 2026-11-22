@@ -38,6 +38,7 @@ const r = await first.request.post(BASE + "/api/login", { data: { user: "netryxl
 if (!r.ok()) throw new Error("login " + r.status());
 const state = await first.storageState();
 await first.close();
+const refused = [];
 for (const [name, hash, w, h, click] of shots) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, storageState: state });
   const page = await ctx.newPage();
@@ -52,9 +53,18 @@ for (const [name, hash, w, h, click] of shots) {
   // The value itself is never printed: the log may be read too.
   const text = (await page.evaluate(() => document.body.innerText)).toLowerCase();
   const hit = deny.findIndex((v) => text.includes(v));
-  if (hit >= 0) throw new Error(`${name}: the page shows line ${hit + 1} of ~/netryx-shots.deny; not saved`);
+  if (hit >= 0) {
+    // The other views are still taken; the run fails at the end.
+    refused.push(`${name}: the page shows line ${hit + 1} of ~/netryx-shots.deny; not saved`);
+    await ctx.close();
+    continue;
+  }
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: process.env.FULL === "1" });
   await ctx.close();
   console.log("saved", name);
 }
 await browser.close();
+if (refused.length) {
+  for (const r of refused) console.error(r);
+  process.exit(1);
+}

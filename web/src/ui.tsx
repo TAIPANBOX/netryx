@@ -106,8 +106,11 @@ export function Header(p: {
       {p.win && p.onWin && (
         <Pills label="Now averaged over" items={WINDOWS.map((w) => ({ id: w.id, label: w.label }))} value={p.win} onPick={(v) => p.onWin!(v as Win)} />
       )}
-      <button type="button" class="btn-mini" title="Find any client, app, place or rule (Ctrl+K or /)" onClick={() => window.dispatchEvent(new Event("netryx-search"))}>
-        Search <kbd>/</kbd>
+      <button type="button" class="btn-mini btn-icon" aria-label="Search" title="Find any client, app, place or rule (Ctrl+K or /)" onClick={() => window.dispatchEvent(new Event("netryx-search"))}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="M15.5 15.5L21 21" />
+        </svg>
       </button>
       <PauseButton />
       {s.user && (
