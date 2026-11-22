@@ -4,7 +4,7 @@
 
 import { entityHref } from "../entity";
 import { EntityLink } from "./entity";
-import { h } from "preact";
+import { h, type ComponentChildren } from "preact";
 import { useContext, useRef } from "preact/hooks";
 import type { App, AppUsage, Live, LiveApp, LiveConn, LivePlace } from "../types";
 import { windowLabel, type Win } from "../query";
@@ -62,12 +62,20 @@ export function LiveTraffic({ l, seen }: { l: Live; seen: Map<string, App> }) {
   const colors = c.keys.map((k, i) => layerColor(k, manifest, used, LAYER_COLORS[i]));
   // Bottom of the stack first: the rest, then the smaller apps, the largest on top.
   const layers: Layer[] = [];
-  if (c.other) layers.push({ label: "others", color: OTHER_COLOR, values: c.otherDown });
+  const layerKeys: (string | undefined)[] = [];
+  if (c.other) {
+    layers.push({ label: "others", color: OTHER_COLOR, values: c.otherDown });
+    layerKeys.push(undefined);
+  }
   for (let i = c.keys.length - 1; i >= 0; i--) {
     const k = c.keys[i];
     layers.push({ label: layerLabel(k, seen, manifest), color: colors[i], values: c.down[k] });
+    layerKeys.push(k);
   }
-  const legend = [...layers].reverse().map((x) => ({ label: x.label, color: x.color }));
+  // A legend entry names its app, and leads to it.
+  const legend: { label: string; color: string; node?: ComponentChildren }[] = layers
+    .map((x, i) => ({ label: x.label, color: x.color, node: layerKeys[i] ? <EntityLink e={{ kind: "app", id: layerKeys[i]! }}>{x.label}</EntityLink> : undefined }))
+    .reverse();
   legend.push({ label: "up", color: UP_COLOR });
   const step = Math.round(l.stepSec);
   return (
@@ -206,7 +214,7 @@ export function LivePlaces({ places }: { places: LivePlace[] }) {
           <div class="col-tight">
             <span class="small-13 ellipsis">
               <EntityLink e={{ kind: "country", cc: p.cc }}>{placeName(p)}</EntityLink>
-              {p.org && <span class="muted small"> · {p.org}</span>}
+              {p.org && <span class="muted small"> · <EntityLink e={{ kind: "network", asn: p.asn ?? 0 }}>{p.org}</EntityLink></span>}
             </span>
             <div class="bars bars-thin">
               <span class="bar bar-down" style={{ width: `${total > 0 ? ((100 * p.down) / total).toFixed(2) : "0"}%` }} />

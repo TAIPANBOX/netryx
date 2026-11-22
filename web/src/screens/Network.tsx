@@ -251,7 +251,9 @@ function Forwards({ d }: { d: NetworkView }) {
         f.rules.map((r, i) => (
           <div key={`${r.name}-${i}`} class={r.enabled ? "row-between domain-row" : "row-between domain-row is-off"}>
             <div class="col-tight">
-              <span class="strong">{r.name || `forward ${i + 1}`}</span>
+              <span class="strong">
+                {r.device && r.name === r.device.name ? <ClientLink mac={r.device.mac} name={r.name} /> : r.name || `forward ${i + 1}`}
+              </span>
               <span class="small">
                 {r.proto} {r.port} → {r.device ? <ClientLink mac={r.device.mac} name={forwardTarget(r)} title={r.device.name} /> : forwardTarget(r)}
               </span>

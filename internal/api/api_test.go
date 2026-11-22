@@ -358,6 +358,10 @@ func TestOverviewShape(t *testing.T) {
 	if got := str(field(country, "org")); got != "Netflix" {
 		t.Errorf("countries[0].org = %q, want Netflix (the dominant organisation of DE)", got)
 	}
+	// The organisation is a link to its network's page, so it carries its AS.
+	if got := str(field(country, "asn")); got != "2906" {
+		t.Errorf("countries[0].asn = %q, want 2906 (the network behind the organisation)", got)
+	}
 	if got := num(field(country, "share")); got < 0.66 || got > 0.67 {
 		t.Errorf("countries[0].share = %v, want about 4000/6000", got)
 	}
@@ -1117,6 +1121,10 @@ func TestTheLiveViewShowsAppsConnectionsAndPlaces(t *testing.T) {
 	places := arr(field(v, "places"))
 	if len(places) != 4 {
 		t.Fatalf("DE/Netflix, the house, US/GitHub and the unknown: %v", places)
+	}
+	// A place's organisation leads to its network, so the place carries its AS.
+	if num(field(places[0], "asn")) != 64500 {
+		t.Errorf("places[0].asn = %v, want 64500", field(places[0], "asn"))
 	}
 	if str(field(places[0], "cc")) != "DE" || num(field(places[0], "down")) != 4000 || field(places[0], "other") != false {
 		t.Fatalf("the busiest place first: %v", places[0])

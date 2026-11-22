@@ -23,7 +23,7 @@ export interface TopClient extends Row {
   mac: string; name: string; down: number; up: number; topApp: App | null; countries: string[] | null;
 }
 export interface TopApp extends App, Row { clients: number; down: number; up: number }
-export interface Country extends Row { cc: string; org: string; down: number; up: number; share: number }
+export interface Country extends Row { cc: string; org: string; asn?: string; down: number; up: number; share: number }
 
 export interface Overview {
   wan: Wan;
@@ -92,7 +92,7 @@ export interface LiveConn {
   /** The two ends as address:port, the device's first: what the cut route takes. */
   local: string; remote: string;
 }
-export interface LivePlace extends Row { cc: string; org: string; down: number; up: number }
+export interface LivePlace extends Row { cc: string; org: string; asn?: number; down: number; up: number }
 /** One Sync of the ring: bytes per second per app over the stepSec before t. */
 export interface LivePoint { t: string; stepSec: number; down: Record<string, number> | null; up: Record<string, number> | null }
 export interface Live {

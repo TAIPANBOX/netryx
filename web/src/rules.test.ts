@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   describeRule, ruleFromForm, nextLogin, daysText, stateOf, pauseBody, pauseUntil, blockedTile, appliesTo, manifestName, appChoices, isPause, formProblem, formFromRule,
-  liveAllows, allowText, activePause, loginWarning, usageText, usageLabel, ruleVerb,
+  liveAllows, allowText, activePause, loginWarning, usageText, usageLabel, ruleVerb, ruleWhen,
   type Rule, type RuleForm,
 } from "./rules";
 
@@ -217,4 +217,13 @@ test("a rule's links say what it does: blocks, limits, or pauses the whole inter
   assert.equal(ruleVerb(rule({ action: "limit", minutes: 60 })), "limits to 60 min a day");
   assert.equal(ruleVerb(rule({ action: "limit", minutes: 1 })), "limits to 1 min a day");
   assert.equal(ruleVerb(rule({ what: "all", targets: [] })), "blocks the whole internet");
+});
+
+test("a rule's title ends with when it holds, as its summary does", () => {
+  assert.equal(ruleWhen(rule()), "Mon-Fri 21:00-07:00");
+  assert.equal(ruleWhen(rule({ action: "limit", minutes: 60, days: ["sat", "sun"] })), "Sat, Sun · 60 min a day");
+  assert.equal(ruleWhen(rule({ action: "limit", minutes: 30, days: [] })), "30 min a day");
+  for (const r of [rule(), rule({ action: "limit", minutes: 60, days: [] }), rule({ what: "country", targets: ["RU"], who: "all", members: [], days: [], from: "", to: "" })]) {
+    assert.ok(describeRule(r).endsWith(" · " + ruleWhen(r)), describeRule(r));
+  }
 });
