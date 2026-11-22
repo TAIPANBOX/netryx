@@ -4,7 +4,7 @@
 
 import { h } from "preact";
 import { useContext, useEffect, useRef, useState } from "preact/hooks";
-import type { Device, Group, HouseApp, HouseDestinations } from "../types";
+import type { Device, Group, HouseApp, HouseDestinations, Person } from "../types";
 import type { Rule } from "../rules";
 import { manifestName } from "../rules";
 import { getJSON } from "../api";
@@ -25,7 +25,7 @@ function typing(t: EventTarget | null): boolean {
 }
 
 const KIND_TEXT: Record<string, string> = {
-  client: "Client", app: "App", category: "Category", country: "Country", network: "Network", domain: "Domain", group: "Group", rule: "Rule",
+  person: "Person", client: "Client", app: "App", category: "Category", country: "Country", network: "Network", domain: "Domain", group: "Group", rule: "Rule",
 };
 
 export function SearchBox() {
@@ -43,6 +43,9 @@ export function SearchBox() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((o) => !o);
+      } else if (e.key === "Escape") {
+        // Esc closes the box wherever the focus is, not only in its field.
+        setOpen(false);
       } else if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey && !typing(e.target)) {
         e.preventDefault();
         setOpen(true);
@@ -70,8 +73,9 @@ export function SearchBox() {
       getJSON<HouseDestinations>("/api/destinations?range=24h", ac.signal),
       getJSON<Group[]>("/api/groups", ac.signal).catch(() => [] as Group[]),
       getJSON<Rule[]>("/api/rules", ac.signal).catch(() => [] as Rule[]),
+      getJSON<Person[]>("/api/people", ac.signal).catch(() => [] as Person[]),
     ])
-      .then(([devices, apps, dest, groups, rules]) => setIndex(buildIndex({ devices, apps, dest, groups, rules, appName })))
+      .then(([devices, apps, dest, groups, rules, people]) => setIndex(buildIndex({ devices, apps, dest, groups, rules, appName, people })))
       .catch((e: Error) => {
         if (!ac.signal.aborted) setError(e.message);
       });

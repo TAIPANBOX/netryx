@@ -104,6 +104,9 @@ export interface Live {
 }
 
 /** A group of devices, as GET /api/groups lists it. */
+/** GET /api/people: someone in the house and the devices that are theirs. */
+export interface Person { id: string; name: string; macs: string[] }
+
 export interface Group {
   id: string;
   name: string;

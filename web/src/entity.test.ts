@@ -71,3 +71,16 @@ test("a thing's view names what it belongs to, each a link", () => {
   assert.deepEqual(parentsOf({ kind: "country", cc: "US" }, {}), []);
   assert.deepEqual(parentsOf({ kind: "app", id: "youtube" }, undefined), []);
 });
+
+test("a person is a thing of its own: its page, its devices' chip, its route", () => {
+  assert.equal(entityHref({ kind: "person", id: "sam" }), "#/person/sam");
+  assert.equal(entityHref({ kind: "person", id: "Bad Id" }), undefined);
+  assert.deepEqual(parseRoute("#/person/sam"), { name: "person", id: "sam" });
+  assert.deepEqual(parseRoute("#/people"), { name: "people" });
+  assert.deepEqual(parseRoute("#/person/Bad%20Id"), { name: "people" });
+  // A client belongs to its person and its group.
+  assert.deepEqual(parentsOf({ kind: "client", mac: "aa:bb:cc:dd:ee:01" }, { mac: "aa:bb:cc:dd:ee:01", group: "kids" }, { group: () => "Kids", person: () => ({ id: "sam", name: "Sam" }) }), [
+    { label: "Sam", href: "#/person/sam" },
+    { label: "Kids", href: "#/group/kids" },
+  ]);
+});

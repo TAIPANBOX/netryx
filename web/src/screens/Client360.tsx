@@ -4,10 +4,11 @@
 // and error state, so one router read failing never blanks the page.
 
 import { parentsOf } from "../entity";
+import { ownerOf } from "../people";
 import { ChipChain, EntityLink } from "./entity";
 import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useRef, useState } from "preact/hooks";
-import type { App, AppUsage, Destinations, Device, FlowsPage, Group, Live, NetworkView, Range, SeriesPoint } from "../types";
+import type { App, AppUsage, Destinations, Device, FlowsPage, Group, Person, Live, NetworkView, Range, SeriesPoint } from "../types";
 import { getJSON, mac as enc, usePoll, type Polled } from "../api";
 import { RANGES, windowLabel, type Win } from "../query";
 import { Header, Pills, Card, Status, Loading, Empty, IconContext } from "../ui";
@@ -40,17 +41,18 @@ export function Client360({ mac, from = "", range, onRange, win, onWin }: { mac:
   const name = d ? deviceName(d) : mac;
   const notFound = dev.status === 404 && !d;
   const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
+  const people = usePoll((s) => getJSON<Person[]>("/api/people", s), 60_000, []).data;
   return (
     <div class="page">
       <Header section="clients" range={range} onRange={onRange} win={win} onWin={onWin} />
       <main class="main">
-        <ChipChain from={from} base={[{ label: "Clients", href: "#/clients" }]} last={name} parents={parentsOf({ kind: "client", mac }, d, { group: (g) => groupName(g, groups) })} />
+        <ChipChain from={from} base={[{ label: "Clients", href: "#/clients" }]} last={name} parents={parentsOf({ kind: "client", mac }, d, { group: (g) => groupName(g, groups), person: (m) => ownerOf(people, m) })} />
         {notFound ? <Empty>The router knows no device with MAC {mac.toUpperCase()}.</Empty> : <Status polled={dev} />}
         {!d ? (
           notFound ? null : <Loading />
         ) : (
           <div class="stack">
-            <Identity d={d} />
+            <Identity d={d} person={ownerOf(people, d.mac)} />
             <div class="grid-2">
               <Connected d={d} />
               <SecuritySection d={d} />
@@ -66,7 +68,7 @@ export function Client360({ mac, from = "", range, onRange, win, onWin }: { mac:
   );
 }
 
-function Identity({ d }: { d: Device }) {
+function Identity({ d, person }: { d: Device; person?: { id: string; name: string } }) {
   const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
   const rows: [string, ComponentChildren][] = [
     ["Vendor", d.vendor ? `${d.vendor} (by OUI)` : "-"],
@@ -74,6 +76,7 @@ function Identity({ d }: { d: Device }) {
     ["IPv4", (d.ipv4 ?? []).join(", ") || "-"],
     ["IPv6", (d.ipv6 ?? []).join(", ") || "-"],
     ["Hostname", d.hostname || "-"],
+    ["Person", person ? <EntityLink e={{ kind: "person", id: person.id }}>{person.name}</EntityLink> : <a href="#/people">nobody yet</a>],
     ["Group", d.group ? <EntityLink e={{ kind: "group", id: d.group }}>{groupName(d.group, groups)}</EntityLink> : "no group"],
     ["First seen", date(d.first)],
     ["Last seen", d.online ? "online now" : `${date(d.last)} ${time(d.last)}`],

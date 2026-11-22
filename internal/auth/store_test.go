@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"netryx/internal/ramfile"
 )
 
 // storeRig is newRig with the sessions kept in a file, and a restart: a new
@@ -94,7 +96,7 @@ func TestASessionsFileOthersCouldTouchIsNotLoaded(t *testing.T) {
 	}{
 		{"readable by others", func(p string) { os.Chmod(p, 0o644) }},
 		{"writable by the group", func(p string) { os.Chmod(p, 0o620) }},
-		{"another owner", func(string) { ownerOf = func(fs.FileInfo) (uint32, bool) { return 4242, true } }},
+		{"another owner", func(string) { ramfile.Owner = func(fs.FileInfo) (uint32, bool) { return 4242, true } }},
 		{"a symbolic link", func(p string) {
 			b, _ := os.ReadFile(p)
 			real := p + ".real"
@@ -111,7 +113,7 @@ func TestASessionsFileOthersCouldTouchIsNotLoaded(t *testing.T) {
 		{"a directory others can write", func(p string) { os.Chmod(filepath.Dir(p), 0o777) }},
 	} {
 		t.Run(c.what, func(t *testing.T) {
-			defer func() { ownerOf = fileOwner }()
+			defer func(o func(fs.FileInfo) (uint32, bool)) { ramfile.Owner = o }(ramfile.Owner)
 			r, path := storeRig(t)
 			sid, _ := r.login("root", adminPW, lan)
 			c.spoil(path)

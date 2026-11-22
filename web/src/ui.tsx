@@ -115,9 +115,9 @@ export function Header(p: {
       <PauseButton />
       {s.user && (
         <span class="who small">
-          <span class="muted">{s.user}</span>
+          <span class="muted who-name">{s.user}</span>
           {!s.canWrite && <span class="tag">read only</span>}
-          <button type="button" class="btn-mini" onClick={() => void logout()}>Sign out</button>
+          <button type="button" class="btn-mini" title={`Signed in as ${s.user}`} onClick={() => void logout()}>Sign out</button>
         </span>
       )}
     </header>

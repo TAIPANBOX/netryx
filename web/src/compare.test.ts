@@ -29,17 +29,25 @@ test("picking clients to compare stops at three and a second pick takes one back
   assert.deepEqual(pickCompare(s, "b"), ["a", "c"]);
 });
 
-test("the comparison lines up what tells devices apart", () => {
-  const a = dev({ mac: "aa:bb:cc:dd:ee:01", label: "Sam's phone", group: "kids", last24h: { down: 2048, up: 10 }, recent: { down: 125, up: 0 }, topApp: { id: "instagram", name: "Instagram", category: "social" }, countryCount: 3 });
+test("the comparison lines up what tells devices apart, each name a link", () => {
+  const a = dev({ mac: "aa:bb:cc:dd:ee:01", label: "Sam's phone", group: "kids", last24h: { down: 2048, up: 10 }, recent: { down: 125, up: 0 }, rate: { down: 9000, up: 0 }, topApp: { id: "instagram", name: "Instagram", category: "social" }, countryCount: 3 });
   const b = dev({ mac: "aa:bb:cc:dd:ee:02", label: "Work laptop", online: false, link: { kind: "wired", iface: "lan1", ssid: "", band: "", signal: 0 } as Device["link"] });
-  const rows = compareRows([a, b], (g) => (g === "kids" ? "Kids" : g));
-  const row = (l: string) => rows.find((r) => r.label === l)?.values;
-  assert.deepEqual(row("State"), ["online", "offline"]);
-  assert.deepEqual(row("24 h ↓"), [bytes(2048), bytes(0)]);
-  assert.deepEqual(row("Now ↓"), ["1 kbit/s", "0 bit/s"]);
-  assert.deepEqual(row("Busiest app"), ["Instagram", "-"]);
-  assert.deepEqual(row("Countries"), ["3", "0"]);
-  assert.deepEqual(row("Group"), ["Kids", "no group"]);
-  assert.deepEqual(row("Connected"), ["Wi-Fi home", "wired lan1"]);
+  const rows = compareRows([a, b], (g) => (g === "kids" ? "Kids" : g), "3 min", { "aa:bb:cc:dd:ee:01": ["US", "NL", "--"] });
+  const row = (l: string) => rows.find((r) => r.label === l)?.cells;
+  const texts = (l: string) => row(l)?.map((c) => c.list ? c.list.map((x) => x.text).join(",") : c.text);
+  assert.deepEqual(texts("State"), ["online", "offline"]);
+  assert.deepEqual(texts("24 h ↓"), [bytes(2048), bytes(0)]);
+  // Now is the window's average, as on Clients; right now is said beside it.
+  assert.deepEqual(texts("Now ↓, 3 min avg"), ["1 kbit/s", "0 bit/s"]);
+  assert.equal(row("Now ↓, 3 min avg")?.[0].note, "right now 72 kbit/s");
+  assert.deepEqual(texts("Busiest app"), ["Instagram", "-"]);
+  assert.deepEqual(row("Busiest app")?.[0].e, { kind: "app", id: "instagram" });
+  assert.equal(row("Busiest app")?.[1].e, undefined);
+  assert.deepEqual(texts("Group"), ["Kids", "no group"]);
+  assert.deepEqual(row("Group")?.[0].e, { kind: "group", id: "kids" });
+  // Countries are the places themselves, each a link; without the list, the count.
+  assert.deepEqual(texts("Countries"), ["US,NL", "0"]);
+  assert.deepEqual(row("Countries")?.[0].list?.[0].e, { kind: "country", cc: "US" });
+  assert.deepEqual(texts("Connected"), ["Wi-Fi home", "wired lan1"]);
   assert.equal(rows[0].label, "State");
 });

@@ -46,3 +46,10 @@ test("a card says the few things worth knowing before opening it", () => {
   assert.deepEqual(hoverSummary({ kind: "rule", id: "r_1" }, [r]).lines, ["active now", "blocked 4 times"]);
   assert.equal(hoverSummary({ kind: "rule", id: "r_9" }, [r]).lines[0], "this rule no longer exists");
 });
+
+test("a person's card names their devices", () => {
+  assert.deepEqual(hoverEntity("#/person/sam"), { kind: "person", id: "sam" });
+  assert.equal(hoverPath({ kind: "person", id: "sam" }), "/api/people");
+  assert.deepEqual(hoverSummary({ kind: "person", id: "sam" }, [{ id: "sam", name: "Sam", macs: ["a", "b"] }]), { title: "Sam", lines: ["2 devices"] });
+  assert.equal(hoverSummary({ kind: "person", id: "x" }, []).lines[0], "this person no longer exists");
+});
