@@ -9,7 +9,7 @@ import { RANGES } from "../query";
 import { Bars } from "../charts";
 import { Header, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
 import { bytes, share, num, appName, countryName, clientName, plural } from "../format";
-import { clientsLine, countryHref, domainText, rulesForCountry } from "../house";
+import { clientsLine, closesHouse, countryHref, domainText, rulesForCountry } from "../house";
 import { BlockCountry, CDN_NOTE, RuleTags, useRules } from "./controls";
 import { HouseTraffic } from "./Apps";
 
@@ -28,7 +28,7 @@ export function Destinations({ range, onRange }: { range: Range; onRange: (r: Ra
           <h1>Destinations</h1>
           {d && (
             <span class="muted small">
-              {plural(d.countries.filter((c) => !c.other).length, "country", "countries")} · {plural(d.networks.length, "network", "networks")} over {periodOf(range)}; the house's own traffic is left out
+              {plural(d.countries.filter((c) => !c.other).length, "country", "countries")} · {plural(d.networks.length, "network", "networks")} over {periodOf(range)}; the house's own traffic is left out of the countries and networks
             </span>
           )}
         </div>
@@ -74,7 +74,7 @@ export function Destinations({ range, onRange }: { range: Range; onRange: (r: Ra
                           </td>
                           <td class="small">
                             <RuleTags rules={closing} />
-                            {href && closing.length === 0 && <BlockCountry cc={c.cc} />}
+                            {href && !closesHouse(closing, Date.now()) && <BlockCountry cc={c.cc} />}
                           </td>
                         </tr>
                       );
@@ -101,7 +101,7 @@ export function Destinations({ range, onRange }: { range: Range; onRange: (r: Ra
               <Card label="Domains" title="Domains" aside={<span class="muted small">the names the house's apps asked for</span>}>
                 {d.domains.length === 0 && <Empty>No names in this period.</Empty>}
                 {d.domains.map((dm) => (
-                  <div key={dm.name} class="app-row">
+                  <div key={(dm.app?.id ?? "") + "|" + dm.name} class="app-row">
                     <AppIcon id={dm.app?.id ?? "unknown"} name={appName(dm.app?.name ?? "")} size={24} />
                     <div class="col-tight">
                       <span class="mono small break">{domainText(dm)}</span>
@@ -140,7 +140,7 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
                 <div class="col-tight grow">
                   <h1>{countryName(d.cc)}</h1>
                   <span class="soft small">
-                    {plural(d.clients.filter((c) => !c.other).length, "client", "clients")} · {share(d.share)} of what left the house · {plural(d.networks.length, "network", "networks")}
+                    {plural(d.clientCount, "client", "clients")} · {share(d.share)} of what left the house · {plural(d.networks.length, "network", "networks")}
                   </span>
                   <RuleTags rules={closing} />
                 </div>
@@ -149,7 +149,7 @@ export function Destination({ cc, range, onRange }: { cc: string; range: Range; 
                   <br />↑ {bytes(d.up)}
                 </span>
               </div>
-              {closing.length === 0 ? <BlockCountry cc={d.cc} /> : <span class="muted small">The country is told by the address: {CDN_NOTE}.</span>}
+              {!closesHouse(closing, Date.now()) ? <BlockCountry cc={d.cc} /> : <span class="muted small">The country is told by the address: {CDN_NOTE}.</span>}
             </Card>
             <HouseTraffic d={d} range={range} />
             <div class="grid-3">

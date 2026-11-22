@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rulesForApp, rulesForCountry, clientsLine, matchApp, categoriesIn, appHref, countryHref, domainText } from "./house";
+import { rulesForApp, rulesForCountry, clientsLine, matchApp, categoriesIn, appHref, countryHref, domainText, closesHouse, ruleTagText, appsSummary } from "./house";
 import { parseRoute } from "./query";
 import type { Rule } from "./rules";
 import type { HouseApp } from "./types";
@@ -94,4 +94,30 @@ test("the apps and destinations routes", () => {
   assert.deepEqual(parseRoute("#/destinations"), { name: "destinations" });
   assert.deepEqual(parseRoute("#/destination/de"), { name: "destination", cc: "DE" });
   assert.deepEqual(parseRoute("#/destination/deu"), { name: "destinations" });
+});
+
+test("only an enabled rule for everyone closes it for the house", () => {
+  const now = Date.UTC(2026, 10, 22, 12) ;
+  assert.ok(closesHouse([rule({ who: "all" })], now));
+  assert.ok(!closesHouse([rule({ who: "device", members: ["aa:bb:cc:dd:ee:01"] })], now), "one device's rule leaves the house open");
+  assert.ok(!closesHouse([rule({ who: "group", group: "kids" })], now));
+  assert.ok(!closesHouse([rule({ who: "all", enabled: false })], now), "a rule turned off closes nothing");
+  assert.ok(!closesHouse([rule({ who: "all", until: now / 1000 - 60 })], now), "an ended rule closes nothing");
+  assert.ok(!closesHouse([], now));
+});
+
+test("a rule's tag says for whom and in what state", () => {
+  const now = Date.UTC(2026, 10, 22, 12);
+  assert.equal(ruleTagText(rule({ who: "all" }), now), "blocked");
+  assert.equal(ruleTagText(rule({ who: "device", members: ["aa:bb:cc:dd:ee:01"] }), now), "blocked for 1 device");
+  assert.equal(ruleTagText(rule({ who: "device", members: ["a", "b"] }), now), "blocked for 2 devices");
+  assert.equal(ruleTagText(rule({ who: "group", group: "kids" }), now), "blocked for a group");
+  assert.equal(ruleTagText(rule({ who: "all", action: "limit", minutes: 60 }), now), "time limit");
+  assert.equal(ruleTagText(rule({ who: "all", enabled: false }), now), "blocked, off: turned off");
+});
+
+test("a list cut at its bound says so", () => {
+  assert.equal(appsSummary(3, 100), "3 apps");
+  assert.equal(appsSummary(1, 100), "1 app");
+  assert.equal(appsSummary(100, 100), "the 100 busiest apps");
 });

@@ -15,8 +15,10 @@ Feature: the console shows the whole house by app and by destination
   Scenario: the router and the folded rest are not clients
     Given an app's traffic includes the router's own and the folded rest
     When the Apps list counts its clients
-    Then only devices with a hardware address are counted, and the rest is marked as such
+    Then only devices with a hardware address are counted and named first, and the rest is marked as such
+    And a row with no client behind it says whose traffic it is
     # -> TestTheHouseAppsCountOnlyClients
+    # -> TestARowWithoutClientsSaysWhoseTrafficItIs
 
   Scenario: a house full of names stays a short answer
     Given the history holds more apps than a page can show
@@ -54,8 +56,8 @@ Feature: the console shows the whole house by app and by destination
   Scenario: a closed country or app says so where it is listed
     Given a rule blocks a country, an app or the app's category
     When the owner looks at that country or app
-    Then the row says it is blocked, or why the rule is not working, and leads to the rule
-    And an open country can be blocked for everyone from its row
+    Then the row says it is blocked, for whom when not everyone, or why the rule is not working, and leads to the rule
+    And the country or app can be blocked for everyone from its screen until a rule for everyone is in force
     # (rulesForApp, rulesForCountry: web/src/house.test.ts)
 
   Scenario: the lists come from one pass over the history

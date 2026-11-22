@@ -63,15 +63,17 @@ type networkJSON struct {
 }
 
 type appDetailJSON struct {
-	App     appJSON         `json:"app"`
-	Down    uint64          `json:"down"`
-	Up      uint64          `json:"up"`
-	Flows   uint64          `json:"flows"`
-	Share   float64         `json:"share"`
-	Clients []clientRefJSON `json:"clients"`
-	Places  []networkJSON   `json:"places"`
-	Domains []domainJSON    `json:"domains"`
-	Series  []seriesPoint   `json:"series"`
+	App   appJSON `json:"app"`
+	Down  uint64  `json:"down"`
+	Up    uint64  `json:"up"`
+	Flows uint64  `json:"flows"`
+	Share float64 `json:"share"`
+	// ClientCount counts every client; Clients lists the busiest.
+	ClientCount int             `json:"clientCount"`
+	Clients     []clientRefJSON `json:"clients"`
+	Places      []networkJSON   `json:"places"`
+	Domains     []domainJSON    `json:"domains"`
+	Series      []seriesPoint   `json:"series"`
 }
 
 type houseCountryJSON struct {
@@ -98,14 +100,15 @@ type countryAppJSON struct {
 }
 
 type countryDetailJSON struct {
-	CC       string           `json:"cc"`
-	Down     uint64           `json:"down"`
-	Up       uint64           `json:"up"`
-	Share    float64          `json:"share"`
-	Clients  []clientRefJSON  `json:"clients"`
-	Apps     []countryAppJSON `json:"apps"`
-	Networks []networkJSON    `json:"networks"`
-	Series   []seriesPoint    `json:"series"`
+	CC          string           `json:"cc"`
+	Down        uint64           `json:"down"`
+	Up          uint64           `json:"up"`
+	Share       float64          `json:"share"`
+	ClientCount int              `json:"clientCount"`
+	Clients     []clientRefJSON  `json:"clients"`
+	Apps        []countryAppJSON `json:"apps"`
+	Networks    []networkJSON    `json:"networks"`
+	Series      []seriesPoint    `json:"series"`
 }
 
 func (s *server) houseRoutes(mux *http.ServeMux) {
@@ -136,6 +139,25 @@ func clientRefs(rows []rollup.Row, names map[string]string, n int) []clientRefJS
 		out = append(out, c)
 	}
 	return out
+}
+
+// topRefs names the busiest few clients of a row; a row with no client
+// behind it names its first rows instead (the router, addresses without a
+// hardware address), so the page can say whose traffic it is.
+func topRefs(rows []rollup.Row, names map[string]string) []clientRefJSON {
+	var cl []rollup.Row
+	for _, r := range rows {
+		if isClient(r.Key) {
+			cl = append(cl, r)
+			if len(cl) == houseTopClients {
+				break
+			}
+		}
+	}
+	if len(cl) == 0 {
+		cl = rows
+	}
+	return clientRefs(cl, names, houseTopClients)
 }
 
 // clientCount counts the clients among device rows: the router, the
@@ -184,7 +206,7 @@ func (s *server) houseApps(r *http.Request) (any, error) {
 		out = append(out, houseAppJSON{
 			App: cat.value(ar.Key), Down: ar.Bytes.Down, Up: ar.Bytes.Up, Flows: ar.Bytes.Flows,
 			Share: share(rowBytes(ar), total), Clients: clientCount(cl),
-			Top: clientRefs(cl, names, houseTopClients), Other: ar.Key == serviceKey,
+			Top: topRefs(cl, names), Other: ar.Key == serviceKey,
 		})
 	}
 	return out, nil
@@ -219,10 +241,11 @@ func (s *server) houseApp(r *http.Request) (any, error) {
 	}
 	cat := s.catalog()
 	f := rollup.Filter{App: id}
+	macs := s.h.Top(f, "mac", p.from, p.now, 0)
 	out := appDetailJSON{
 		App: cat.value(id), Down: mine.Bytes.Down, Up: mine.Bytes.Up, Flows: mine.Bytes.Flows,
-		Share:   share(rowBytes(mine), sumBytes(all)),
-		Clients: clientRefs(s.h.Top(f, "mac", p.from, p.now, 0), s.names(), maxDetailClients),
+		Share: share(rowBytes(mine), sumBytes(all)), ClientCount: clientCount(macs),
+		Clients: clientRefs(macs, s.names(), maxDetailClients),
 		Places:  []networkJSON{}, Domains: []domainJSON{},
 		Series: s.seriesOf(f, p, ""),
 	}
@@ -251,7 +274,7 @@ func (s *server) houseDestinations(r *http.Request) (any, error) {
 		cl := clients[cr.Key]
 		out.Countries = append(out.Countries, houseCountryJSON{
 			CC: cr.Key, Down: cr.Bytes.Down, Up: cr.Bytes.Up, Share: share(rowBytes(cr), total),
-			Clients: clientCount(cl), Top: clientRefs(cl, names, houseTopClients), Other: cr.Key == serviceCC,
+			Clients: clientCount(cl), Top: topRefs(cl, names), Other: cr.Key == serviceCC,
 		})
 	}
 	places := wanOnly(s.h.Top(rollup.Filter{}, "place", p.from, p.now, 0), func(r rollup.Row) string { return r.Extra["cc"] })
@@ -286,10 +309,11 @@ func (s *server) houseCountry(r *http.Request) (any, error) {
 	}
 	cat := s.catalog()
 	f := rollup.Filter{CC: cc}
+	macs := s.h.Top(f, "mac", p.from, p.now, 0)
 	out := countryDetailJSON{
 		CC: cc, Down: mine.Bytes.Down, Up: mine.Bytes.Up, Share: share(rowBytes(mine), sumBytes(ccs)),
-		Clients: clientRefs(s.h.Top(f, "mac", p.from, p.now, 0), s.names(), maxDetailClients),
-		Apps:    []countryAppJSON{}, Networks: []networkJSON{},
+		ClientCount: clientCount(macs), Clients: clientRefs(macs, s.names(), maxDetailClients),
+		Apps: []countryAppJSON{}, Networks: []networkJSON{},
 		Series: s.seriesOf(f, p, ""),
 	}
 	for _, ar := range s.h.Top(f, "app", p.from, p.now, maxDestinations) {

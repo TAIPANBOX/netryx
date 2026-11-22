@@ -46,15 +46,30 @@ func TestTheHouseAppsListNamesTheClientsOfEachApp(t *testing.T) {
 // A catch-all is a row of its own, never counted as a client.
 func TestTheHouseAppsCountOnlyClients(t *testing.T) {
 	fl, h, inv, w, ap := fixture()
-	h.top["mac||netflix|"] = append(h.top["mac||netflix|"], row("router", 10, 10, 1), row("other", 5, 5, 1))
+	// The router moved more of it than any client: the row still names the
+	// clients first.
+	h.top["mac||netflix|"] = append([]rollup.Row{row("router", 90000, 10, 1)}, append(h.top["mac||netflix|"], row("other", 5, 5, 1))...)
 	list := arr(decode(t, get(t, New(fl, h, inv, w, ap, clock, nil), http.MethodGet, "/api/apps")))
 	if got := num(field(list[0], "clients")); got != 2 {
 		t.Errorf("clients %v, want 2: the router and other are not clients", got)
 	}
-	for _, c := range arr(field(list[0], "top")) {
-		if str(field(c, "mac")) == "router" && field(c, "other") != true {
-			t.Errorf("the router's row is not marked other: %v", c)
-		}
+	top := arr(field(list[0], "top"))
+	if len(top) != 2 || str(field(top[0], "mac")) != laptop || str(field(top[1], "mac")) != phone {
+		t.Errorf("top %v, want the two clients and not the router", top)
+	}
+}
+
+// A row with no client behind it (the router's own traffic, addresses with
+// no hardware address) names whose traffic it is instead.
+func TestARowWithoutClientsSaysWhoseTrafficItIs(t *testing.T) {
+	fl, h, inv, w, ap := fixture()
+	h.top["cc|||"] = append(h.top["cc|||"], row("GB", 10, 10, 1))
+	h.top["mac|||GB"] = []rollup.Row{row("router", 10, 10, 1)}
+	body := decode(t, get(t, New(fl, h, inv, w, ap, clock, nil), http.MethodGet, "/api/destinations"))
+	gb := byKey(field(body, "countries"), "cc", "GB")
+	top := arr(field(gb, "top"))
+	if num(field(gb, "clients")) != 0 || len(top) != 1 || str(field(top[0], "mac")) != "router" || field(top[0], "other") != true {
+		t.Errorf("GB %v, want no clients and the router's row", gb)
 	}
 }
 
@@ -89,6 +104,9 @@ func TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries(t *testing.T) {
 	body := decode(t, rec)
 	if str(field(body, "app", "name")) != "Netflix" || num(field(body, "down")) != 2500 || num(field(body, "share")) != 0.5 {
 		t.Errorf("head %v", body)
+	}
+	if got := num(field(body, "clientCount")); got != 2 {
+		t.Errorf("clientCount %v, want 2", got)
 	}
 	cl := arr(field(body, "clients"))
 	if len(cl) != 2 || str(field(cl[0], "name")) != "Laptop" || num(field(cl[0], "down")) != 2000 {
@@ -187,6 +205,9 @@ func TestACountryDetailShowsItsClientsAppsAndNetworks(t *testing.T) {
 	body := decode(t, rec)
 	if str(field(body, "cc")) != "DE" || num(field(body, "down")) != 3000 || num(field(body, "share")) != 4000.0/6000 {
 		t.Errorf("head %v", body)
+	}
+	if got := num(field(body, "clientCount")); got != 1 {
+		t.Errorf("clientCount %v, want 1", got)
 	}
 	if c := at(field(body, "clients"), 0); str(field(c, "name")) != "Laptop" {
 		t.Errorf("clients %v", field(body, "clients"))

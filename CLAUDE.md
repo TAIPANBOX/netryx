@@ -625,10 +625,18 @@ enforced, and that is a debt rather than a decision.
   `TestPairsRefuseDimensionsKeysDoNotCarry`)
 - **A row says which rules close it**: an app is closed by an app rule
   naming it or a category rule naming its category, a country by a country
-  rule naming it; each shows its state and leads to Rules, and an open
-  country can be blocked for everyone from its row. (the page: "an app's rules
-  are the ones that name it or its category", "a country's rules are the
-  country rules that name it" in `web/src/house.test.ts`)
+  rule naming it; each tag says for whom when not everyone and its state when
+  not in force, and leads to Rules. The block button stays until an enabled
+  rule for everyone closes it: one device's or a group's rule, or one turned
+  off or ended, does not. (the page: "an app's rules are the ones that name it
+  or its category", "a country's rules are the country rules that name it",
+  "only an enabled rule for everyone closes it for the house", "a rule's tag
+  says for whom and in what state" in `web/src/house.test.ts`)
+- **A row names clients before anything else**, and a row with no client
+  names whose traffic it is (the router, addresses without a hardware
+  address); a detail counts every client even when it lists the busiest 50.
+  (test: `TestTheHouseAppsCountOnlyClients`, `TestARowWithoutClientsSaysWhoseTrafficItIs`,
+  `TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries`)
 
 ## The promise about the running console
 

@@ -12,6 +12,7 @@ import { getJSON, mac as enc, sendJSON, usePoll } from "../api";
 import { useSession } from "../ui";
 import { cutNote, type CutAnswer } from "../live";
 import { countryName, time } from "../format";
+import { ruleTagText } from "../house";
 import { activePause, appliesTo, describeRule, pauseBody, stateOf, untilText, type Names, type PauseKind, type Rule, type RuleBody } from "../rules";
 
 export const CDN_NOTE = "a service of this country reached through a CDN in another country is not blocked this way";
@@ -154,10 +155,9 @@ export function RuleTags({ rules, names }: { rules: Rule[]; names?: Names }) {
     <span class="rule-tags">
       {rules.map((r) => {
         const st = stateOf(r, now);
-        const word = r.action === "limit" ? "time limit" : "blocked";
         return (
           <a key={r.id} href="#/rules" class={`rule-tag rule-tag-${st.kind}`} title={`${describeRule(r, names)} · ${st.text}`}>
-            {st.kind === "active" ? word : `${word}, ${st.text}`}
+            {ruleTagText(r, now)}
           </a>
         );
       })}

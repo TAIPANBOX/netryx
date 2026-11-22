@@ -2,9 +2,9 @@
 // country, how a row names its clients, the search and the links. No DOM here,
 // so node tests cover it.
 
-import type { Rule } from "./rules";
+import { stateOf, type Rule } from "./rules";
 import type { ClientRef, HouseApp } from "./types";
-import { appName, category, clientName } from "./format";
+import { appName, category, clientName, plural } from "./format";
 
 /** The rules that name this app, or its category. */
 export function rulesForApp(rules: Rule[] | undefined, app: { id: string; category: string }): Rule[] {
@@ -64,4 +64,28 @@ export function countryHref(cc: string): string | undefined {
 export function domainText(d: { name: string; other?: boolean }): string {
   if (d.other) return "other names";
   return d.name || "no name";
+}
+
+/** Whether a rule is in force for the whole house now: turned on, not ended, for everyone. */
+function forHouse(r: Rule, nowMs: number): boolean {
+  return r.enabled && !r.error && r.who === "all" && !(r.until && r.until * 1000 <= nowMs);
+}
+
+/** Whether these rules already close the app or country for everyone: then no block button. */
+export function closesHouse(rules: Rule[], nowMs: number): boolean {
+  return rules.some((r) => forHouse(r, nowMs));
+}
+
+/** A rule's tag: what it does, for whom when not everyone, and its state when not in force. */
+export function ruleTagText(r: Rule, nowMs: number): string {
+  let word = r.action === "limit" ? "time limit" : "blocked";
+  if (r.who === "device") word += ` for ${plural(r.members.length, "device", "devices")}`;
+  else if (r.who === "group") word += " for a group";
+  const st = stateOf(r, nowMs);
+  return st.kind === "active" ? word : `${word}, ${st.text}`;
+}
+
+/** The Apps toolbar's count: a list cut at its bound is the busiest of a longer one. */
+export function appsSummary(n: number, max: number): string {
+  return n >= max ? `the ${max} busiest apps` : plural(n, "app", "apps");
 }

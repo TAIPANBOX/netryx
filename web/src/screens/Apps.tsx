@@ -10,7 +10,7 @@ import { splitSeries, timeTicks } from "../geometry";
 import { AreaChart, Bars, Legend } from "../charts";
 import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
 import { bytes, share, num, appName, category, countryName, clientName, nameSource, plural } from "../format";
-import { appHref, categoriesIn, clientsLine, countryHref, domainText, matchApp, rulesForApp } from "../house";
+import { appHref, appsSummary, categoriesIn, clientsLine, closesHouse, countryHref, domainText, matchApp, rulesForApp } from "../house";
 import { BlockApp, RuleTags, useRules } from "./controls";
 import { LAYER_COLORS, UP_COLOR } from "../view";
 
@@ -36,7 +36,7 @@ export function Apps({ range, onRange }: { range: Range; onRange: (r: Range) => 
           <h1>Apps</h1>
           {polled.data && (
             <span class="muted small">
-              {plural(all.length, "app", "apps")} · ↓ {bytes(down)} · ↑ {bytes(up)} over {periodOf(range)}
+              {appsSummary(all.length, 100)} · ↓ {bytes(down)} · ↑ {bytes(up)} over {periodOf(range)}
             </span>
           )}
           <div class="field grow">
@@ -122,7 +122,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
                 <div class="col-tight grow">
                   <h1>{appName(d.app.name)}</h1>
                   <span class="soft small">
-                    {category(d.app.category) || "no category"} · {plural(d.clients.filter((c) => !c.other).length, "client", "clients")} · {share(d.share)} of the house's traffic
+                    {category(d.app.category) || "no category"} · {plural(d.clientCount, "client", "clients")} · {share(d.share)} of the house's traffic
                   </span>
                   <RuleTags rules={rulesForApp(rules, d.app)} />
                 </div>
@@ -131,7 +131,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
                   <br />↑ {bytes(d.up)}
                 </span>
               </div>
-              <BlockApp appId={d.app.id} name={d.app.name} />
+              {!closesHouse(rulesForApp(rules, d.app), Date.now()) && <BlockApp appId={d.app.id} name={d.app.name} />}
             </Card>
             <Traffic d={d} range={range} />
             <div class="grid-3">

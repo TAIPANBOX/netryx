@@ -112,7 +112,8 @@ export interface HouseApp extends Row {
 export interface Network extends Row { cc: string; asn: string; org: string; down: number; up: number }
 export interface AppDetail {
   app: App; down: number; up: number; flows: number; share: number;
-  clients: ClientRef[]; places: Network[]; domains: Domain[]; series: SeriesPoint[];
+  /** Every client of the app; clients lists the busiest 50. */
+  clientCount: number; clients: ClientRef[]; places: Network[]; domains: Domain[]; series: SeriesPoint[];
 }
 export interface HouseCountry extends Row { cc: string; down: number; up: number; share: number; clients: number; top: ClientRef[] }
 export interface HouseDestinations {
@@ -122,5 +123,5 @@ export interface HouseDestinations {
 }
 export interface CountryDetail {
   cc: string; down: number; up: number; share: number;
-  clients: ClientRef[]; apps: ({ app: App; down: number; up: number } & Row)[]; networks: Network[]; series: SeriesPoint[];
+  clientCount: number; clients: ClientRef[]; apps: ({ app: App; down: number; up: number } & Row)[]; networks: Network[]; series: SeriesPoint[];
 }
