@@ -1,9 +1,11 @@
 // Clients: every device the router knows, as a table with the columns of the
 // spec's section 2.2. Not in the mockup; styled like its tables.
 
+import { filterHash } from "../entity";
+import { EntityLink } from "./entity";
 import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { windowLabel, type Win } from "../query";
 import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { Device, Group } from "../types";
@@ -36,11 +38,17 @@ function matches(d: Device, q: string, groups: Group[]): boolean {
 
 const recentTotal = (d: Device) => (d.recent ? d.recent.down + d.recent.up : 0);
 
-export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
+export function Clients({ q0, win, onWin }: { q0: string; win: Win; onWin: (w: Win) => void }) {
   const polled = usePoll((s) => getJSON<Device[]>(`/api/devices?window=${win}`, s), 10_000, [win]);
   const groupsPolled = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []);
   const groups = groupsPolled.data ?? [];
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(q0);
+  // The search is kept in the address (without a new history entry per key),
+  // so Back and a shared link keep it.
+  useEffect(() => {
+    const h = filterHash("clients", { q });
+    if (location.hash !== h) history.replaceState(null, "", h);
+  }, [q]);
   const all = polled.data ?? [];
   const found = all.filter((d) => matches(d, q, groups));
   const online = all.filter((d) => d.online).length;
@@ -127,7 +135,7 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
                         {d.topApp ? (
                           <span class="app-cell">
                             <AppIcon id={d.topApp.id} name={appName(d.topApp.name)} size={20} />
-                            <span>{appName(d.topApp.name)}</span>
+                            <EntityLink e={{ kind: "app", id: d.topApp.id }}>{appName(d.topApp.name)}</EntityLink>
                           </span>
                         ) : (
                           "-"
@@ -145,7 +153,7 @@ export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
                         {d.random && <span class="tag" title="The device made this address up itself; its vendor cannot be told from it">random MAC</span>}
                       </td>
                       <td class="soft small">{linkText(d)}</td>
-                      <td class="soft">{groupName(d.group, groups) || "-"}</td>
+                      <td class="soft">{d.group ? <EntityLink e={{ kind: "group", id: d.group }}>{groupName(d.group, groups)}</EntityLink> : "-"}</td>
                       <td class="num">{d.countryCount}</td>
                       <td class="soft small">{d.online ? "online now" : `${date(d.last)} ${time(d.last)}`}</td>
                     </tr>

@@ -2,6 +2,7 @@
 // traffic, each app it used with that app's domains and countries, and where
 // it went.
 
+import { EntityLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { SortHead, useFlip, useSteadyRows } from "./table";
@@ -146,7 +147,7 @@ function AppDetail({ a, mac }: { a: AppUsage; mac: string }) {
         {domains.map((d) => (
           <div key={d.name} class="row-between small-13">
             <span class="ellipsis">
-              {d.other ? "other domains" : d.name || "no name"}
+              <EntityLink e={{ kind: "domain", name: d.other ? "" : d.name }}>{d.other ? "other domains" : d.name || "no name"}</EntityLink>
               {d.src && !d.other && <span class="muted"> · {nameSource(d.src)}</span>}
             </span>
             <span class="soft nowrap">
@@ -161,7 +162,7 @@ function AppDetail({ a, mac }: { a: AppUsage; mac: string }) {
         {places.map((p) => (
           <div key={p.cc + p.org} class="place-row small-13">
             <CC cc={p.cc} />
-            <span class="ellipsis">{p.other ? "others" : p.org || countryName(p.cc)}</span>
+            <EntityLink e={{ kind: "country", cc: p.other ? "--" : p.cc }} class="ellipsis">{p.other ? "others" : p.org || countryName(p.cc)}</EntityLink>
             <span class="soft nowrap">
               ↓ {bytes(p.down)} · ↑ {bytes(p.up)}
             </span>
@@ -182,7 +183,7 @@ export function Where({ dest }: { dest: Destinations }) {
           {dest.countries.map((c) => (
             <div key={c.cc} class="row-between small-13">
               <span>
-                <b>{c.cc}</b> {c.other || c.cc === "--" ? "unknown or others" : countryName(c.cc)}
+                <b>{c.cc}</b> <EntityLink e={{ kind: "country", cc: c.other ? "--" : c.cc }}>{c.other || c.cc === "--" ? "unknown or others" : countryName(c.cc)}</EntityLink>
               </span>
               <span class="soft nowrap" title={`↑ ${bytes(c.up)}`}>↓ {bytes(c.down)}</span>
             </div>
@@ -194,7 +195,7 @@ export function Where({ dest }: { dest: Destinations }) {
           {dest.orgs.map((o) => (
             <div key={o.asn} class="row-between small-13">
               <span class="ellipsis">
-                {o.other || o.asn === "other" ? "other organisations" : o.org || "no name"}
+                <EntityLink e={{ kind: "network", asn: o.other || o.asn === "other" ? 0 : o.asn }}>{o.other || o.asn === "other" ? "other organisations" : o.org || "no name"}</EntityLink>
                 {!(o.other || o.asn === "other") && <span class="muted"> · AS{o.asn}</span>}
               </span>
               <span class="soft nowrap">↓ {bytes(o.down)}</span>
@@ -207,8 +208,8 @@ export function Where({ dest }: { dest: Destinations }) {
           {dest.domains.map((dm) => (
             <div key={dm.name} class="row-between small-13">
               <span class="ellipsis">
-                {dm.other ? "other domains" : dm.name || "no name"}
-                {dm.app && <span class="muted"> · {appName(dm.app.name)}</span>}
+                <EntityLink e={{ kind: "domain", name: dm.other ? "" : dm.name }}>{dm.other ? "other domains" : dm.name || "no name"}</EntityLink>
+                {dm.app && <span class="muted"> · <EntityLink e={{ kind: "app", id: dm.app.id }}>{appName(dm.app.name)}</EntityLink></span>}
               </span>
               <span class="soft nowrap">↓ {bytes(dm.down)}</span>
             </div>

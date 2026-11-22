@@ -6,9 +6,9 @@
 // attributes or Preact's style object (set via CSSOM), never a style string:
 // the page's CSP refuses inline style.
 
-import { h, Fragment } from "preact";
+import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useState } from "preact/hooks";
-import { areaPath, cumulate, sankeyLayout, type SankeyLink, type SankeyNode } from "./geometry";
+import { areaPath, cumulate, pickColumn, sankeyLayout, type SankeyLink, type SankeyNode } from "./geometry";
 import { rate } from "./format";
 import { appIcon } from "./icons";
 import { IconContext, brokenIcons, iconBroke } from "./ui";
@@ -25,6 +25,8 @@ interface StackedProps {
   downH: number;
   upH: number;
   label: string;
+  /** Called with the column clicked, when the chart leads somewhere. */
+  onPick?: (column: number) => void;
 }
 
 /**
@@ -44,7 +46,20 @@ export function StackedArea(p: StackedProps) {
   }
   return (
     <div class="chart">
-      <svg viewBox={`0 0 1000 ${p.viewH}`} preserveAspectRatio="none" role="img" aria-label={p.label} class="chart-svg" height={p.viewH}>
+      <svg
+        viewBox={`0 0 1000 ${p.viewH}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={p.label}
+        class={p.onPick ? "chart-svg chart-pick" : "chart-svg"}
+        height={p.viewH}
+        onClick={(e) => {
+          const n = p.up.length;
+          if (!p.onPick || n === 0) return;
+          const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+          p.onPick(pickColumn((e.clientX - r.left) / r.width, n));
+        }}
+      >
         <line class="grid" x1="0" y1={p.axis - p.downH} x2="1000" y2={p.axis - p.downH} />
         <line class="grid" x1="0" y1={p.axis - p.downH / 2} x2="1000" y2={p.axis - p.downH / 2} />
         {paths}
@@ -67,13 +82,13 @@ export function Swatch({ color }: { color: string }) {
   return <span class="swatch" style={{ background: color }} />;
 }
 
-export function Legend({ items, ticks }: { items: { label: string; color: string }[]; ticks?: string[] }) {
+export function Legend({ items, ticks }: { items: { label: string; color: string; node?: ComponentChildren }[]; ticks?: string[] }) {
   return (
     <div class="legend">
       {items.map((g) => (
         <span class="legend-item" key={g.label}>
           <Swatch color={g.color} />
-          {g.label}
+          {g.node ?? g.label}
         </span>
       ))}
       {ticks && ticks.length > 0 && <span class="legend-ticks">{ticks.join(" · ")}</span>}

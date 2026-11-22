@@ -3,6 +3,7 @@
 // its security, and what can be done to it. Each section has its own empty
 // and error state, so one router read failing never blanks the page.
 
+import { crumbsFrom } from "../entity";
 import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useRef, useState } from "preact/hooks";
 import type { App, AppUsage, Destinations, Device, FlowsPage, Group, Live, NetworkView, Range, SeriesPoint } from "../types";
@@ -30,7 +31,7 @@ function Section<T>({ polled, empty, children }: { polled: Polled<T>; empty?: (d
   return e ? <Empty>{e}</Empty> : <>{children(polled.data)}</>;
 }
 
-export function Client360({ mac, range, onRange, win, onWin }: { mac: string; range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
+export function Client360({ mac, from = "", range, onRange, win, onWin }: { mac: string; from?: string; range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
   const base = `/api/devices/${enc(mac)}`;
   const dev = usePoll((s) => getJSON<Device>(`${base}?window=${win}`, s), 10_000, [mac, win]);
   const d = dev.data;
@@ -40,9 +41,7 @@ export function Client360({ mac, range, onRange, win, onWin }: { mac: string; ra
     <div class="page">
       <Header section="clients" range={range} onRange={onRange} win={win} onWin={onWin} />
       <main class="main">
-        <div class="crumbs">
-          <a href="#/clients">Clients</a> / {name}
-        </div>
+        <Crumbs from={from} name={name} />
         {notFound ? <Empty>The router knows no device with MAC {mac.toUpperCase()}.</Empty> : <Status polled={dev} />}
         {!d ? (
           notFound ? null : <Loading />
@@ -240,5 +239,23 @@ function RulesSection({ d }: { d: Device }) {
         }
       </Section>
     </Card>
+  );
+}
+
+/** Clients › name, or the path the owner took (Apps › YouTube › name). */
+function Crumbs({ from, name }: { from: string; name: string }) {
+  const appNames = manifestName(useContext(IconContext));
+  const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
+  const path = crumbsFrom(from, { app: appNames, group: (id) => groupName(id, groups) });
+  const shown = path.length ? path : [{ label: "Clients", href: "#/clients" }];
+  return (
+    <p class="crumbs">
+      {shown.map((c) => (
+        <span key={c.href}>
+          <a href={c.href}>{c.label}</a> ›{" "}
+        </span>
+      ))}
+      {name}
+    </p>
   );
 }

@@ -2,6 +2,8 @@
 // last five minutes by app, the active apps, the connections and where they
 // go, from the live view polled every 2 s.
 
+import { entityHref } from "../entity";
+import { EntityLink } from "./entity";
 import { h } from "preact";
 import { useContext, useRef } from "preact/hooks";
 import type { App, AppUsage, Live, LiveApp, LiveConn, LivePlace } from "../types";
@@ -121,8 +123,8 @@ export function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: str
           <div key={a.app.id} data-key={a.app.id} class="live-app">
             <AppIcon id={a.app.id} name={name} size={40} />
             <div class="col-tight">
-              <span class="strong ellipsis">{name}</span>
-              <span class="muted small">{name.includes(" · ") ? "by organisation" : category(a.app.category) || "-"}</span>
+              <EntityLink e={{ kind: "app", id: a.app.id }} class="strong ellipsis">{name}</EntityLink>
+              <span class="muted small">{name.includes(" · ") ? "by organisation" : <EntityLink e={{ kind: "category", id: a.app.category }}>{category(a.app.category) || "-"}</EntityLink>}</span>
               <BlockApp appId={a.app.id} name={name} mac={mac} />
             </div>
             <div class="col-tight live-rate" title={`average over the last ${windowLabel(win)}; right now ↓ ${rate(a.down)} · ↑ ${rate(a.up)}`}>
@@ -135,10 +137,10 @@ export function LiveApps({ apps, mac, recent, win }: { apps: LiveApp[]; mac: str
             </svg>
             <span class="soft live-conns nowrap">{num(a.flows)} conn.</span>
             <span class="small-13 ellipsis live-domain">
-              {a.domain || "no name"}
+              <EntityLink e={{ kind: "domain", name: a.domain }}>{a.domain || "no name"}</EntityLink>
               {a.src && a.domain && <span class="muted"> · {nameSource(a.src)}</span>}
             </span>
-            <span class="small-13 soft ellipsis live-where">{whereText(a.cc, a.org)}</span>
+            <span class="small-13 soft ellipsis live-where"><EntityLink e={{ kind: "country", cc: a.cc }}>{whereText(a.cc, a.org)}</EntityLink></span>
           </div>
         );
       })}
@@ -163,12 +165,18 @@ export function LiveConns({ mac, conns, flows }: { mac: string; conns: LiveConn[
           <div key={keys[i]} class={canWrite && c.local && c.remote ? "live-conn live-conn-w" : "live-conn"}>
             <AppIcon id={c.app.id} name={appName(c.app.name)} size={28} />
             <span class="ellipsis">
-              {label}
-              {c.org && c.name && <span class="muted"> · {c.org}</span>}
+              {c.name ? <EntityLink e={{ kind: "domain", name: c.name }}>{label}</EntityLink> : <EntityLink e={{ kind: "network", asn: c.asn }}>{label}</EntityLink>}
+              {c.org && c.name && <span class="muted"> · <EntityLink e={{ kind: "network", asn: c.asn }}>{c.org}</EntityLink></span>}
             </span>
-            <span title={placeName(c)}>
-              <CC cc={c.cc} />
-            </span>
+            {entityHref({ kind: "country", cc: c.cc }) ? (
+              <a title={placeName(c)} href={entityHref({ kind: "country", cc: c.cc })} class="entity-link">
+                <CC cc={c.cc} />
+              </a>
+            ) : (
+              <span title={placeName(c)}>
+                <CC cc={c.cc} />
+              </span>
+            )}
             <span class="nowrap live-conn-rate">
               ↓ {p.down} <span class="muted">↑ {p.up}</span> <span class="muted small">{p.unit}</span>
             </span>
@@ -197,7 +205,7 @@ export function LivePlaces({ places }: { places: LivePlace[] }) {
           <CC cc={p.cc} />
           <div class="col-tight">
             <span class="small-13 ellipsis">
-              {placeName(p)}
+              <EntityLink e={{ kind: "country", cc: p.cc }}>{placeName(p)}</EntityLink>
               {p.org && <span class="muted small"> · {p.org}</span>}
             </span>
             <div class="bars bars-thin">

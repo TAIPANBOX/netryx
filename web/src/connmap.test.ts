@@ -79,3 +79,12 @@ test("a name that carries under 3% of the window folds into the rest, so small f
   assert.deepEqual(labels(2), ["big.example", "2 other domains"]);
   assert.deepEqual(labels(4), ["United States", "2 other countries"]);
 });
+
+test("one folded name reads in the singular", () => {
+  const m = connMap("Laptop", [
+    flow({ app: yt, name: "big.example", org: "BIG", asn: 1, cc: "US", winDown: 9700 }),
+    flow({ app: gh, name: "tiny.example", org: "TINY", asn: 2, cc: "DE", winDown: 100 }),
+  ]);
+  const labels = m.nodes.filter((n) => n.id.endsWith(":*")).map((n) => n.label);
+  assert.deepEqual(labels, ["1 other app", "1 other domain", "1 other network", "1 other country"]);
+});

@@ -1151,3 +1151,76 @@ func (s *Store) Recent(f Filter, dim string, span time.Duration) ([]Row, time.Du
 	}
 	return ranked(acc), covered
 }
+
+// HoldersOf is who reached one network or asked for one domain: by device,
+// by app and, for a network, by country, each ranked as Top ranks.
+type HoldersOf struct {
+	MACs, Apps, CCs []Row
+	// Org is the network's organisation as last named; empty for a domain.
+	Org string
+}
+
+// Holders answers, in one pass over the marginals, what Top(f, dim) would
+// give for key under each device's and each app's own filter (and, for a
+// network, each country's): the network and domain pages read it, so they
+// never scan the history once per client or app and never stop at the
+// busiest few. dim is "asn" or "domain"; anything else is empty.
+func (s *Store) Holders(dim, key string, from, to time.Time) HoldersOf {
+	if dim != "asn" && dim != "domain" {
+		return HoldersOf{}
+	}
+	var asn uint64
+	if dim == "asn" {
+		n, err := strconv.ParseUint(key, 10, 32)
+		if err != nil {
+			return HoldersOf{}
+		}
+		asn = n
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	macs, apps, ccs := map[string]*Row{}, map[string]*Row{}, map[string]*Row{}
+	put := func(acc map[string]*Row, k string, b Bytes) {
+		r := acc[k]
+		if r == nil {
+			r = &Row{Key: k}
+			acc[k] = r
+		}
+		r.Bytes = add(r.Bytes, b)
+	}
+	var out HoldersOf
+	from, to = from.UTC(), to.UTC()
+	l := s.finest(from, time.Hour)
+	for _, bk := range s.coarseOf(l).each(from.Truncate(s.ringOf(l).step), to) {
+		if dim == "asn" {
+			for mac, m := range bk.ASN {
+				for ak, c := range m.Rows {
+					if uint64(ak.ASN) != asn {
+						continue
+					}
+					put(macs, mac, c.B)
+					put(apps, ak.App, c.B)
+					put(ccs, ak.CC, c.B)
+					if c.Org != "" {
+						out.Org = c.Org
+					}
+				}
+			}
+			continue
+		}
+		for mac, m := range bk.Dom {
+			for dk, c := range m.Rows {
+				if !strings.EqualFold(dk.Domain, key) {
+					continue
+				}
+				put(macs, mac, c.B)
+				put(apps, dk.App, c.B)
+			}
+		}
+	}
+	out.MACs, out.Apps = ranked(macs), ranked(apps)
+	if dim == "asn" {
+		out.CCs = ranked(ccs)
+	}
+	return out
+}

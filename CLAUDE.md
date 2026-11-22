@@ -657,6 +657,25 @@ enforced, and that is a debt rather than a decision.
   (test: `TestTheHouseAppsCountOnlyClients`, `TestARowWithoutClientsSaysWhoseTrafficItIs`,
   `TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries`)
 
+## The promise about clickable names
+
+- **Every name is a link to its screen**, the folded rest and the house
+  itself excepted: a client's card, an app, a country, a network
+  (`#/asn/<n>`), a domain (`#/domain/<name>`), a category (Apps filtered), a
+  group (`#/group/<id>`), a rule (`#/rules?rule=`); a filter is in the address,
+  and a link from a detail carries `from` for the breadcrumbs. (the page:
+  `web/src/entity.test.ts`)
+- **A network's and a domain's page** read the history in one pass over the
+  marginals (`Holders`), which answers for every device, app and country what
+  `Top` would answer under its own filter, so no client or app is left out; a
+  domain that could not be one is a 400. (test: `TestHoldersAgreeWithTopPerDeviceAndApp`,
+  `TestANetworkPageNamesItsCountriesClientsAndApps`, `TestADomainPageNamesItsAppsAndClients`)
+- **The line's card reads only the line** (`/api/wan`), never the history.
+  (test: `TestTheLineCardAsksOnlyForTheLine`)
+- **The flows can be asked for a stretch of time and a network** (`from`,
+  `to` in RFC 3339, `asn`), malformed ones refused.
+  (test: `TestFlowsCanBeAskedForAStretchOfTimeAndANetwork`, `TestFlowsCanBeAskedForOneNetwork`)
+
 ## The promise about Client 360
 
 - **A client's name opens its card beside it**: several cards can be open

@@ -15,10 +15,10 @@ const NEUTRAL = "#7FB2F0";
 /** A name that carries less of the window than this folds into the rest: small bands would pile their labels up. */
 const MIN_SHARE = 0.03;
 const KINDS = [
-  { id: "app", other: "apps" },
-  { id: "domain", other: "domains" },
-  { id: "net", other: "networks" },
-  { id: "cc", other: "countries" },
+  { id: "app", one: "app", other: "apps" },
+  { id: "domain", one: "domain", other: "domains" },
+  { id: "net", one: "network", other: "networks" },
+  { id: "cc", one: "country", other: "countries" },
 ] as const;
 
 type Key = { id: string; label: string; href?: string };
@@ -86,7 +86,7 @@ export function connMap(name: string, rows: FlowRow[], top = 5): ConnMap {
   }
   for (const [c, kind] of KINDS.entries()) {
     const n = nodes.get(`${kind.id}:*`);
-    if (n) n.label = `${folded[c].size} other ${kind.other}`;
+    if (n) n.label = `${folded[c].size} other ${folded[c].size === 1 ? kind.one : kind.other}`;
   }
   // Each column busiest first, the folded rest last.
   const ordered = [...nodes.values()].sort((a, b) => a.col - b.col || Number(a.id.endsWith(":*")) - Number(b.id.endsWith(":*")) || b.v - a.v);

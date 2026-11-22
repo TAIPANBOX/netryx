@@ -375,3 +375,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .map-scroll { overflow-x: auto; }
 .map-scroll .sankey { min-width: 760px; }
 .row-item { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
+.tile-button { font: inherit; text-align: left; cursor: pointer; width: 100%; }
+.tile-button:focus-visible { outline: 2px solid var(--accent); }
+.chart-pick { cursor: pointer; }
+.rule-focused { outline: 2px solid var(--accent); }
+.rule-links { gap: 4px 8px; }

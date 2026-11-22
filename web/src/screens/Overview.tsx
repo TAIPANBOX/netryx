@@ -1,7 +1,9 @@
 // Overview: the state of the line, the house's traffic over the period, and who,
 // what and where it went to.
 
-import { ClientLink } from "./entity";
+import { useCards } from "./windows";
+import { stretchHref } from "../entity";
+import { ClientLink, EntityLink } from "./entity";
 import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { Overview as OverviewData, Range } from "../types";
@@ -61,11 +63,14 @@ function Tiles({ d, rules, alerts }: { d: OverviewData; rules?: Rule[]; alerts?:
   const q = lineQuality(w);
   const blocked = blockedTile(rules);
   const al = alertsTile(alerts, Date.now());
-  const tiles: { label: string; value: string; sub: string; bad?: boolean; later?: boolean; href?: string }[] = [
-    { label: "WAN", value: w.up ? "Online" : "No connection", sub: `${addr} · uptime ${duration(w.uptimeSec)}`, bad: !w.up },
-    { label: "Speed now", value: `↓ ${r.down} · ↑ ${r.up}`, sub: r.unit + (w.device ? ` · ${w.device}` : "") },
-    { label: "Line quality", value: q.value, sub: q.sub, bad: q.bad },
-    { label: "Clients", value: `${num(d.clients.online)} online`, sub: newDevices(d.clients.new24h) },
+  const { open } = useCards();
+  // The line's tiles open one card with the line's details beside them.
+  const line = (e: Element) => open("wan", { title: "Internet line", body: () => <LineCard /> }, e);
+  const tiles: { label: string; value: string; sub: string; bad?: boolean; later?: boolean; href?: string; card?: boolean }[] = [
+    { label: "WAN", value: w.up ? "Online" : "No connection", sub: `${addr} · uptime ${duration(w.uptimeSec)}`, bad: !w.up, card: true },
+    { label: "Speed now", value: `↓ ${r.down} · ↑ ${r.up}`, sub: r.unit + (w.device ? ` · ${w.device}` : ""), card: true },
+    { label: "Line quality", value: q.value, sub: q.sub, bad: q.bad, card: true },
+    { label: "Clients", value: `${num(d.clients.online)} online`, sub: newDevices(d.clients.new24h), href: "#/clients" },
     { label: "Alerts", value: al.value, sub: al.sub, href: "#/security" },
     { label: "Blocked", value: blocked.value, sub: blocked.sub, href: "#/rules" },
   ];
@@ -81,6 +86,8 @@ function Tiles({ d, rules, alerts }: { d: OverviewData; rules?: Rule[]; alerts?:
         );
         return t.href ? (
           <a key={t.label} class="tile tile-link" href={t.href}>{inner}</a>
+        ) : t.card ? (
+          <button key={t.label} type="button" class="tile tile-link tile-button" onClick={(e) => line(e.currentTarget as Element)}>{inner}</button>
         ) : (
           <div key={t.label} class={t.later ? "tile later" : "tile"} title={t.later ? LATER : undefined} aria-disabled={t.later ? "true" : undefined}>
             {inner}
@@ -101,12 +108,27 @@ function Traffic({ d, range, split, onSplit }: { d: OverviewData; range: Range; 
 
   // Bottom of the stack first: "the rest", then the smaller top keys, the largest on top.
   const layers: Layer[] = [];
-  if (s.other) layers.push({ label: otherLabel(split, d), color: OTHER_COLOR, values: s.otherDown });
+  // The key behind each layer, by position: two clients may share a name.
+  const layerKeys: (string | undefined)[] = [];
+  if (s.other) {
+    layers.push({ label: otherLabel(split, d), color: OTHER_COLOR, values: s.otherDown });
+    layerKeys.push(undefined);
+  }
   for (let i = s.keys.length - 1; i >= 0; i--) {
     layers.push({ label: label(s.keys[i]), color: LAYER_COLORS[i], values: s.down[s.keys[i]] });
+    layerKeys.push(s.keys[i]);
   }
-  const legend = [...layers].reverse().map((l) => ({ label: l.label, color: l.color }));
-  legend.push({ label: split === "none" ? "up" : "up (all)", color: UP_COLOR });
+  // A legend entry is a link: a client opens its card, an app its page.
+  const legend = layers.map((l, i) => ({ l, k: layerKeys[i] })).reverse().map(({ l, k }) => {
+    const node = !k || split === "none" ? undefined : split === "mac" && /^[0-9a-f:]{17}$/i.test(k) ? <ClientLink mac={k} name={l.label} /> : split === "app" ? <EntityLink e={{ kind: "app", id: k }}>{l.label}</EntityLink> : undefined;
+    return { label: l.label, color: l.color, node };
+  });
+  legend.push({ label: split === "none" ? "up" : "up (all)", color: UP_COLOR, node: undefined });
+  // A click on the chart opens the flows of that stretch of time.
+  const pick = (i: number) => {
+    const h = s.t[i] ? stretchHref(s.t[i], stepOf(range)) : undefined;
+    if (h) location.hash = h;
+  };
 
   return (
     <Card label="WAN traffic">
@@ -126,7 +148,7 @@ function Traffic({ d, range, split, onSplit }: { d: OverviewData; range: Range; 
       {d.series.length === 0 ? (
         <Empty>No traffic in this period yet.</Empty>
       ) : (
-        <StackedArea layers={layers} up={s.up} viewH={260} axis={170} downH={160} upH={80} label="WAN traffic chart for the period" />
+        <StackedArea layers={layers} up={s.up} viewH={260} axis={170} downH={160} upH={80} label="WAN traffic chart for the period; click a stretch for its flows" onPick={pick} />
       )}
       <Legend items={legend} ticks={timeTicks(s.t, range)} />
     </Card>
@@ -181,11 +203,17 @@ function TopApps({ d }: { d: OverviewData }) {
           <div key={a.id} class="app-row">
             <AppIcon id={a.other ? "other" : a.id} name={name} size={34} />
             <div class="col-tight">
-              <span class="strong ellipsis">{name}</span>
+              <EntityLink e={{ kind: "app", id: a.other ? "other" : a.id }} class="strong ellipsis">{name}</EntityLink>
               <span class="muted small">
-                {a.other
-                  ? "folded rows"
-                  : `${name.includes(" · ") ? "by organisation" : category(a.category) || "no category"} · ${plural(a.clients, "client", "clients")}`}
+                {a.other ? (
+                  "folded rows"
+                ) : (
+                  <>
+                    {name.includes(" · ") ? "by organisation" : <EntityLink e={{ kind: "category", id: a.category }}>{category(a.category) || "no category"}</EntityLink>}
+                    {" · "}
+                    {plural(a.clients, "client", "clients")}
+                  </>
+                )}
               </span>
             </div>
             <span class="soft small right">
@@ -208,7 +236,7 @@ function Countries({ d }: { d: OverviewData }) {
           <CC cc={k.cc} />
           <div class="col-tight">
             <span>
-              {k.other || k.cc === "--" ? "unknown or others" : countryName(k.cc)}
+              <EntityLink e={{ kind: "country", cc: k.other ? "--" : k.cc }}>{k.other || k.cc === "--" ? "unknown or others" : countryName(k.cc)}</EntityLink>
               {k.org && <span class="muted small"> · {k.org}</span>}
             </span>
             <Bars thin parts={[{ pct: k.share * 100, kind: "down" }]} />
@@ -275,5 +303,32 @@ function Now({ d }: { d: OverviewData }) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** The internet line in a card: its address, uptime, speed and quality, polled while open. */
+function LineCard() {
+  const polled = usePoll((s) => getJSON<OverviewData["wan"]>("/api/wan", s), 10_000, []);
+  const w = polled.data;
+  if (!w) return polled.error ? <p class="bad-text small">The router is not answering: {polled.error}.</p> : <Loading />;
+  const r = ratePair(w.rxRate, w.txRate);
+  const q = lineQuality(w);
+  const rows: [string, string][] = [
+    ["State", w.up ? "online" : "no connection"],
+    ["Device", w.device || "-"],
+    ["IPv4", w.ipv4 || "-"],
+    ["IPv6", w.ipv6 || "-"],
+    ["Up for", duration(w.uptimeSec)],
+    ["Speed now", `↓ ${r.down} · ↑ ${r.up} ${r.unit}`],
+    ["Latency", w.latencyMs === null ? "no answer yet" : `${w.latencyMs.toFixed(1)} ms`],
+    ["Jitter", w.jitterMs === null ? "no answer yet" : `${w.jitterMs.toFixed(1)} ms`],
+    ["Loss", `${w.lossPct.toFixed(1)}%`],
+    ["Quality", `${q.value} · ${q.sub}`],
+  ];
+  return (
+    <div class="col-tight">
+      <div class="kv-mini">{rows.map(([k, v]) => [<span key={k + "k"}>{k}</span>, <span key={k + "v"} class="break">{v}</span>])}</div>
+      <a class="btn self-start" href="#/network">Network</a>
+    </div>
   );
 }

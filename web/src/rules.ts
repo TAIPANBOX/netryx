@@ -374,3 +374,9 @@ export function usageText(u: Usage, z: string = zone()): string {
   }
   return `used ${u.used} of ${u.limit} min`;
 }
+
+/** What a rule does, as its links on the Rules screen begin. */
+export function ruleVerb(r: Rule): string {
+  if (r.action === "limit") return `limits to ${r.minutes ?? 0} min a day`;
+  return r.what === "all" ? "blocks the whole internet" : "blocks";
+}
