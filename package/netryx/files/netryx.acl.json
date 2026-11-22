@@ -1,0 +1,12 @@
+{
+	"netryx": {
+		"description": "netryx console",
+		"read": {
+			"netryx": [ "view" ],
+			"ubus": { "session": [ "access", "destroy" ] }
+		},
+		"write": {
+			"netryx": [ "control" ]
+		}
+	}
+}

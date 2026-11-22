@@ -1,0 +1,17 @@
+# Build output: binaries and packages are made from source, never reviewed,
+# and a repository that carries them grows by megabytes per build.
+build/
+
+# Packages are built by package/netryx/build.sh + mkapk.sh, never reviewed,
+# and each one is megabytes. They do not belong in history.
+*.apk
+
+# Downloaded data (scripts/fetch-data.sh) and the UI's dependencies and output.
+data/
+web/node_modules/
+web/dist-test/
+internal/web/dist/*
+!internal/web/dist/.keep
+
+# Execution workspace of the plan runner (ledger, briefs, reports).
+.superpowers/

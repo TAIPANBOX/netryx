@@ -1,0 +1,7 @@
+#!/bin/sh
+# The rpcd exec plugin behind the ubus object netryx: the six reads of
+# `netryx ctl` (status, devices, rules, alerts, apps, usage), answered by the
+# binary from its root-only socket. rpcd runs plugins as root; the console's
+# ACL grants no call of this object, so only root and what root lets through
+# (an openwrt-mcp ubus_call policy) reach it.
+exec /usr/sbin/netryx rpcd "$@"

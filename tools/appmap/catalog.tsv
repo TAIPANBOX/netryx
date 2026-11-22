@@ -1,0 +1,277 @@
+# Catalog for tools/appmap: which v2fly list covers which app, and how the app is drawn.
+# Entry lines:  <v2fly list>	<id>	<name>	<category>	<icon>	<colour>
+# Org lines:    @org	<lower case substring of the ASN organisation>	<id>	<name>	<category>	<icon>	<colour>
+# Hand written domains: @domain	<domain>	<id>	<name>	<category>	<icon>	<colour>. They are emitted before every list, so they win over any v2fly rule.
+# Categories: video social messaging calls cloud gaming music ai ads shopping news travel payments smarthome dev other
+# Icon: si:<Simple Icons slug> when Simple Icons has the brand, else fav:<main domain> (the console fetches that favicon once), else empty (a letter tile).
+# Colour: left empty. A Simple Icons brand (si:) takes its colour from simple-icons.json by -brands; any other app has none.
+# The same id, name, icon and colour on every line of one app. The first line that sets an icon or colour wins.
+
+# DNS over HTTPS resolvers (stage 2b, category doh). Domains from each provider's public DoH documentation;
+# their published anycast addresses are @addr lines at the end, so a client that bootstraps by address is caught too.
+# Port 53 to those addresses is redirected to the router before the forward chain, so plain DNS is unaffected.
+@domain	dns.google	doh-google	Google Public DNS	doh	si:google	
+@domain	dns.google.com	doh-google	Google Public DNS	doh	si:google	
+@domain	cloudflare-dns.com	doh-cloudflare	Cloudflare DNS	doh	si:cloudflare	
+@domain	one.one.one.one	doh-cloudflare	Cloudflare DNS	doh	si:cloudflare	
+@domain	dns.quad9.net	doh-quad9	Quad9	doh	si:quad9	
+@domain	dns.nextdns.io	doh-nextdns	NextDNS	doh	fav:nextdns.io	
+@domain	dns.adguard-dns.com	doh-adguard	AdGuard DNS	doh	si:adguard	
+@domain	dns.mullvad.net	doh-mullvad	Mullvad DNS	doh	si:mullvad	
+@domain	use-application-dns.net	doh-canary	Firefox DoH check	doh		
+# VPN providers by domain (stage 2b, category vpn).
+@domain	expressvpn.com	expressvpn	ExpressVPN	vpn	si:expressvpn	
+@domain	surfshark.com	surfshark	Surfshark	vpn	si:surfshark	
+@domain	protonvpn.com	protonvpn	Proton VPN	vpn	si:protonvpn	
+@domain	crunchyroll.com	crunchyroll	Crunchyroll	video	si:crunchyroll	
+@domain	tv.apple.com	appletv	Apple TV	video	si:appletv	
+@domain	hulu.com	hulu	Hulu	video	fav:hulu.com	
+@domain	peacocktv.com	peacock	Peacock	video	fav:peacocktv.com	
+@domain	joinmastodon.org	mastodon	Mastodon	social	si:mastodon	
+@domain	snapchat.com	snapchat	Snapchat	social	si:snapchat	
+@domain	weibo.com	weibo	Weibo	social	si:sinaweibo	
+@domain	nextdoor.com	nextdoor	Nextdoor	social	si:nextdoor	
+@domain	tinder.com	tinder	Tinder	social	si:tinder	
+@domain	wechat.com	wechat	WeChat	messaging	si:wechat	
+@domain	threema.ch	threema	Threema	messaging	si:threema	
+@domain	kakao.com	kakaotalk	KakaoTalk	messaging	si:kakaotalk	
+@domain	meet.google.com	googlemeet	Google Meet	calls	si:googlemeet	
+@domain	facetime.apple.com	facetime	FaceTime	calls	fav:facetime.apple.com	
+@domain	jitsi.org	jitsi	Jitsi	calls	si:jitsi	
+@domain	onedrive.live.com	onedrive	OneDrive	cloud	fav:onedrive.live.com	
+@domain	outlook.com	outlook	Outlook	cloud	fav:outlook.com	
+@domain	aws.amazon.com	aws	AWS	cloud	fav:aws.amazon.com	
+@domain	amazonaws.com	aws	AWS	cloud	fav:aws.amazon.com	
+@domain	github.com	github	GitHub	dev	si:github	
+@domain	bitbucket.org	bitbucket	Bitbucket	dev	si:bitbucket	
+@domain	npmjs.com	npm	npm	dev	si:npm	
+@domain	pypi.org	pypi	PyPI	dev	si:pypi	
+@domain	terraform.io	terraform	Terraform	dev	si:terraform	
+@domain	xbox.com	xbox	Xbox	gaming	fav:xbox.com	
+@domain	battle.net	battlenet	Battle.net	gaming	si:battledotnet	
+@domain	minecraft.net	minecraft	Minecraft	gaming	fav:minecraft.net	
+@domain	music.apple.com	apple-music	Apple Music	music	si:applemusic	
+@domain	music.youtube.com	youtubemusic	YouTube Music	music	si:youtubemusic	
+@domain	pandora.com	pandora	Pandora	music	si:pandora	
+@domain	shazam.com	shazam	Shazam	music	si:shazam	
+@domain	qobuz.com	qobuz	Qobuz	music	fav:qobuz.com	
+@domain	claude.ai	claude	Claude	ai	si:claude	
+@domain	gemini.google.com	gemini	Gemini	ai	si:googlegemini	
+@domain	copilot.microsoft.com	copilot	Microsoft Copilot	ai	fav:copilot.microsoft.com	
+@domain	mistral.ai	mistral	Mistral AI	ai	si:mistralai	
+@domain	midjourney.com	midjourney	Midjourney	ai	fav:midjourney.com	
+@domain	poe.com	poe	Poe	ai	si:poe	
+@domain	cohere.com	cohere	Cohere	ai	fav:cohere.com	
+@domain	adjust.com	adjust	Adjust	ads	fav:adjust.com	
+@domain	aliexpress.com	aliexpress	AliExpress	shopping	si:aliexpress	
+@domain	etsy.com	etsy	Etsy	shopping	si:etsy	
+@domain	zalando.com	zalando	Zalando	shopping	si:zalando	
+@domain	asos.com	asos	ASOS	shopping	fav:asos.com	
+@domain	temu.com	temu	Temu	shopping	fav:temu.com	
+@domain	shein.com	shein	SHEIN	shopping	fav:shein.com	
+@domain	vinted.com	vinted	Vinted	shopping	si:vinted	
+@domain	ocado.com	ocado	Ocado	shopping	fav:ocado.com	
+@domain	argos.co.uk	argos	Argos	shopping	si:argos	
+@domain	johnlewis.com	johnlewis	John Lewis	shopping	fav:johnlewis.com	
+@domain	currys.co.uk	currys	Currys	shopping	fav:currys.co.uk	
+@domain	bolt.eu	bolt	Bolt	travel	fav:bolt.eu	
+@domain	ryanair.com	ryanair	Ryanair	travel	si:ryanair	
+@domain	easyjet.com	easyjet	easyJet	travel	si:easyjet	
+@domain	wizzair.com	wizzair	Wizz Air	travel	si:wizzair	
+@domain	lufthansa.com	lufthansa	Lufthansa	travel	si:lufthansa	
+@domain	britishairways.com	britishairways	British Airways	travel	si:britishairways	
+@domain	maps.google.com	googlemaps	Google Maps	travel	si:googlemaps	
+@domain	waze.com	waze	Waze	travel	si:waze	
+@domain	skyscanner.net	skyscanner	Skyscanner	travel	fav:skyscanner.net	
+@domain	tripadvisor.com	tripadvisor	Tripadvisor	travel	si:tripadvisor	
+@domain	thetrainline.com	trainline	Trainline	travel	fav:thetrainline.com	
+@domain	eurostar.com	eurostar	Eurostar	travel	fav:eurostar.com	
+@domain	expedia.com	expedia	Expedia	travel	si:expedia	
+@domain	deliveroo.co.uk	deliveroo	Deliveroo	other	si:deliveroo	
+@domain	revolut.com	revolut	Revolut	payments	si:revolut	
+@domain	monzo.com	monzo	Monzo	payments	si:monzo	
+@domain	klarna.com	klarna	Klarna	payments	si:klarna	
+@domain	starlingbank.com	starling	Starling Bank	payments	si:starlingbank	
+@domain	natwest.com	natwest	NatWest	payments	fav:natwest.com	
+@domain	barclays.co.uk	barclays	Barclays	payments	si:barclays	
+@domain	coinbase.com	coinbase	Coinbase	payments	si:coinbase	
+@domain	washingtonpost.com	washingtonpost	Washington Post	news	fav:washingtonpost.com	
+@domain	yahoo.com	yahoo	Yahoo	news	fav:yahoo.com	
+@domain	speedtest.net	speedtest	Speedtest	other	si:speedtest	
+@domain	trello.com	trello	Trello	other	si:trello	
+@domain	linear.app	linear	Linear	dev	si:linear	
+@domain	stackoverflow.com	stackoverflow	Stack Overflow	dev	si:stackoverflow	
+@domain	mullvad.net	mullvad	Mullvad	vpn	si:mullvad	
+@domain	1password.com	1password	1Password	other	si:1password	
+@domain	imdb.com	imdb	IMDb	other	si:imdb	
+@domain	yandex.ru	yandex	Yandex	other	fav:yandex.ru	
+@domain	baidu.com	baidu	Baidu	other	si:baidu	
+@domain	wikipedia.org	wikipedia	Wikipedia	other	si:wikipedia	
+@domain	bing.com	bing	Bing	other	fav:bing.com	
+@domain	tuya.com	tuya	Tuya	smarthome	fav:tuya.com	
+@domain	ring.com	ring	Ring	smarthome	si:ring	
+@domain	nest.com	nest	Nest	smarthome	fav:nest.com	
+@domain	meethue.com	philipshue	Philips Hue	smarthome	si:philipshue	
+@domain	mi.com	xiaomi	Xiaomi	smarthome	si:xiaomi	
+@domain	ecobee.com	ecobee	ecobee	smarthome	fav:ecobee.com	
+@domain	sonos.com	sonos	Sonos	smarthome	si:sonos	
+@domain	home-assistant.io	homeassistant	Home Assistant	smarthome	si:homeassistant	
+@domain	shelly.cloud	shelly	Shelly	smarthome	si:shelly	
+@domain	tp-link.com	tplink	TP-Link	smarthome	si:tplink	
+@domain	teams.microsoft.com	teams	Microsoft Teams	calls	fav:teams.microsoft.com	
+@domain	teams.live.com	teams	Microsoft Teams	calls	fav:teams.microsoft.com	
+@domain	teams.cdn.office.net	teams	Microsoft Teams	calls	fav:teams.microsoft.com	
+@domain	skype.com	teams	Microsoft Teams	calls	fav:teams.microsoft.com	
+youtube	youtube	YouTube	video	si:youtube	
+netflix	netflix	Netflix	video	si:netflix	
+disney	disney	Disney+	video	fav:disneyplus.com	
+primevideo	primevideo	Prime Video	video	fav:primevideo.com	
+hbo	hbo	HBO Max	video	si:hbomax	
+twitch	twitch	Twitch	video	si:twitch	
+vimeo	vimeo	Vimeo	video	si:vimeo	
+bbc	bbc	BBC	video	fav:bbc.com	
+dailymotion	dailymotion	Dailymotion	video	si:dailymotion	
+hulu	hulu	Hulu	video	fav:hulu.com	
+plex	plex	Plex	video	si:plex	
+mubi	mubi	MUBI	video	si:mubi	
+bilibili	bilibili	Bilibili	video	si:bilibili	
+facebook	facebook	Facebook	social	si:facebook	
+instagram	instagram	Instagram	social	si:instagram	
+tiktok	tiktok	TikTok	social	si:tiktok	
+twitter	twitter	X (Twitter)	social	si:x	
+reddit	reddit	Reddit	social	si:reddit	
+linkedin	linkedin	LinkedIn	social	fav:linkedin.com	
+pinterest	pinterest	Pinterest	social	si:pinterest	
+bluesky	bluesky	Bluesky	social	si:bluesky	
+threads	threads	Threads	social	si:threads	
+tumblr	tumblr	Tumblr	social	si:tumblr	
+quora	quora	Quora	social	si:quora	
+vk	vk	VK	social	si:vk	
+whatsapp	whatsapp	WhatsApp	messaging	si:whatsapp	
+telegram	telegram	Telegram	messaging	si:telegram	
+signal	signal	Signal	messaging	si:signal	
+discord	discord	Discord	messaging	si:discord	
+viber	viber	Viber	messaging	si:viber	
+line	line	LINE	messaging	si:line	
+slack	slack	Slack	messaging	fav:slack.com	
+matrix	matrix	Matrix	messaging	si:matrix	
+zoom	zoom	Zoom	calls	si:zoom	
+webex	webex	Webex	calls	si:webex	
+icloud	icloud	iCloud	cloud	si:icloud	
+apple	apple	Apple	cloud	si:apple	
+google	google	Google	cloud	si:google	
+microsoft	microsoft	Microsoft	cloud	fav:microsoft.com	
+onedrive	onedrive	OneDrive	cloud	fav:onedrive.live.com	
+dropbox	dropbox	Dropbox	cloud	si:dropbox	
+amazon	amazon	Amazon	cloud	fav:amazon.com	
+github	github	GitHub	dev	si:github	
+gitlab	gitlab	GitLab	dev	si:gitlab	
+tailscale	tailscale	Tailscale	dev	si:tailscale	
+kubernetes	kubernetes	Kubernetes	dev	si:kubernetes	
+digitalocean	digitalocean	DigitalOcean	cloud	si:digitalocean	
+hetzner	hetzner	Hetzner	cloud	si:hetzner	
+vercel	vercel	Vercel	dev	si:vercel	
+netlify	netlify	Netlify	dev	si:netlify	
+figma	figma	Figma	cloud	si:figma	
+atlassian	atlassian	Atlassian	cloud	si:atlassian	
+protonmail	protonmail	Proton Mail	cloud	si:protonmail	
+steam	steam	Steam	gaming	si:steam	
+xbox	xbox	Xbox	gaming	fav:xbox.com	
+playstation	playstation	PlayStation	gaming	si:playstation	
+epicgames	epicgames	Epic Games	gaming	si:epicgames	
+nintendo	nintendo	Nintendo	gaming	fav:nintendo.com	
+blizzard	blizzard	Blizzard	gaming	fav:blizzard.com	
+roblox	roblox	Roblox	gaming	si:roblox	
+riot	riotgames	Riot Games	gaming	si:riotgames	
+ea	ea	EA	gaming	si:ea	
+ubisoft	ubisoft	Ubisoft	gaming	si:ubisoft	
+gog	gog	GOG	gaming	si:gogdotcom	
+spotify	spotify	Spotify	music	si:spotify	
+deezer	deezer	Deezer	music	si:deezer	
+tidal	tidal	Tidal	music	si:tidal	
+soundcloud	soundcloud	SoundCloud	music	si:soundcloud	
+apple-music	apple-music	Apple Music	music	si:applemusic	
+bandcamp	bandcamp	Bandcamp	music	si:bandcamp	
+lastfm	lastfm	Last.fm	music	si:lastdotfm	
+openai	openai	OpenAI	ai	fav:openai.com	
+anthropic	anthropic	Anthropic	ai	si:anthropic	
+perplexity	perplexity	Perplexity	ai	si:perplexity	
+deepseek	deepseek	DeepSeek	ai	si:deepseek	
+huggingface	huggingface	Hugging Face	ai	si:huggingface	
+poe	poe	Poe	ai	si:poe	
+groq	groq	Groq	ai	fav:groq.com	
+cursor	cursor	Cursor	ai	si:cursor	
+category-ads-all	ads	Ads and trackers	ads		
+adjust	adjust	Adjust	ads	fav:adjust.com	
+ebay	ebay	eBay	shopping	si:ebay	
+booking	booking	Booking.com	travel	si:bookingdotcom	
+airbnb	airbnb	Airbnb	travel	si:airbnb	
+paypal	paypal	PayPal	payments	si:paypal	
+walmart	walmart	Walmart	shopping	fav:walmart.com	
+ikea	ikea	IKEA	shopping	si:ikea	
+uber	uber	Uber	travel	si:uber	
+wise	wise	Wise	payments	si:wise	
+stripe	stripe	Stripe	payments	si:stripe	
+hsbc	hsbc	HSBC	payments	si:hsbc	
+cnn	cnn	CNN	news	si:cnn	
+nytimes	nytimes	New York Times	news	fav:nytimes.com	
+reuters	reuters	Reuters	news	fav:reuters.com	
+theguardian	theguardian	The Guardian	news	si:theguardian	
+bloomberg	bloomberg	Bloomberg	news	fav:bloomberg.com	
+ft	ft	Financial Times	news	fav:ft.com	
+economist	economist	The Economist	news	fav:economist.com	
+yahoo	yahoo	Yahoo	news	fav:yahoo.com	
+dailymail	dailymail	Daily Mail	news	fav:dailymail.co.uk	
+cloudflare	cloudflare	Cloudflare	other	si:cloudflare	
+akamai	akamai	Akamai	other	si:akamai	
+fastly	fastly	Fastly	other	si:fastly	
+docker	docker	Docker	dev	si:docker	
+speedtest	speedtest	Speedtest	other	si:speedtest	
+notion	notion	Notion	other	si:notion	
+canva	canva	Canva	other	fav:canva.com	
+trello	trello	Trello	other	si:trello	
+nordvpn	nordvpn	NordVPN	vpn	si:nordvpn	
+bitwarden	bitwarden	Bitwarden	other	si:bitwarden	
+imdb	imdb	IMDb	other	si:imdb	
+duckduckgo	duckduckgo	DuckDuckGo	other	si:duckduckgo	
+yandex	yandex	Yandex	other	fav:yandex.ru	
+baidu	baidu	Baidu	other	si:baidu	
+bing	bing	Bing	other	fav:bing.com	
+xiaomi	xiaomi	Xiaomi	smarthome	si:xiaomi	
+@org	netflix	netflix	Netflix	video	si:netflix	
+@org	youtube	youtube	YouTube	video	si:youtube	
+@org	zoom-video-comm	zoom	Zoom	calls	si:zoom	
+@org	valve-corporation	steam	Steam	gaming	si:steam	
+@org	sony interactive entertainment	playstation	PlayStation	gaming	si:playstation	
+@org	roblox	roblox	Roblox	gaming	si:roblox	
+@org	nintendo	nintendo	Nintendo	gaming	fav:nintendo.com	
+@org	tiktok	tiktok	TikTok	social	si:tiktok	
+@org	facebook	facebook	Facebook	social	si:facebook	
+@org	twitter	twitter	X (Twitter)	social	si:x	
+@org	linkedin	linkedin	LinkedIn	social	fav:linkedin.com	
+@org	telegram	telegram	Telegram	messaging	si:telegram	
+@org	signal-as	signal	Signal	messaging	si:signal	
+@org	dropbox	dropbox	Dropbox	cloud	si:dropbox	
+@org	apple	apple	Apple	cloud	si:apple	
+@org	google	google	Google	cloud	si:google	
+@org	microsoft	microsoft	Microsoft	cloud	fav:microsoft.com	
+@org	amazon	amazon	Amazon	cloud	fav:amazon.com	
+@org	akamai	akamai	Akamai	other	si:akamai	
+@org	cloudflare	cloudflare	Cloudflare	other	si:cloudflare	
+@org	fastly	fastly	Fastly	other	si:fastly	
+
+# Static ranges and ports (stage 2b). Sources: Google Public DNS, Cloudflare 1.1.1.1 and Quad9 documentation
+# (anycast resolver addresses); WireGuard and OpenVPN default ports.
+@addr	8.8.8.8/32	doh-google	Google Public DNS	doh	si:google	
+@addr	8.8.4.4/32	doh-google	Google Public DNS	doh	si:google	
+@addr	2001:4860:4860::8888/128	doh-google	Google Public DNS	doh	si:google	
+@addr	2001:4860:4860::8844/128	doh-google	Google Public DNS	doh	si:google	
+@addr	1.1.1.1/32	doh-cloudflare	Cloudflare DNS	doh	si:cloudflare	
+@addr	1.0.0.1/32	doh-cloudflare	Cloudflare DNS	doh	si:cloudflare	
+@addr	2606:4700:4700::1111/128	doh-cloudflare	Cloudflare DNS	doh	si:cloudflare	
+@addr	2606:4700:4700::1001/128	doh-cloudflare	Cloudflare DNS	doh	si:cloudflare	
+@addr	9.9.9.9/32	doh-quad9	Quad9	doh	si:quad9	
+@addr	149.112.112.112/32	doh-quad9	Quad9	doh	si:quad9	
+@port	udp	51820	wireguard	WireGuard	vpn	si:wireguard	
+@port	udp	1194	openvpn	OpenVPN	vpn	si:openvpn	
+@port	tcp	1194	openvpn	OpenVPN	vpn	si:openvpn	

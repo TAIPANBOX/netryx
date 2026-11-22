@@ -1,0 +1,14 @@
+{
+  "name": "netryx-console",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The netryx console page. Built on forge by build.sh into internal/web/dist.",
+  "dependencies": {
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}

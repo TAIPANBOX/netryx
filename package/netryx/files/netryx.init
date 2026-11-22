@@ -1,0 +1,161 @@
+#!/bin/sh /etc/rc.common
+# netryx runs as a procd service, configured from /etc/config/netryx.
+#
+# The settings are read here and passed on the command line rather than parsed
+# in the binary. It keeps one description of each option instead of two, and
+# it means `netryx serve` behaves the same whether procd or a person starts it.
+START=95
+STOP=10
+USE_PROCD=1
+
+start_service() {
+	# A module that is installed is not necessarily loaded before the first
+	# boot after installation.
+	for m in nf_conntrack nf_conntrack_netlink nfnetlink_log; do
+		grep -q "^$m " /proc/modules 2>/dev/null || modprobe "$m" 2>/dev/null
+	done
+
+	# Without accounting the kernel keeps no byte counters on a connection,
+	# and every volume in the console reads zero. It is switched on here and
+	# left on after the service stops: other users of the counters gain from
+	# it, and switching it off under them would zero theirs.
+	sysctl -w net.netfilter.nf_conntrack_acct=1 >/dev/null 2>&1
+
+	config_load netryx
+	local ifaces mode listen group snaplen capture geo apps oui state wan ping meta fetch
+	config_get ifaces main interface 'br-lan'
+	config_get mode main mode 'ingress'
+	config_get listen main listen '127.0.0.1:8788'
+	config_get group main log_group '7'
+	config_get_bool capture main capture 1
+	local pdns
+	config_get_bool pdns main passive_dns 1
+	config_get geo main geo '/usr/share/netryx/ip2asn-combined.tsv.gz'
+	config_get apps main apps '/usr/share/netryx/appmap.tsv'
+	config_get oui main oui '/usr/share/netryx/oui.txt'
+	config_get meta main meta '/usr/share/netryx/apps-meta.json'
+	config_get_bool fetch main fetch_icons 1
+	config_get state main state '/etc/netryx'
+	config_get wan main wan 'wan'
+	config_get ping main ping_target ''
+	local cert key mtoken memlimit
+	config_get cert main cert '/etc/uhttpd.crt'
+	config_get key main key '/etc/uhttpd.key'
+	config_get mtoken main metrics_token ''
+	config_get memlimit main memory_limit '160MiB'
+	[ -n "$state" ] || state=/etc/netryx
+
+	# History and labels live here, readable by root only: it is a record of
+	# what each device did. The service writes one small file an hour.
+	[ -d "$state" ] || mkdir -p -m 0700 "$state"
+
+	# Rule schedules are written in the router's own zone.
+	local zone
+	zone=$(uci -q get system.@system[0].zonename)
+	[ -n "$zone" ] || zone=UTC
+
+	# The rules outlive netryx: their table stays in the kernel when the
+	# service stops or crashes, and after a reboot it is loaded here, before
+	# netryx starts, from the files netryx wrote (the ruleset, then what the
+	# app sets held), so the rules hold from the first packet. The schedules
+	# in it are UTC hours, hence TZ=UTC. A table already in the kernel is
+	# left as it is: netryx keeps it current.
+	if ! nft list table inet netryx_rules >/dev/null 2>&1; then
+		local f out
+		for f in "$state/rules.nft" "$state/sets.nft"; do
+			[ -f "$f" ] || continue
+			out=$(TZ=UTC nft -f "$f" 2>&1) || logger -t netryx "could not load $f: $out"
+		done
+	fi
+
+	# The Go runtime reads its soft heap limit from GOMEMLIMIT, as an int64 of
+	# bytes, and a value it cannot parse stops the service at start. Only a
+	# whole number above zero is passed, with B or KiB (at most 15 digits),
+	# MiB (at most 12) or GiB (at most 9), all under 2^63 bytes; anything else
+	# is logged and the service runs without a limit (a zero would keep the
+	# collector running without pause). Empty means no limit.
+	if [ -n "$memlimit" ]; then
+		local n max
+		case "$memlimit" in
+		*KiB) n=${memlimit%KiB} max=15 ;;
+		*MiB) n=${memlimit%MiB} max=12 ;;
+		*GiB) n=${memlimit%GiB} max=9 ;;
+		*B) n=${memlimit%B} max=15 ;;
+		*) n= max=0 ;;
+		esac
+		case "$n" in
+		'' | *[!0-9]*) n= ;;
+		*[!0]*) [ "${#n}" -le "$max" ] || n= ;;
+		*) n= ;;
+		esac
+		if [ -z "$n" ]; then
+			logger -t netryx "memory_limit '$memlimit' is not a number above zero with B or KiB (up to 15 digits), MiB (up to 12) or GiB (up to 9): no memory limit set"
+			memlimit=
+		fi
+	fi
+
+	# uci gives a list as space separated words; the binary takes commas.
+	ifaces=$(echo "$ifaces" | tr ' ' ',')
+
+	procd_open_instance
+	# Every option is written -name=value: Go's flag package takes a boolean's
+	# value only after "=", and a value given as the next word ends the parse,
+	# so every option after it would be dropped without a word. serve refuses
+	# a command line with words left over.
+	procd_set_param command /usr/sbin/netryx serve \
+		-watch-iface="$ifaces" \
+		-mode="$mode" \
+		-addr="$listen" \
+		-group="$group" \
+		-capture="$([ "$capture" = 1 ] && echo true || echo false)" \
+		-dns="$([ "$pdns" = 1 ] && echo true || echo false)" \
+		-geo="$geo" \
+		-apps="$apps" \
+		-oui="$oui" \
+		-meta="$meta" \
+		-fetch-icons="$([ "$fetch" = 1 ] && echo true || echo false)" \
+		-state="$state" \
+		-wan="$wan" \
+		-ping="$ping" \
+		-zone="$zone" \
+		-cert="$cert" \
+		-key="$key"
+	# The scrape token goes in the service's environment, which only root can
+	# read; on the command line every user's ps would show it. procd keeps the
+	# last env given to an instance, so everything goes in one call.
+	set --
+	[ -n "$mtoken" ] && set -- "$@" NETRYX_METRICS_TOKEN="$mtoken"
+	[ -n "$memlimit" ] && set -- "$@" GOMEMLIMIT="$memlimit"
+	[ $# -gt 0 ] && procd_set_param env "$@"
+	# The service installs an nftables rule and opens netlink sockets, so it
+	# needs CAP_NET_ADMIN. procd's `capabilities` parameter takes the path to a
+	# capabilities file and applies it under ujail, which is not what a bare
+	# list of capability names does, so the honest statement is that this runs
+	# as root today. Narrowing it is worth doing and is not done yet.
+	procd_set_param respawn 3600 5 0
+	# On a stop the service writes its history before it exits; procd's
+	# default of 5 s before SIGKILL is tight on a slow flash.
+	procd_set_param term_timeout 15
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+# A reload starts the instance again only if its command line changed (a
+# setting only the start reads); otherwise serve reads its rules again on
+# SIGHUP and goes on with the same process.
+reload_service() {
+	rc_procd start_service
+	procd_send_signal netryx '*' HUP
+}
+
+service_triggers() {
+	procd_add_reload_trigger "netryx"
+	# The zone the schedules are written in is the system's.
+	procd_add_reload_trigger "system"
+	# The rule is attached to the bridge's member devices, so a network reload
+	# can take a device away under it. The service supervises that itself and
+	# reattaches within fifteen seconds; the reload reaches serve as a SIGHUP,
+	# which reads the rules again and changes nothing when nothing changed.
+	procd_add_reload_trigger "network"
+}
