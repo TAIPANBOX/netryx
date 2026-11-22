@@ -12,7 +12,8 @@ import { getJSON, mac as enc, sendJSON, usePoll } from "../api";
 import { useSession } from "../ui";
 import { cutNote, type CutAnswer } from "../live";
 import { countryName, time } from "../format";
-import { activePause, appliesTo, pauseBody, stateOf, untilText, type PauseKind, type Rule, type RuleBody } from "../rules";
+import { ruleTagText } from "../house";
+import { activePause, appliesTo, describeRule, pauseBody, stateOf, untilText, type Names, type PauseKind, type Rule, type RuleBody } from "../rules";
 
 export const CDN_NOTE = "a service of this country reached through a CDN in another country is not blocked this way";
 export const CUT_NOTE = "the app may connect again at once unless a rule stops it";
@@ -119,8 +120,12 @@ export function BlockCountry({ cc }: { cc: string }) {
   );
 }
 
-/** An app row: block it on this device or for everyone, always; a schedule is set on the Rules tab. */
-export function BlockApp({ appId, name, mac }: { appId: string; name: string; mac: string }) {
+/**
+ * An app row: block it on this device or for everyone, always; a schedule is
+ * set on the Rules tab. Without a device (the house's Apps screen) only "for
+ * everyone" is offered.
+ */
+export function BlockApp({ appId, name, mac = "" }: { appId: string; name: string; mac?: string }) {
   const { canWrite } = useSession();
   const c = useChange();
   if (!canWrite || !appId || appId === "other" || appId === "unknown" || name.includes(" · ")) return null;
@@ -130,12 +135,33 @@ export function BlockApp({ appId, name, mac }: { appId: string; name: string; ma
     <div class="mini-actions">
       {!c.s.note && (
         <Fragment>
-          <button type="button" class="btn-mini" disabled={c.s.busy} onClick={() => go("device")}>Block on this device</button>
+          {mac && <button type="button" class="btn-mini" disabled={c.s.busy} onClick={() => go("device")}>Block on this device</button>}
           <button type="button" class="btn-mini" disabled={c.s.busy} onClick={() => go("all")}>Block for everyone</button>
         </Fragment>
       )}
       <Outcome s={c.s} undo={() => void c.undo()} />
     </div>
+  );
+}
+
+/**
+ * The rules that already close an app or a country, as tags that say their
+ * state and lead to the Rules tab; the whole rule is in the tag's title.
+ */
+export function RuleTags({ rules, names }: { rules: Rule[]; names?: Names }) {
+  if (rules.length === 0) return null;
+  const now = Date.now();
+  return (
+    <span class="rule-tags">
+      {rules.map((r) => {
+        const st = stateOf(r, now);
+        return (
+          <a key={r.id} href="#/rules" class={`rule-tag rule-tag-${st.kind}`} title={`${describeRule(r, names)} · ${st.text}`}>
+            {ruleTagText(r, now)}
+          </a>
+        );
+      })}
+    </span>
   );
 }
 

@@ -1,4 +1,4 @@
-// The console's entry: a hash router over four screens and the period every
+// The console's entry: a hash router over the screens and the period every
 // screen shares. Routes are #/, #/clients, #/client/<mac>, #/flows, #/rules.
 // Behind them is the login: with no session, or after a 401 anywhere, the
 // login takes the page and gives it back at the screen it interrupted.
@@ -19,6 +19,8 @@ import { FiltersScreen } from "./screens/Filters";
 import { Security } from "./screens/Security";
 import { Rules } from "./screens/Rules";
 import { Login } from "./screens/Login";
+import { Apps, AppScreen } from "./screens/Apps";
+import { Destinations, Destination } from "./screens/Destinations";
 
 // The period is a per-viewer convenience; storage may be missing (a private
 // window, a blocked site), and then the page simply starts at 24 hours.
@@ -154,6 +156,14 @@ function Screen() {
       return <FiltersScreen />;
     case "security":
       return <Security />;
+    case "apps":
+      return <Apps range={range} onRange={pick} />;
+    case "app":
+      return <AppScreen key={route.id} id={route.id} range={range} onRange={pick} />;
+    case "destinations":
+      return <Destinations range={range} onRange={pick} />;
+    case "destination":
+      return <Destination key={route.cc} cc={route.cc} range={range} onRange={pick} />;
     default:
       return <Overview range={range} onRange={pick} />;
   }

@@ -11,15 +11,15 @@ import { logout } from "./api";
 import { time } from "./format";
 import { appIcon, type IconManifest } from "./icons";
 
-type Section = "overview" | "clients" | "flows" | "rules" | "security";
+type Section = "overview" | "clients" | "apps" | "destinations" | "flows" | "rules" | "security";
 
 // The sections the mockup names that this stage does not have yet are shown
 // greyed out, so the layout matches and nothing pretends to work.
 const NAV: { id: Section | null; label: string; href?: string }[] = [
   { id: "overview", label: "Overview", href: "#/" },
   { id: "clients", label: "Clients", href: "#/clients" },
-  { id: null, label: "Apps" },
-  { id: null, label: "Destinations" },
+  { id: "apps", label: "Apps", href: "#/apps" },
+  { id: "destinations", label: "Destinations", href: "#/destinations" },
   { id: "flows", label: "Flows", href: "#/flows" },
   { id: "security", label: "Security", href: "#/security" },
   { id: "rules", label: "Rules", href: "#/rules" },

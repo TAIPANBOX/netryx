@@ -35,6 +35,7 @@ type Flows interface {
 type History interface {
 	Series(rollup.Filter, time.Time, time.Time, time.Duration, string) []rollup.Point
 	Top(rollup.Filter, string, time.Time, time.Time, int) []rollup.Row
+	Pairs(rollup.Filter, string, string, time.Time, time.Time) map[string][]rollup.Row
 }
 
 // Apps names an app id from the catalog of rules, so a name does not depend
@@ -156,6 +157,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/destinations", s.route(s.destinations))
 	mux.HandleFunc("/api/devices/{mac}/live", s.route(s.live))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
+	s.houseRoutes(mux)
 	// Without this the mux would answer an unknown path in plain text.
 	mux.HandleFunc("/api/", s.route(func(*http.Request) (any, error) {
 		return nil, httpError{http.StatusNotFound, "no such route"}

@@ -20,6 +20,8 @@ const shots = [
   ["flows", "#/flows?q=" + encodeURIComponent('client:"Sam\'s phone"'), 1440, 900],
   ["rules", "#/rules", 1440, 900],
   ["security", "#/security", 1440, 1000],
+  ["apps", "#/apps", 1440, 1000],
+  ["destinations", "#/destinations", 1440, 1000],
 ];
 // One login; every view reuses its cookie.
 const first = await browser.newContext();

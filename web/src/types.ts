@@ -17,7 +17,7 @@ export interface Wan {
 
 // other marks a rollup catch-all row (the "other" key or country "--"): it is
 // shown as "others", never linked and never counted as one client or app.
-interface Row { other?: boolean }
+export interface Row { other?: boolean }
 
 export interface TopClient extends Row {
   mac: string; name: string; down: number; up: number; topApp: App | null; countries: string[] | null;
@@ -99,4 +99,29 @@ export interface Group {
   id: string;
   name: string;
   members: string[];
+}
+
+// The house-wide views (GET /api/apps, /api/apps/{id}, /api/destinations,
+// /api/destinations/{cc}), mirrored from internal/api/house.go.
+export interface ClientRef extends Row { mac: string; name: string; down: number; up: number }
+export interface HouseApp extends Row {
+  app: App; down: number; up: number; flows: number; share: number;
+  /** How many clients used it; top names the busiest few. */
+  clients: number; top: ClientRef[];
+}
+export interface Network extends Row { cc: string; asn: string; org: string; down: number; up: number }
+export interface AppDetail {
+  app: App; down: number; up: number; flows: number; share: number;
+  /** Every client of the app; clients lists the busiest 50. */
+  clientCount: number; clients: ClientRef[]; places: Network[]; domains: Domain[]; series: SeriesPoint[];
+}
+export interface HouseCountry extends Row { cc: string; down: number; up: number; share: number; clients: number; top: ClientRef[] }
+export interface HouseDestinations {
+  countries: HouseCountry[];
+  networks: Network[];
+  domains: ({ name: string; app: App | null; down: number; up: number } & Row)[];
+}
+export interface CountryDetail {
+  cc: string; down: number; up: number; share: number;
+  clientCount: number; clients: ClientRef[]; apps: ({ app: App; down: number; up: number } & Row)[]; networks: Network[]; series: SeriesPoint[];
 }

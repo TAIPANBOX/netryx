@@ -1033,6 +1033,15 @@ func (s *Store) Top(f Filter, dim string, from, to time.Time, n int) []Row {
 	default:
 		return nil
 	}
+	rows := ranked(acc)
+	if n > 0 && len(rows) > n {
+		rows = rows[:n]
+	}
+	return rows
+}
+
+// ranked orders a top list: most bytes first, then by key, then by app.
+func ranked(acc map[string]*Row) []Row {
 	rows := make([]Row, 0, len(acc))
 	for _, r := range acc {
 		rows = append(rows, *r)
@@ -1046,8 +1055,47 @@ func (s *Store) Top(f Filter, dim string, from, to time.Time, n int) []Row {
 		}
 		return rows[i].Extra["app"] < rows[j].Extra["app"]
 	})
-	if n > 0 && len(rows) > n {
-		rows = rows[:n]
-	}
 	return rows
+}
+
+// Pairs answers, in one pass over the keys, what Top(f with dim set to k, by)
+// answers for every k of dim: for each app or country, the devices (or apps,
+// or countries) that moved its bytes, ranked as Top ranks them. dim and by
+// are two different dimensions every key carries (mac, app, cc); anything
+// else is nil.
+func (s *Store) Pairs(f Filter, dim, by string, from, to time.Time) map[string][]Row {
+	keyDim := func(d string) bool { return d == "mac" || d == "app" || d == "cc" }
+	if !keyDim(dim) || !keyDim(by) || dim == by {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	acc := map[string]map[string]*Row{}
+	from, to = from.UTC(), to.UTC()
+	l := s.finest(from, 0)
+	s.eachKeys(l, from.Truncate(s.ringOf(l).step), to, func(_ time.Time, keys map[Key]Bytes) {
+		for k, b := range keys {
+			if !f.match(k) {
+				continue
+			}
+			a, _ := splitKey(k, dim)
+			c, _ := splitKey(k, by)
+			m := acc[a]
+			if m == nil {
+				m = map[string]*Row{}
+				acc[a] = m
+			}
+			r := m[c]
+			if r == nil {
+				r = &Row{Key: c}
+				m[c] = r
+			}
+			r.Bytes = add(r.Bytes, b)
+		}
+	})
+	out := make(map[string][]Row, len(acc))
+	for a, m := range acc {
+		out[a] = ranked(m)
+	}
+	return out
 }

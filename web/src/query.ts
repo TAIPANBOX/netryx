@@ -10,9 +10,13 @@ export type Route =
   | { name: "flows"; q: string }
   | { name: "rules" }
   | { name: "filters" }
-  | { name: "security" };
+  | { name: "security" }
+  | { name: "apps" }
+  | { name: "app"; id: string }
+  | { name: "destinations" }
+  | { name: "destination"; cc: string };
 
-/** Reads a location hash: #/, #/clients, #/client/<mac>, #/flows?q=..., #/rules, #/rules/filters, #/security */
+/** Reads a location hash: #/, #/clients, #/client/<mac>, #/flows?q=..., #/rules, #/rules/filters, #/security, #/apps, #/app/<id>, #/destinations, #/destination/<cc> */
 export function parseRoute(hash: string): Route {
   const raw = hash.replace(/^#/, "");
   const [path, query = ""] = raw.split("?", 2);
@@ -35,6 +39,23 @@ export function parseRoute(hash: string): Route {
       return { name: "flows", q: new URLSearchParams(query).get("q") ?? "" };
     case "security":
       return { name: "security" };
+    case "apps":
+      return { name: "apps" };
+    case "app": {
+      let id = "";
+      try {
+        id = decodeURIComponent(parts[1] ?? "");
+      } catch {
+        id = "";
+      }
+      return /^[a-z0-9][a-z0-9._+-]{0,63}$/.test(id) ? { name: "app", id } : { name: "apps" };
+    }
+    case "destinations":
+      return { name: "destinations" };
+    case "destination": {
+      const cc = (parts[1] ?? "").toUpperCase();
+      return /^[A-Z]{2}$/.test(cc) ? { name: "destination", cc } : { name: "destinations" };
+    }
     default:
       return { name: "overview" };
   }
