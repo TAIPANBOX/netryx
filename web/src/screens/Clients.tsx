@@ -1,8 +1,10 @@
 // Clients: every device the router knows, as a table with the columns of the
 // spec's section 2.2. Not in the mockup; styled like its tables.
 
-import { h } from "preact";
-import { useState } from "preact/hooks";
+import { h, type ComponentChildren } from "preact";
+import { useRef, useState } from "preact/hooks";
+import { windowLabel, type Win } from "../query";
+import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { Device, Group } from "../types";
 import { getJSON, mac, usePoll } from "../api";
 import { Header, Status, Loading, Empty, AppIcon } from "../ui";
@@ -31,21 +33,40 @@ function matches(d: Device, q: string, groups: Group[]): boolean {
   return q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
 }
 
-export function Clients() {
-  const polled = usePoll((s) => getJSON<Device[]>("/api/devices", s), 10_000, []);
+const recentTotal = (d: Device) => (d.recent ? d.recent.down + d.recent.up : 0);
+
+export function Clients({ win, onWin }: { win: Win; onWin: (w: Win) => void }) {
+  const polled = usePoll((s) => getJSON<Device[]>(`/api/devices?window=${win}`, s), 10_000, [win]);
   const groupsPolled = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []);
   const groups = groupsPolled.data ?? [];
   const [q, setQ] = useState("");
   const all = polled.data ?? [];
-  // Online first, then by traffic: the devices that matter now are on top.
-  const rows = all
-    .filter((d) => matches(d, q, groups))
-    .sort((a, b) => Number(b.online) - Number(a.online) || b.last24h.down + b.last24h.up - (a.last24h.down + a.last24h.up));
+  const found = all.filter((d) => matches(d, q, groups));
   const online = all.filter((d) => d.online).length;
+  // The busiest over the window first by default; any column sorts, and
+  // rows move at most every 30 s.
+  const { rows, sort, pick } = useSteadyRows(
+    "clients",
+    found,
+    (d) => d.mac,
+    {
+      state: (d) => Number(d.online),
+      name: (d) => deviceName(d),
+      vendor: (d) => d.vendor,
+      now: recentTotal,
+      day: (d) => d.last24h.down + d.last24h.up,
+      countries: (d) => d.countryCount,
+      last: (d) => Date.parse(d.last) || 0,
+    },
+    { col: "now", dir: "desc" },
+  );
+  const body = useRef<HTMLTableSectionElement>(null);
+  useFlip(body);
+  const th = (label: ComponentChildren, col: string, first: "asc" | "desc" = "desc", num = false) => <SortTh label={label} col={col} sort={sort} pick={pick} first={first} num={num} />;
 
   return (
     <div class="page">
-      <Header section="clients" note="Traffic over 24 h" />
+      <Header section="clients" note="Traffic over 24 h" win={win} onWin={onWin} />
       <main class="main">
         <Status polled={polled} />
         <div class="toolbar">
@@ -68,23 +89,23 @@ export function Clients() {
               <table class="table clients-table">
                 <thead>
                   <tr>
-                    <th>State</th>
-                    <th>Name</th>
-                    <th>Vendor</th>
+                    {th("State", "state")}
+                    {th("Name", "name", "asc")}
+                    {th(`Now, ${windowLabel(win)} avg ↓ · ↑`, "now", "desc", true)}
+                    {th("24 h ↓ · ↑", "day", "desc", true)}
+                    <th>App</th>
+                    {th("Vendor", "vendor", "asc")}
                     <th>IPv4 · IPv6</th>
                     <th>MAC</th>
                     <th>Connection</th>
                     <th>Group</th>
-                    <th class="num">Now ↓ · ↑</th>
-                    <th class="num">24 h ↓ · ↑</th>
-                    <th>App</th>
-                    <th class="num">Countries</th>
-                    <th>Last seen</th>
+                    {th("Countries", "countries", "desc", true)}
+                    {th("Last seen", "last")}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody ref={body}>
                   {rows.map((d) => (
-                    <tr key={d.mac}>
+                    <tr key={d.mac} data-key={d.mac}>
                       <td>
                         <span class={d.online ? "dot dot-on" : "dot dot-off"} aria-hidden="true" />
                         <span class="sr">{d.online ? "online" : "offline"}</span>
@@ -92,6 +113,24 @@ export function Clients() {
                       <td>
                         <a href={`#/client/${mac(d.mac)}`} class="strong">{deviceName(d)}</a>
                         {d.hostname && d.hostname !== deviceName(d) && <div class="muted small">{d.hostname}</div>}
+                      </td>
+                      <td class="num small" title={`average over the last ${windowLabel(win)}; right now ↓ ${rate(d.rate.down)} · ↑ ${rate(d.rate.up)}`}>
+                        ↓ {rate(d.recent?.down ?? 0)}
+                        <br />{" "}↑ {rate(d.recent?.up ?? 0)}
+                      </td>
+                      <td class="num small">
+                        ↓ {bytes(d.last24h.down)}
+                        <br />{" "}↑ {bytes(d.last24h.up)}
+                      </td>
+                      <td>
+                        {d.topApp ? (
+                          <span class="app-cell">
+                            <AppIcon id={d.topApp.id} name={appName(d.topApp.name)} size={20} />
+                            <span>{appName(d.topApp.name)}</span>
+                          </span>
+                        ) : (
+                          "-"
+                        )}
                       </td>
                       <td class="soft">{d.vendor || "-"}</td>
                       <td class="mono small">
@@ -106,24 +145,6 @@ export function Clients() {
                       </td>
                       <td class="soft small">{linkText(d)}</td>
                       <td class="soft">{groupName(d.group, groups) || "-"}</td>
-                      <td class="num small">
-                        ↓ {rate(d.rate.down)}
-                        <br />↑ {rate(d.rate.up)}
-                      </td>
-                      <td class="num small">
-                        ↓ {bytes(d.last24h.down)}
-                        <br />↑ {bytes(d.last24h.up)}
-                      </td>
-                      <td>
-                        {d.topApp ? (
-                          <span class="app-cell">
-                            <AppIcon id={d.topApp.id} name={appName(d.topApp.name)} size={20} />
-                            <span>{appName(d.topApp.name)}</span>
-                          </span>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
                       <td class="num">{d.countryCount}</td>
                       <td class="soft small">{d.online ? "online now" : `${date(d.last)} ${time(d.last)}`}</td>
                     </tr>

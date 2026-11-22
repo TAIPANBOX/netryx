@@ -638,6 +638,28 @@ enforced, and that is a debt rather than a decision.
   (test: `TestTheHouseAppsCountOnlyClients`, `TestARowWithoutClientsSaysWhoseTrafficItIs`,
   `TestAnAppDetailShowsItsClientsPlacesDomainsAndSeries`)
 
+## The promise about calm live figures
+
+- **Now is the average over a sliding window** (1, 3 or 10 minutes, 3 by
+  default), from the rollup's minutes: `Recent` sums the minutes from
+  now-window, to the minute, and divides by the time they cover, which after a
+  restart starts at the store's first delta. Clients, Apps, Destinations and a
+  client's apps carry it as `recent`; a window other than 1m, 3m or 10m is a 400.
+  (test: `TestRecentSumsTheMinutesOfTheWindow`, `TestRecentCoversOnlyWhatTheStoreSaw`,
+  `TestRecentReadsOnlyTheDimensionsKeysCarry`, `TestTheNowColumnsAreTheWindowsAverage`,
+  `TestTheWindowIsOneThreeOrTenMinutes`)
+- **The live flows rank by what they moved over the window**: each live flow
+  keeps its bytes of the last 11 minutes (176 bytes a flow, 1.4 MB for a full
+  table), and a live read with a window returns the busiest over it, with those
+  bytes, as one page. (test: `TestLiveFlowsCanBeReadByRecentVolume`,
+  `TestOldMinutesFallOutOfTheWindow`, `TestASlotReusedLaterHoldsNothingOld`, `TestAReusedKeyStartsItsWindowEmpty`, `TestLiveFlowsAreAskedByTheWindow`)
+- **Rows hold still**: they move at most every 30 s and only when two rows
+  shown in the wrong order differ by more than 12%; a new row takes its place
+  at once; any column sorts either way and the choice is kept per table (the
+  live flows and the journal apart); Pause stops every poll but the first after
+  a screen opens or its question changes. (the page: `web/src/steady.test.ts`;
+  the glide itself is not enforced by a test, measured in the lab)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's
@@ -775,7 +797,8 @@ enforced, and that is a debt rather than a decision.
 - **A page left open across an upgrade learns of it**: build.sh writes the
   page's build (a digest of its sources) into the bundle and beside it, every
   API answer names the build served (`X-Netryx-Build`), and a page that sees
-  another offers a reload. (test: `TestEveryAnswerNamesTheBuildServed`,
+  another offers a reload; on the login, where nothing is lost (a restart ends
+  the session), it reloads itself, once for each build. (test: `TestEveryAnswerNamesTheBuildServed`,
   `TestTheBuildIsReadFromBesideThePage`; the page: "a page left open across an
   upgrade is told the router serves a newer one" in `web/src/api.test.ts`)
 

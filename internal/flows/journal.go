@@ -1,6 +1,7 @@
 package flows
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,9 @@ type Query struct {
 	From, To           time.Time
 	Limit              int    // 100 when zero, never more than 500
 	Cursor             string // the next value of the previous page
+	// Window, with Live, ranks the live flows by the bytes each moved over
+	// the last minutes (WinUp and WinDown) instead of newest first.
+	Window time.Duration
 }
 
 const (
@@ -81,6 +85,39 @@ func (t *Table) Query(q Query) (rows []Flow, next string) {
 		}
 		rows = append(rows, *f)
 		return true
+	}
+	if q.Live && q.Window > 0 {
+		// Ranked by recent volume, the whole page at once: the order of the
+		// bytes moved has no stable cursor, so there is no next page.
+		type ranked struct {
+			en       *entry
+			up, down uint64
+		}
+		var all []ranked
+		for _, en := range t.live {
+			t.resolve(en)
+			if !m.match(&en.Flow) {
+				continue
+			}
+			up, down := en.winBytes(t.lastSync, q.Window)
+			all = append(all, ranked{en, up, down})
+		}
+		sort.Slice(all, func(i, j int) bool {
+			a, b := all[i].up+all[i].down, all[j].up+all[j].down
+			if a != b {
+				return a > b
+			}
+			return all[i].en.seq > all[j].en.seq
+		})
+		for _, r := range all {
+			if len(rows) == limit {
+				break
+			}
+			f := r.en.Flow
+			f.WinUp, f.WinDown = r.up, r.down
+			rows = append(rows, f)
+		}
+		return rows, ""
 	}
 	if q.Live {
 		for _, en := range t.liveNewestFirst(cursor) {

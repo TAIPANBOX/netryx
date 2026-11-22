@@ -9,7 +9,7 @@ import type { Range } from "./types";
 import type { IconManifest } from "./icons";
 import { getJSON, getSession, onUnauthorized } from "./api";
 import { IconContext, SessionContext, type SessionInfo } from "./ui";
-import { parseRoute, RANGES } from "./query";
+import { parseRoute, RANGES, WINDOWS, type Win } from "./query";
 import { nextLogin } from "./rules";
 import { Overview } from "./screens/Overview";
 import { Clients } from "./screens/Clients";
@@ -33,6 +33,17 @@ function savedRange(): Range {
     // no storage: fall through to the default
   }
   return "24h";
+}
+
+// The window the Now columns average over, remembered as the period is.
+function savedWindow(): Win {
+  try {
+    const v = localStorage.getItem("netryx.window");
+    if (WINDOWS.some((w) => w.id === v)) return v as Win;
+  } catch {
+    // no storage: the default
+  }
+  return "3m";
 }
 
 // The icon manifest is loaded once for the whole page. Without it (no icon
@@ -134,6 +145,15 @@ function Screen() {
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
+  const [win, setWin] = useState<Win>(savedWindow);
+  const pickWin = (w: Win) => {
+    setWin(w);
+    try {
+      localStorage.setItem("netryx.window", w);
+    } catch {
+      // not remembered, still applied
+    }
+  };
   const pick = (r: Range) => {
     setRange(r);
     try {
@@ -146,11 +166,11 @@ function Screen() {
   const route = parseRoute(hash);
   switch (route.name) {
     case "clients":
-      return <Clients />;
+      return <Clients win={win} onWin={pickWin} />;
     case "client":
-      return <Client key={route.mac} mac={route.mac} range={range} onRange={pick} />;
+      return <Client key={route.mac} mac={route.mac} range={range} onRange={pick} win={win} onWin={pickWin} />;
     case "flows":
-      return <Flows key={route.q} initial={route.q} />;
+      return <Flows key={route.q} initial={route.q} win={win} onWin={pickWin} />;
     case "rules":
       return <Rules />;
     case "filters":
@@ -158,11 +178,11 @@ function Screen() {
     case "security":
       return <Security />;
     case "apps":
-      return <Apps range={range} onRange={pick} />;
+      return <Apps range={range} onRange={pick} win={win} onWin={pickWin} />;
     case "app":
       return <AppScreen key={route.id} id={route.id} range={range} onRange={pick} />;
     case "destinations":
-      return <Destinations range={range} onRange={pick} />;
+      return <Destinations range={range} onRange={pick} win={win} onWin={pickWin} />;
     case "network":
       return <Network />;
     case "destination":

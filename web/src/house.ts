@@ -2,9 +2,9 @@
 // country, how a row names its clients, the search and the links. No DOM here,
 // so node tests cover it.
 
-import { stateOf, type Rule } from "./rules";
+import { manifestName, stateOf, type Names, type Rule } from "./rules";
 import type { ClientRef, HouseApp } from "./types";
-import { appName, category, clientName, plural } from "./format";
+import { appName, category, clientName, groupName, plural } from "./format";
 
 /** The rules that name this app, or its category. */
 export function rulesForApp(rules: Rule[] | undefined, app: { id: string; category: string }): Rule[] {
@@ -88,4 +88,18 @@ export function ruleTagText(r: Rule, nowMs: number): string {
 /** The Apps toolbar's count: a list cut at its bound is the busiest of a longer one. */
 export function appsSummary(n: number, max: number): string {
   return n >= max ? `the ${max} busiest apps` : plural(n, "app", "apps");
+}
+
+/** The names a rule's tag uses: a device by the name the console shows, a group and an app by theirs. */
+export function ruleNames(
+  devices: { mac: string; name: string; label: string; hostname: string }[],
+  groups: { id: string; name: string }[],
+  manifest: Record<string, { name?: string }> | null | undefined,
+): Names {
+  const dev = new Map(devices.map((d) => [d.mac.toLowerCase(), d.label || d.name || d.hostname]));
+  return {
+    device: (m) => dev.get(m.toLowerCase()) || m,
+    group: (id) => groupName(id, groups),
+    app: manifestName(manifest),
+  };
 }

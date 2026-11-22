@@ -158,3 +158,27 @@ test("a poller started in a hidden tab waits to be shown", async () => {
   assert.equal(calls.length, 1);
   p.dispose();
 });
+
+test("a page that turns still between polls asks no more until it moves again", async () => {
+  const { clock, advance } = fakeClock();
+  let calls = 0;
+  let still = false;
+  const p = createPoller<number>({
+    load: async () => ++calls,
+    everyMs: 1000,
+    clock,
+    hidden: () => still,
+    onData: () => {},
+    onError: () => {},
+  });
+  p.start();
+  await flush();
+  assert.equal(calls, 1);
+  still = true; // paused after the first answer, with no event to say so
+  await advance(5000);
+  assert.equal(calls, 1, "no poll while still");
+  still = false;
+  p.resume();
+  await flush();
+  assert.equal(calls, 2, "a poll as soon as it moves");
+});

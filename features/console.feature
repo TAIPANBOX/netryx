@@ -282,7 +282,9 @@ Feature: the console shows what each client did, by app and by place
     Given the console is open in a tab while the router is upgraded
     When the page next hears from the router
     Then it says the router now serves a newer console and offers a reload
+    And a page sent to the login by the restart reloads itself onto the newer one, once for each build
     # -> TestEveryAnswerNamesTheBuildServed
     # -> TestTheBuildIsReadFromBesideThePage
     # (the page: "a page left open across an upgrade is told the router serves a newer one" and
-    # "a newer build seen before anyone listens is still told to the first listener" in web/src/api.test.ts)
+    # "a newer build seen before anyone listens is still told to the first listener",
+    # "the login reloads itself onto a newer page once for each build the router serves" in web/src/api.test.ts)

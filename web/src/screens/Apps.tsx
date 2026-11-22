@@ -1,35 +1,56 @@
 // Apps: every app the house used in the period, and one app across the
 // house: who used it, where it went, how it was named, when it moved.
 
-import { h } from "preact";
-import { useState } from "preact/hooks";
+import { h, type ComponentChildren } from "preact";
+import { useRef, useState } from "preact/hooks";
+import { SortTh, useFlip, useSteadyRows } from "./table";
 import type { AppDetail, HouseApp, Range } from "../types";
 import { getJSON, mac, usePoll } from "../api";
-import { RANGES, stepOf } from "../query";
+import { RANGES, stepOf, windowLabel, type Win } from "../query";
 import { splitSeries, timeTicks } from "../geometry";
 import { AreaChart, Bars, Legend } from "../charts";
 import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
-import { bytes, share, num, appName, category, countryName, clientName, nameSource, plural } from "../format";
+import { bytes, rate, share, num, appName, category, countryName, clientName, nameSource, plural } from "../format";
 import { appHref, appsSummary, categoriesIn, clientsLine, closesHouse, countryHref, domainText, matchApp, rulesForApp } from "../house";
-import { BlockApp, RuleTags, useRules } from "./controls";
+import { BlockApp, RuleTags, useRuleNames, useRules } from "./controls";
 import { LAYER_COLORS, UP_COLOR } from "../view";
 
 const periodOf = (r: Range) => RANGES.find((x) => x.id === r)?.label ?? r;
 
-export function Apps({ range, onRange }: { range: Range; onRange: (r: Range) => void }) {
-  const polled = usePoll((s) => getJSON<HouseApp[]>(`/api/apps?range=${range}`, s), 15_000, [range]);
+export function Apps({ range, onRange, win, onWin }: { range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
+  const polled = usePoll((s) => getJSON<HouseApp[]>(`/api/apps?range=${range}&window=${win}`, s), 15_000, [range, win]);
   const { rules } = useRules();
+  const names = useRuleNames();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const all = polled.data ?? [];
   const cats = categoriesIn(all);
-  const rows = all.filter((a) => (!cat || a.app.category === cat) && matchApp(a, q));
+  const found = all.filter((a) => (!cat || a.app.category === cat) && matchApp(a, q));
+  const { rows, sort, pick } = useSteadyRows(
+    "apps",
+    found,
+    (a) => a.app.id,
+    {
+      name: (a) => appName(a.app.name),
+      category: (a) => category(a.app.category),
+      clients: (a) => a.clients,
+      share: (a) => a.share,
+      bytes: (a) => a.down + a.up,
+      now: (a) => (a.recent ? a.recent.down + a.recent.up : 0),
+    },
+    { col: "bytes", dir: "desc" },
+  );
+  const body = useRef<HTMLTableSectionElement>(null);
+  useFlip(body);
+  const th = (label: ComponentChildren, col: string, first: "asc" | "desc" = "desc", num = false, also?: string[]) => (
+    <SortTh label={label} col={col} sort={sort} pick={pick} first={first} num={num} also={also} />
+  );
   const down = all.reduce((s, a) => s + a.down, 0);
   const up = all.reduce((s, a) => s + a.up, 0);
 
   return (
     <div class="page">
-      <Header section="apps" range={range} onRange={onRange} />
+      <Header section="apps" range={range} onRange={onRange} win={win} onWin={onWin} />
       <main class="main">
         <Status polled={polled} />
         <div class="toolbar">
@@ -55,20 +76,21 @@ export function Apps({ range, onRange }: { range: Range; onRange: (r: Range) => 
               <table class="table house-table">
                 <thead>
                   <tr>
-                    <th>App</th>
-                    <th>Category</th>
-                    <th>Clients</th>
-                    <th>Share</th>
-                    <th class="num">↓ · ↑</th>
+                    {th("App", "name", "asc")}
+                    {th("Category", "category", "asc")}
+                    {th("Clients", "clients")}
+                    {th("Share", "share")}
+                    {th(`${periodOf(range)} ↓ · ↑`, "bytes", "desc", true)}
+                    {th(`Now, ${windowLabel(win)} avg`, "now", "desc", true)}
                     <th>Rules</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody ref={body}>
                   {rows.map((a) => {
                     const name = a.other ? "other apps" : appName(a.app.name);
                     const href = appHref(a);
                     return (
-                      <tr key={a.app.id}>
+                      <tr key={a.app.id} data-key={a.app.id}>
                         <td>
                           <span class="app-cell">
                             <AppIcon id={a.other ? "other" : a.app.id} name={name} size={24} />
@@ -87,7 +109,11 @@ export function Apps({ range, onRange }: { range: Range; onRange: (r: Range) => 
                           ↓ {bytes(a.down)}
                           <br />{" "}↑ {bytes(a.up)}
                         </td>
-                        <td class="small">{a.other ? "" : <RuleTags rules={rulesForApp(rules, a.app)} />}</td>
+                        <td class="num small">
+                          ↓ {rate(a.recent?.down ?? 0)}
+                          <br />{" "}↑ {rate(a.recent?.up ?? 0)}
+                        </td>
+                        <td class="small">{a.other ? "" : <RuleTags rules={rulesForApp(rules, a.app)} names={names} />}</td>
                       </tr>
                     );
                   })}
@@ -105,6 +131,7 @@ export function Apps({ range, onRange }: { range: Range; onRange: (r: Range) => 
 export function AppScreen({ id, range, onRange }: { id: string; range: Range; onRange: (r: Range) => void }) {
   const polled = usePoll((s) => getJSON<AppDetail>(`/api/apps/${encodeURIComponent(id)}?range=${range}`, s), 15_000, [id, range]);
   const { rules } = useRules();
+  const names = useRuleNames();
   const d = polled.data;
   return (
     <div class="page">
@@ -124,7 +151,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
                   <span class="soft small">
                     {category(d.app.category) || "no category"} · {plural(d.clientCount, "client", "clients")} · {share(d.share)} of the house's traffic
                   </span>
-                  <RuleTags rules={rulesForApp(rules, d.app)} />
+                  <RuleTags rules={rulesForApp(rules, d.app)} names={names} />
                 </div>
                 <span class="soft small right">
                   ↓ {bytes(d.down)}

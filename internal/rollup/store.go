@@ -391,7 +391,10 @@ type Store struct {
 	// at its first delta. The minutes are not saved, so before it only the
 	// hours and days know what happened, and a delta stamped earlier does
 	// not make the minutes before it whole.
-	since   time.Time
+	since time.Time
+	// firstAt is when the first delta was taken: nothing before it in its
+	// minute was counted, so a window starts there at the earliest.
+	firstAt time.Time
 	dropped uint64
 	late    uint64
 	minCap  int
@@ -563,6 +566,7 @@ func (s *Store) Add(d flows.Delta) {
 	}
 	if s.since.IsZero() {
 		s.since = now.Truncate(time.Minute)
+		s.firstAt = now
 	}
 	d.MAC, d.App, d.CC = s.intern(d.MAC), s.intern(d.App), s.intern(d.CC)
 	d.Domain, d.Org, d.NameSrc = s.intern(d.Domain), s.intern(d.Org), s.intern(d.NameSrc)
@@ -1098,4 +1102,52 @@ func (s *Store) Pairs(f Filter, dim, by string, from, to time.Time) map[string][
 		out[a] = ranked(m)
 	}
 	return out
+}
+
+// Recent sums the minutes of the last span by dim (mac, app or cc) and says
+// how long they cover: from now-span, to the minute, or the first minute the
+// store took if that is later, to now. The minutes are not saved, so after a
+// restart the window covers only what this run has seen, and a rate taken
+// from it is never divided by time nobody counted.
+func (s *Store) Recent(f Filter, dim string, span time.Duration) ([]Row, time.Duration) {
+	if dim != "mac" && dim != "app" && dim != "cc" || span <= 0 {
+		return nil, 0
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.since.IsZero() {
+		return nil, 0
+	}
+	now := s.now().UTC()
+	from := now.Add(-span).Truncate(time.Minute)
+	start := from
+	if start.Before(s.firstAt) {
+		start = s.firstAt.UTC()
+	}
+	if from.Before(s.since) {
+		from = s.since
+	}
+	covered := now.Sub(start)
+	if covered <= 0 {
+		return nil, 0
+	}
+	acc := map[string]*Row{}
+	for _, m := range s.mins {
+		if m == nil || !s.mr.holds(m.At) || m.At.Before(from) || m.At.After(now) {
+			continue
+		}
+		for k, b := range m.Keys {
+			if !f.match(k) {
+				continue
+			}
+			key, _ := splitKey(k, dim)
+			r := acc[key]
+			if r == nil {
+				r = &Row{Key: key}
+				acc[key] = r
+			}
+			r.Bytes = add(r.Bytes, b)
+		}
+	}
+	return ranked(acc), covered
 }

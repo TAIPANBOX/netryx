@@ -71,6 +71,17 @@ export const RANGES: { id: Range; label: string; step: number }[] = [
   { id: "30d", label: "30 days", step: 86400 },
 ];
 
+export type Win = "1m" | "3m" | "10m";
+/** The windows the Now columns average over. */
+export const WINDOWS: { id: Win; label: string }[] = [
+  { id: "1m", label: "1 min" },
+  { id: "3m", label: "3 min" },
+  { id: "10m", label: "10 min" },
+];
+export function windowLabel(w: Win): string {
+  return WINDOWS.find((x) => x.id === w)?.label ?? w;
+}
+
 export function stepOf(r: Range): number {
   return RANGES.find((x) => x.id === r)?.step ?? 600;
 }
@@ -110,10 +121,11 @@ export function parseFlowQuery(text: string, devices: { mac: string; name: strin
 }
 
 /** The /api/flows URL for a filter; empty filters are left out. */
-export function flowsPath(f: FlowFilter, o: { live: boolean; limit: number; cursor?: string }): string {
+export function flowsPath(f: FlowFilter, o: { live: boolean; limit: number; cursor?: string; window?: Win }): string {
   const p = new URLSearchParams();
   for (const k of ["q", "mac", "app", "cc", "dir"] as const) if (f[k]) p.set(k, f[k]);
   if (o.live) p.set("live", "1");
+  if (o.live && o.window) p.set("window", o.window);
   p.set("limit", String(o.limit));
   if (o.cursor) p.set("cursor", o.cursor);
   return "/api/flows?" + p.toString();

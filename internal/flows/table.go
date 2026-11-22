@@ -72,6 +72,53 @@ type entry struct {
 	// that opened halfway through an interval moved its bytes in half of it.
 	rateAt             time.Time
 	sinceUp, sinceDown uint64
+	// win holds the bytes (up, down) the flow moved in each of the last
+	// winSlots minutes, by unix minute modulo winSlots; winAt is the minute
+	// last written. 176 bytes a flow, 1.4 MB for a full table of 8192.
+	win   [winSlots][2]uint64
+	winAt int64
+}
+
+// winSlots is how many minutes a flow's recent volume reaches back: the
+// longest window (10 minutes) and the minute in progress.
+const winSlots = 11
+
+// addWin files bytes the flow moved under the minute of now, clearing the
+// minutes it skipped since it last moved.
+func (en *entry) addWin(now time.Time, up, down uint64) {
+	m := now.Unix() / 60
+	if m != en.winAt {
+		if en.winAt == 0 || m-en.winAt >= winSlots || m < en.winAt {
+			en.win = [winSlots][2]uint64{}
+		} else {
+			for k := en.winAt + 1; k <= m; k++ {
+				en.win[k%winSlots] = [2]uint64{}
+			}
+		}
+		en.winAt = m
+	}
+	i := m % winSlots
+	en.win[i][0] += up
+	en.win[i][1] += down
+}
+
+// winBytes is what the flow moved over the window ending at now: the minute
+// in progress and the whole minutes before it, back to now-span, to the
+// minute (as rollup.Recent reads the house's minutes).
+func (en *entry) winBytes(now time.Time, span time.Duration) (up, down uint64) {
+	m := now.Unix() / 60
+	first := now.Add(-span).Unix() / 60
+	if first < m-winSlots+1 {
+		first = m - winSlots + 1
+	}
+	for k := first; k <= m; k++ {
+		if k > en.winAt {
+			continue
+		}
+		up += en.win[k%winSlots][0]
+		down += en.win[k%winSlots][1]
+	}
+	return up, down
 }
 
 // Table is the live flow table and its journal. One mutex guards it: the
@@ -542,6 +589,8 @@ func (t *Table) restart(en *entry, now time.Time, out *[]Delta) {
 	en.Start = now
 	en.Name, en.NameSrc = "", ""
 	en.App, en.Geo = enrich.App{}, enrich.ASInfo{}
+	// Nor has it moved anything yet in the window.
+	en.win, en.winAt = [winSlots][2]uint64{}, 0
 }
 
 // bounded is a map capped at a fixed size that forgets its oldest key first.
@@ -757,6 +806,9 @@ func (t *Table) sample(now time.Time, step time.Duration) {
 		if secs := now.Sub(en.rateAt).Seconds(); secs > 0 {
 			en.RateUp = float64(en.sinceUp) / secs
 			en.RateDown = float64(en.sinceDown) / secs
+		}
+		if en.sinceUp > 0 || en.sinceDown > 0 {
+			en.addWin(now, en.sinceUp, en.sinceDown)
 		}
 		en.sinceUp, en.sinceDown, en.rateAt = 0, 0, now
 		if step <= 0 {

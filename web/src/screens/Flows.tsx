@@ -1,11 +1,12 @@
 // Flows: the live table and the journal, searchable, with one flow's details
 // beside it.
 
-import { h } from "preact";
+import { h, type ComponentChildren } from "preact";
+import { SortHead, useFlip, useSteadyRows } from "./table";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Device, FlowRow, FlowsPage } from "../types";
 import { getJSON, usePoll } from "../api";
-import { flowsPath, parseFlowQuery, type FlowFilter } from "../query";
+import { flowsPath, parseFlowQuery, windowLabel, type FlowFilter, type Win } from "../query";
 import { Header, Pills, Status, Loading, Empty, LATER, AppIcon } from "../ui";
 import { flowKey, selectFlow } from "../view";
 import { bytes, time, dateTime, duration, appName, category, countryName, dirArrow, nameSource, port, isZeroTime, num, clientName } from "../format";
@@ -32,7 +33,7 @@ function target(f: FlowRow): string {
 
 const DIR_TEXT: Record<string, string> = { out: "outgoing (from the house)", in: "incoming (from the internet)", local: "local" };
 
-export function Flows({ initial }: { initial: string }) {
+export function Flows({ initial, win, onWin }: { initial: string; win: Win; onWin: (w: Win) => void }) {
   const [text, setText] = useState(initial);
   const [applied, setApplied] = useState(initial);
   const [preset, setPreset] = useState("");
@@ -60,7 +61,7 @@ export function Flows({ initial }: { initial: string }) {
   const keyNow = useRef(key);
   keyNow.current = key + (live ? "|live" : "");
 
-  const polled = usePoll((s) => getJSON<FlowsPage>(flowsPath(filter, { live, limit: LIMIT }), s), live ? 5_000 : 0, [key, live]);
+  const polled = usePoll((s) => getJSON<FlowsPage>(flowsPath(filter, { live, limit: LIMIT, window: win }), s), live ? 5_000 : 0, [key, live, win]);
   useEffect(() => {
     setMore(null);
     setSelKey("");
@@ -68,7 +69,33 @@ export function Flows({ initial }: { initial: string }) {
     setMoreState({ busy: false, error: "" });
   }, [key, live]);
 
-  const rows = [...(polled.data?.rows ?? []), ...(more?.rows ?? [])];
+  const loaded = [...(polled.data?.rows ?? []), ...(more?.rows ?? [])];
+  // Live, the bytes are what each flow moved over the window, and the
+  // busiest over it come first; rows move at most every 30 s.
+  const down = (f: FlowRow) => (live ? f.winDown ?? 0 : f.down);
+  const up = (f: FlowRow) => (live ? f.winUp ?? 0 : f.up);
+  const getters: Record<string, (f: FlowRow) => string | number> = {
+      vol: (f) => down(f) + up(f),
+      down,
+      up,
+      end: (f) => (isZeroTime(f.end) ? Number.MAX_SAFE_INTEGER : Date.parse(f.end) || 0),
+      client: (f) => clientName({ mac: f.mac, name: f.client }),
+      dir: (f) => f.dir,
+      name: (f) => target(f),
+      app: (f) => appName(f.app.name),
+      cc: (f) => f.cc || "--",
+      dur: (f) => seconds(f, polled.at ?? Date.now()),
+  };
+  // Live and the journal sort apart: live by volume over the window, the
+  // journal newest first, each remembered on its own.
+  const liveRows = useSteadyRows("flows-live", live ? loaded : [], flowKey, getters, { col: "vol", dir: "desc" });
+  const journalRows = useSteadyRows("flows-journal", live ? [] : loaded, flowKey, getters, { col: "end", dir: "desc" });
+  const { rows, sort, pick } = live ? liveRows : journalRows;
+  const list = useRef<HTMLDivElement>(null);
+  useFlip(list);
+  const head = (label: ComponentChildren, col: string, first: "asc" | "desc" = "asc", also?: string[]) => (
+    <SortHead label={label} col={col} sort={sort} pick={pick} first={first} also={also} />
+  );
   const next = more ? more.next : polled.data?.next ?? "";
   const now = polled.at ?? Date.now();
   // The panel follows a flow by its key, not its row number: a live refresh
@@ -101,7 +128,7 @@ export function Flows({ initial }: { initial: string }) {
 
   return (
     <div class="page">
-      <Header section="flows" />
+      <Header section="flows" win={win} onWin={onWin} />
       <main class="main">
         <div class="toolbar">
           <h1>Flows</h1>
@@ -133,24 +160,25 @@ export function Flows({ initial }: { initial: string }) {
         <div class="split">
           <section aria-label="Flows table" class="card card-flush flows-card">
             <div class="scroll-x">
-              <div class="flows-table">
+              <div class="flows-table" ref={list}>
                 <div class="flows-grid flows-head">
-                  <span>End</span>
-                  <span>Client</span>
-                  <span>Dir.</span>
-                  <span>Target and name source</span>
-                  <span>App</span>
-                  <span>Country · ASN</span>
+                  {head("End", "end", "desc")}
+                  {head("Client", "client")}
+                  {head("Dir.", "dir")}
+                  {head("Target and name source", "name")}
+                  {head("App", "app")}
+                  {head("Country · ASN", "cc")}
                   <span>Port</span>
-                  <span>↓ down</span>
-                  <span>↑ up</span>
-                  <span>Dur.</span>
+                  {head(live ? `↓ ${windowLabel(win)}` : "↓ down", "down", "desc", ["vol"])}
+                  {head(live ? `↑ ${windowLabel(win)}` : "↑ up", "up", "desc", ["vol"])}
+                  {head("Dur.", "dur", "desc")}
                 </div>
                 {!polled.data && !polled.error && <Loading />}
                 {polled.data && rows.length === 0 && <Empty>No flows match this search.</Empty>}
-                {rows.map((f, i) => (
+                {rows.map((f) => (
                   <button
-                    key={i}
+                    key={flowKey(f)}
+                    data-key={flowKey(f)}
                     type="button"
                     class={flowKey(f) === shownKey ? "flows-grid flows-row active" : "flows-grid flows-row"}
                     onClick={() => {
@@ -173,8 +201,8 @@ export function Flows({ initial }: { initial: string }) {
                       <b>{f.cc || "--"}</b> <span class="muted small">{f.asn ? `AS${f.asn}` : ""}</span>
                     </span>
                     <span class="soft">{port(f.remote, f.proto)}</span>
-                    <span>{bytes(f.down)}</span>
-                    <span>{bytes(f.up)}</span>
+                    <span>{bytes(down(f))}</span>
+                    <span>{bytes(up(f))}</span>
                     <span class="soft">{duration(seconds(f, now))}</span>
                   </button>
                 ))}

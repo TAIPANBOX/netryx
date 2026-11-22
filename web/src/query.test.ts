@@ -51,3 +51,9 @@ test("#/rules/filters is the filters screen", () => {
   assert.deepEqual(parseRoute("#/rules/filters"), { name: "filters" });
   assert.deepEqual(parseRoute("#/rules"), { name: "rules" });
 });
+
+test("the live flows are asked by the window, the journal never", () => {
+  const f = { q: "", mac: "", app: "", cc: "", dir: "" };
+  assert.equal(flowsPath(f, { live: true, limit: 100, window: "3m" }), "/api/flows?live=1&window=3m&limit=100");
+  assert.equal(flowsPath(f, { live: false, limit: 100, window: "3m" }), "/api/flows?limit=100");
+});

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rulesForApp, rulesForCountry, clientsLine, matchApp, categoriesIn, appHref, countryHref, domainText, closesHouse, ruleTagText, appsSummary } from "./house";
+import { rulesForApp, rulesForCountry, clientsLine, matchApp, categoriesIn, appHref, countryHref, domainText, closesHouse, ruleTagText, appsSummary, ruleNames } from "./house";
 import { parseRoute } from "./query";
 import type { Rule } from "./rules";
 import type { HouseApp } from "./types";
@@ -120,4 +120,16 @@ test("a list cut at its bound says so", () => {
   assert.equal(appsSummary(3, 100), "3 apps");
   assert.equal(appsSummary(1, 100), "1 app");
   assert.equal(appsSummary(100, 100), "the 100 busiest apps");
+});
+
+test("a rule's tag names devices, groups and apps as the console does", () => {
+  const n = ruleNames(
+    [{ mac: "aa:bb:cc:dd:ee:01", name: "Sam's phone", label: "", hostname: "" }],
+    [{ id: "kids", name: "Kids" }],
+    { tiktok: { name: "TikTok" } },
+  );
+  assert.equal(n.device?.("aa:bb:cc:dd:ee:01"), "Sam's phone");
+  assert.equal(n.device?.("aa:bb:cc:dd:ee:09"), "aa:bb:cc:dd:ee:09");
+  assert.equal(n.group?.("kids"), "Kids");
+  assert.equal(n.app?.("tiktok"), "TikTok");
 });

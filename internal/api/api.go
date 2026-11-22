@@ -36,6 +36,7 @@ type History interface {
 	Series(rollup.Filter, time.Time, time.Time, time.Duration, string) []rollup.Point
 	Top(rollup.Filter, string, time.Time, time.Time, int) []rollup.Row
 	Pairs(rollup.Filter, string, string, time.Time, time.Time) map[string][]rollup.Row
+	Recent(rollup.Filter, string, time.Duration) ([]rollup.Row, time.Duration)
 }
 
 // Apps names an app id from the catalog of rules, so a name does not depend
@@ -592,13 +593,19 @@ func (s *server) deviceFor(r *http.Request) (inventory.Device, error) {
 	return inventory.Device{}, httpError{http.StatusNotFound, "no device with that MAC"}
 }
 
-func (s *server) devices(*http.Request) (any, error) {
+func (s *server) devices(r *http.Request) (any, error) {
+	recent, recentSec, err := s.recent(r, rollup.Filter{}, "mac")
+	if err != nil {
+		return nil, err
+	}
 	p := s.day()
 	cat, rates, totals, active := s.catalog(), s.f.Rates(), s.totals(p), s.active(p.now)
 	out := []deviceJSON{}
 	sec := s.security()
 	for _, d := range s.inv.Devices() {
-		out = append(out, withSecurity(s.deviceView(d, p, cat, rates, totals, active), sec))
+		j := withSecurity(s.deviceView(d, p, cat, rates, totals, active), sec)
+		j.Recent, j.RecentSec = recent[d.MAC], recentSec
+		out = append(out, j)
 	}
 	return out, nil
 }
@@ -608,8 +615,14 @@ func (s *server) device(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	recent, recentSec, err := s.recent(r, rollup.Filter{MAC: d.MAC}, "mac")
+	if err != nil {
+		return nil, err
+	}
 	p := s.day()
-	return withSecurity(s.deviceView(d, p, s.catalog(), s.f.Rates(), s.totals(p), s.active(p.now)), s.security()), nil
+	j := withSecurity(s.deviceView(d, p, s.catalog(), s.f.Rates(), s.totals(p), s.active(p.now)), s.security())
+	j.Recent, j.RecentSec = recent[d.MAC], recentSec
+	return j, nil
 }
 
 // security is each device's isolation and quarantine, nil without the rules.
@@ -661,6 +674,10 @@ func (s *server) apps(r *http.Request) (any, error) {
 	cat := s.catalog()
 	// Accepted decision: the share is taken over this device's total for the
 	// period, not over the whole house, so one device's app shares add up to 1.
+	recent, _, err := s.recent(r, rollup.Filter{MAC: d.MAC}, "app")
+	if err != nil {
+		return nil, err
+	}
 	all := s.h.Top(rollup.Filter{MAC: d.MAC}, "app", p.from, p.now, 0)
 	total := sumBytes(all)
 	out := []appUsageJSON{}
@@ -670,7 +687,7 @@ func (s *server) apps(r *http.Request) (any, error) {
 			App: cat.value(ar.Key), Down: ar.Bytes.Down, Up: ar.Bytes.Up,
 			Flows: ar.Bytes.Flows, Share: share(rowBytes(ar), total),
 			Domains: []domainJSON{}, Places: []placeJSON{},
-			Other: ar.Key == serviceKey,
+			Other: ar.Key == serviceKey, Recent: recent[ar.Key],
 		}
 		for _, dr := range s.h.Top(f, "domain", p.from, p.now, maxDestinations) {
 			u.Domains = append(u.Domains, domainJSON{
@@ -738,9 +755,18 @@ func (s *server) flows(r *http.Request) (any, error) {
 		}
 		mac = hw.String()
 	}
+	live := q.Get("live") == "1"
+	var window time.Duration
+	if live && q.Get("window") != "" {
+		w, err := windowOf(r)
+		if err != nil {
+			return nil, err
+		}
+		window = w
+	}
 	rows, next := s.f.Query(flows.Query{
 		MAC: mac, App: q.Get("app"), CC: q.Get("cc"), Text: q.Get("q"),
-		Dir: dir, Live: q.Get("live") == "1", Limit: limit, Cursor: q.Get("cursor"),
+		Dir: dir, Live: live, Limit: limit, Cursor: q.Get("cursor"), Window: window,
 	})
 
 	clients := map[string]string{}
@@ -760,6 +786,7 @@ func (s *server) flows(r *http.Request) (any, error) {
 			App: appJSON{ID: f.App.ID, Name: f.App.Name, Category: f.App.Category},
 			CC:  f.Geo.CC, ASN: f.Geo.ASN, Org: f.Geo.Org,
 			Up: f.Up.Bytes, Down: f.Down.Bytes, Evicted: f.Evicted,
+			WinUp: f.WinUp, WinDown: f.WinDown,
 		})
 	}
 	return page, nil

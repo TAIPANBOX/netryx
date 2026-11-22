@@ -4,11 +4,12 @@
 // countries, the Sankey, where it went and its latest flows.
 
 import { h, type ComponentChildren } from "preact";
-import { useContext, useState } from "preact/hooks";
+import { useContext, useRef, useState } from "preact/hooks";
+import { SortHead, useFlip, useSteadyRows } from "./table";
 import { alertText, type AlertsState } from "../security";
 import type { AppUsage, Destinations, Device, FlowsPage, Group, Range, SeriesPoint } from "../types";
 import { getJSON, mac as enc, usePoll } from "../api";
-import { stepOf, RANGES } from "../query";
+import { stepOf, RANGES, windowLabel, type Win } from "../query";
 import { splitSeries, timeTicks } from "../geometry";
 import { StackedArea, Legend, Sankey, type Layer } from "../charts";
 import { Header, Pills, Card, CC, Status, Loading, Empty, LATER, AppIcon, IconContext } from "../ui";
@@ -34,7 +35,7 @@ type Mode = "live" | Range;
  * The card always opens in "Now". Picking a period shows the period
  * sections and also becomes the period the other screens use.
  */
-export function Client({ mac, onRange }: { mac: string; range: Range; onRange: (r: Range) => void }) {
+export function Client({ mac, onRange, win, onWin }: { mac: string; range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
   const [mode, setMode] = useState<Mode>("live");
   const pick = (id: string) => {
     if (id === "live") {
@@ -47,10 +48,10 @@ export function Client({ mac, onRange }: { mac: string; range: Range; onRange: (
   const modes = (
     <Pills label="Mode" value={mode} onPick={pick} items={[{ id: "live", label: "Now" }, ...RANGES.map((r) => ({ id: r.id, label: r.label }))]} />
   );
-  return mode === "live" ? <ClientLive mac={mac} modes={modes} /> : <ClientPeriod mac={mac} range={mode} modes={modes} />;
+  return mode === "live" ? <ClientLive mac={mac} modes={modes} win={win} onWin={onWin} /> : <ClientPeriod mac={mac} range={mode} modes={modes} win={win} onWin={onWin} />;
 }
 
-function ClientPeriod({ mac, range, modes }: { mac: string; range: Range; modes: ComponentChildren }) {
+function ClientPeriod({ mac, range, modes, win, onWin }: { mac: string; range: Range; modes: ComponentChildren; win: Win; onWin: (w: Win) => void }) {
   const [split, setSplit] = useState<SplitKind>("app");
   const base = `/api/devices/${enc(mac)}`;
   const polled = usePoll(
@@ -58,21 +59,21 @@ function ClientPeriod({ mac, range, modes }: { mac: string; range: Range; modes:
       const [device, traffic, apps, dest, flows] = await Promise.all([
         getJSON<Device>(base, s),
         getJSON<SeriesPoint[]>(`${base}/traffic?range=${range}&split=${split}`, s),
-        getJSON<AppUsage[]>(`${base}/apps?range=${range}`, s),
+        getJSON<AppUsage[]>(`${base}/apps?range=${range}&window=${win}`, s),
         getJSON<Destinations>(`${base}/destinations?range=${range}`, s),
         getJSON<FlowsPage>(`/api/flows?mac=${enc(mac)}&limit=5`, s),
       ]);
       return { device, traffic, apps, dest, flows };
     },
     10_000,
-    [mac, range, split],
+    [mac, range, split, win],
   );
   const d = polled.data;
   const name = d ? deviceName(d.device) : mac;
 
   return (
     <div class="page">
-      <Header section="clients" pills={modes} />
+      <Header section="clients" pills={modes} win={win} onWin={onWin} />
       <main class="main">
         <div class="crumbs">
           <a href="#/clients">Clients</a> / {name}
@@ -88,7 +89,7 @@ function ClientPeriod({ mac, range, modes }: { mac: string; range: Range; modes:
           <div class="stack">
             <DeviceCard d={d.device} />
             <Traffic d={d} range={range} split={split} onSplit={setSplit} />
-            <Apps apps={d.apps} mac={mac} />
+            <Apps apps={d.apps} mac={mac} win={win} />
             <div class="grid-2">
               <Card label="Traffic flow" title="Client → apps → countries">
                 <Sankey {...sankeyOf(name, d.apps)} label={`Diagram: where ${name} sends traffic, by app and country`} />
@@ -184,28 +185,47 @@ function Traffic({ d, range, split, onSplit }: { d: ClientData; range: Range; sp
   );
 }
 
-function Apps({ apps, mac }: { apps: AppUsage[]; mac: string }) {
+function Apps({ apps, mac, win }: { apps: AppUsage[]; mac: string; win: Win }) {
   const [open, setOpen] = useState<string>("");
+  const { rows, sort, pick } = useSteadyRows(
+    "client-apps",
+    apps,
+    (a) => a.app.id,
+    {
+      name: (a) => appName(a.app.name),
+      category: (a) => category(a.app.category),
+      down: (a) => a.down,
+      up: (a) => a.up,
+      flows: (a) => a.flows,
+      share: (a) => a.share,
+      now: (a) => (a.recent ? a.recent.down + a.recent.up : 0),
+    },
+    { col: "share", dir: "desc" },
+  );
+  const list = useRef<HTMLDivElement>(null);
+  useFlip(list);
+  const head = (label: ComponentChildren, col: string, first: "asc" | "desc" = "desc") => <SortHead label={label} col={col} sort={sort} pick={pick} first={first} />;
   return (
     <Card label="Client apps" title="Apps" aside={<span class="muted small">click a row for that app's domains and countries</span>}>
       {apps.length === 0 ? (
         <Empty>No apps in this period.</Empty>
       ) : (
         <div class="scroll-x">
-          <div class="apps-table">
+          <div class="apps-table" ref={list}>
             <div class="apps-grid apps-head">
-              <span>App</span>
-              <span>Category</span>
-              <span>↓ down</span>
-              <span>↑ up</span>
-              <span>Flows</span>
-              <span>Share</span>
+              {head("App", "name", "asc")}
+              {head("Category", "category", "asc")}
+              {head("↓ down", "down")}
+              {head("↑ up", "up")}
+              {head("Flows", "flows")}
+              {head("Share", "share")}
+              {head(`Now, ${windowLabel(win)}`, "now")}
             </div>
-            {apps.map((a) => {
+            {rows.map((a) => {
               const isOpen = open === a.app.id;
               const name = a.other ? "other apps" : appName(a.app.name);
               return (
-                <div key={a.app.id} class="apps-item">
+                <div key={a.app.id} data-key={a.app.id} class="apps-item">
                   <button type="button" class="apps-grid apps-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? "" : a.app.id)}>
                     <span class="strong app-cell">
                       <span class="caret" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
@@ -217,6 +237,7 @@ function Apps({ apps, mac }: { apps: AppUsage[]; mac: string }) {
                     <span>{bytes(a.up)}</span>
                     <span>{num(a.flows)}</span>
                     <span>{share(a.share)}</span>
+                    <span class="small">↓ {rate(a.recent?.down ?? 0)}</span>
                   </button>
                   {isOpen && <AppDetail a={a} mac={mac} />}
                 </div>

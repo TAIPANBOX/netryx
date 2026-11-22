@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "preact/hooks";
 import { createPoller } from "./poll";
+import { isPaused, onPause } from "./pause";
 import { setZone } from "./zone";
 
 export class ApiError extends Error {
@@ -135,6 +136,7 @@ export async function login(user: string, password: string): Promise<LoginResult
   } catch {
     return { ok: false, text: "The router is not answering." };
   }
+  noteBuild(r);
   if (r.ok) {
     const j = (await r.json()) as { csrf: string; user: string; canWrite: boolean; zone?: string };
     setCSRF(j.csrf || "");
@@ -195,14 +197,21 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
   const loadRef = useRef(load);
   loadRef.current = load;
 
+  // Pause holds the figures still: no poll asks again while it is on, except
+  // the first load after the screen opened or its question changed (another
+  // window, period, filter), so what is shown always answers what is asked.
   useEffect(() => {
-    const hidden = () => document.visibilityState === "hidden";
+    let answered = false;
+    const hidden = () => document.visibilityState === "hidden" || (isPaused() && answered);
     const poller = createPoller<T>({
       load: (signal) => loadRef.current(signal),
       everyMs,
       clock: { setTimeout: (fn, ms) => window.setTimeout(fn, ms), clearTimeout: (h) => window.clearTimeout(h as number) },
       hidden,
-      onData: (data) => setState({ data, at: Date.now() }),
+      onData: (data) => {
+        answered = true;
+        setState({ data, at: Date.now() });
+      },
       onError: (e) => {
         const status = e instanceof ApiError ? e.status : 0;
         const error = e instanceof Error ? e.message : String(e);
@@ -212,9 +221,11 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
     const onVisibility = () => (hidden() ? poller.pause() : poller.resume());
     poller.start();
     document.addEventListener("visibilitychange", onVisibility);
+    const offPause = onPause(onVisibility);
     return () => {
       poller.dispose();
       document.removeEventListener("visibilitychange", onVisibility);
+      offPause();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [everyMs, ...deps]);
@@ -227,6 +238,7 @@ export function usePoll<T>(load: (signal: AbortSignal) => Promise<T>, everyMs: n
 declare const __NETRYX_BUILD__: string;
 let build = typeof __NETRYX_BUILD__ === "string" ? __NETRYX_BUILD__ : "dev";
 let newBuildTold = false;
+let served = "";
 const newBuildListeners = new Set<() => void>();
 
 /** Sets this page's build (tests). */
@@ -251,8 +263,25 @@ export function onNewBuild(fn: () => void): () => void {
 
 /** Reads the build the router serves from an answer, and tells once when it is not this page's. */
 function noteBuild(r: Response) {
-  const served = r.headers.get("X-Netryx-Build");
-  if (!served || build === "dev" || served === build || newBuildTold) return;
+  const id = r.headers.get("X-Netryx-Build");
+  if (id) served = id;
+  if (!id || build === "dev" || id === build || newBuildTold) return;
   newBuildTold = true;
   for (const fn of newBuildListeners) fn();
 }
+
+/**
+ * The build the login should reload onto: the router's when it is not this
+ * page's, unless the page already reloaded for that one (a browser that kept
+ * the old file must not reload for ever). "" means stay.
+ */
+export function reloadFor(mine: string, served: string, done: string | null): string {
+  if (mine === "dev" || !served || served === mine || served === done) return "";
+  return served;
+}
+
+/** The build the router named on its last answer, "" before one. */
+export const servedBuild = () => served;
+
+/** This page's own build. */
+export const pageBuild = () => build;
