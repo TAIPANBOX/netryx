@@ -17,7 +17,7 @@ log() { echo "== $*"; }
 
 apk add -q nftables iproute2 dnsmasq curl ca-certificates >/dev/null 2>&1
 
-log "будую дім: роутер і $N пристроїв"
+log "building the house: a router and $N devices"
 ip link add br-lan type bridge
 ip addr add $LAN.1/24 dev br-lan
 ip link set br-lan up
@@ -37,14 +37,14 @@ while [ "$i" -le "$N" ]; do
 	i=$((i + 1))
 done
 
-log "резолвер і DHCP"
+log "resolver and DHCP"
 mkdir -p /var/lib/misc
 dnsmasq --interface=br-lan --bind-interfaces \
 	--dhcp-range=$LAN.50,$LAN.150,12h \
 	--dhcp-leasefile=/tmp/dhcp.leases \
 	--log-facility=/tmp/dnsmasq.log --pid-file=/tmp/dnsmasq.pid
 
-log "маршрутизація назовні"
+log "routing to the outside"
 sysctl -qw net.ipv4.ip_forward=1
 OUT=$(ip route show default | awk '{print $5; exit}')
 cat >/tmp/nat.nft <<NFT
@@ -56,7 +56,7 @@ table inet nat {
 NFT
 nft -f /tmp/nat.nft
 
-log "кожен пристрій бере адресу по DHCP, зі своїм іменем"
+log "each device takes an address over DHCP, with its own name"
 names="phone-lounge laptop-study tv-kitchen camera-hall printer-study tablet-den console-den speaker-hall"
 i=1
 for name in $names; do
@@ -68,17 +68,17 @@ for name in $names; do
 	i=$((i + 1))
 done
 
-log "оренди, які роздав резолвер:"
+log "the leases the resolver handed out:"
 cat /tmp/dhcp.leases 2>/dev/null | awk '{print "  "$2"  "$3"  "$4}'
 
-log "запускаю netryx на роутері цього дому"
+log "starting netryx on this house's router"
 /work/netryx serve -mode ingress -watch-iface br-lan -addr 127.0.0.1:8788 \
 	-leases /tmp/dhcp.leases -dns=true >/tmp/netryx.log 2>&1 &
 sleep 3
-grep -qE "слухаю|listening" /tmp/netryx.log || { echo "не піднявся:"; cat /tmp/netryx.log; exit 1; }
-echo "  правило в ядрі: $(nft list chain netdev netryx observe | grep -oE 'devices = \{[^}]*\}' | head -1)"
+grep -qE "listening" /tmp/netryx.log || { echo "did not come up:"; cat /tmp/netryx.log; exit 1; }
+echo "  rule in the kernel: $(nft list chain netdev netryx observe | grep -oE 'devices = \{[^}]*\}' | head -1)"
 
-log "пристрої ходять в інтернет, кожен своїм шляхом"
+log "the devices go to the internet, each its own way"
 sites="example.com www.wikipedia.org www.debian.org www.kernel.org api.github.com www.rfc-editor.org"
 i=1
 while [ "$i" -le "$N" ]; do
@@ -96,27 +96,27 @@ while [ "$i" -le "$N" ]; do
 done
 sleep 3
 
-log "що побачив netryx:"
+log "what netryx saw:"
 wget -qO- http://127.0.0.1:8788/api/snapshot | tr -d ' \n' > /tmp/snap.json 2>/dev/null
 
-log "рядки таблиці:"
+log "the table's rows:"
 tr '}' '\n' </tmp/snap.json | grep '"mac"' | \
 	sed -E 's/.*"name":"([^"]*)","addr":"([^"]*)","mac":"([^"]*)".*/  \1  \2  \3/' | head -12
 echo
 sites_line=$(grep -o '"sites":\[[^]]*\]' /tmp/snap.json | head -4)
-echo "  призначення: $sites_line"
+echo "  destinations: $sites_line"
 echo
-log "перевірка:"
+log "check:"
 macs=$(grep -o '"mac":"02:00:00:00:00:0[0-9]"' /tmp/snap.json | sort -u | wc -l | tr -d ' ')
 named=$(grep -oE '"name":"(phone-lounge|laptop-study|tv-kitchen|camera-hall|printer-study|tablet-den|console-den|speaker-hall)"' /tmp/snap.json | sort -u | wc -l | tr -d ' ')
 sites_seen=$(grep -o '"sites":\[[^]]*\]' /tmp/snap.json | tr ',' '\n' | grep -c '"' || true)
 hs=$(grep -o '"handshakes":[0-9]*' /tmp/snap.json | cut -d: -f2 | awk '{s+=$1} END{print s+0}')
-echo "  пристроїв за апаратною адресою: $macs з $N"
-echo "  названих з оренди DHCP: $named з $N"
-echo "  розпізнаних призначень: $sites_seen"
-echo "  рукостискань усього: $hs"
-[ "$macs" -ge "$N" ] || { echo "  ПРОВАЛ: не всі пристрої видно"; exit 1; }
-[ "$named" -ge "$N" ] || { echo "  ПРОВАЛ: не всі названі з DHCP"; exit 1; }
-[ "$sites_seen" -ge "$N" ] || { echo "  ПРОВАЛ: замало розпізнаних призначень"; exit 1; }
-[ "$hs" -ge "$N" ] || { echo "  ПРОВАЛ: замало рукостискань"; exit 1; }
-echo "  усе зійшлось: кожен пристрій окремим рядком, з іменем і з тим, куди ходив"
+echo "  devices by hardware address: $macs of $N"
+echo "  named from a DHCP lease: $named of $N"
+echo "  destinations recognised: $sites_seen"
+echo "  handshakes in all: $hs"
+[ "$macs" -ge "$N" ] || { echo "  FAIL: not every device is seen"; exit 1; }
+[ "$named" -ge "$N" ] || { echo "  FAIL: not every device is named from DHCP"; exit 1; }
+[ "$sites_seen" -ge "$N" ] || { echo "  FAIL: too few destinations recognised"; exit 1; }
+[ "$hs" -ge "$N" ] || { echo "  FAIL: too few handshakes"; exit 1; }
+echo "  all agree: each device on a row of its own, with its name and where it went"

@@ -195,6 +195,11 @@ red   "english-only, Cyrillic in a Telegram alert" sh scripts/english-only.sh "$
 cp internal/alerts/telegram.go "$work/eng/alerts/telegram.go"
 printf '\nconst device = "\320\232\320\260\320\274\320\265\321\200\320\260"\n' >>"$work/eng/alerts/telegram_test.go"
 green "english-only, a Cyrillic device name in a test" sh scripts/english-only.sh "$work/eng/src" "$work/eng/alerts"
+mkdir -p "$work/eng/house"
+cp test/house/house.sh "$work/eng/house/house.sh"
+green "english-only, the house test script" sh scripts/english-only.sh "$work/eng/house"
+printf '\nlog "\320\277\320\265\321\200\320\265\320\262\321\226\321\200\320\272\320\260"\n' >>"$work/eng/house/house.sh"
+red   "english-only, Cyrillic in a test script's output" sh scripts/english-only.sh "$work/eng/house"
 red   "english-only, subject missing" sh scripts/english-only.sh "$work/eng/none"
 
 [ "$fails" -eq 0 ] || { echo "$fails gate(s) without teeth"; exit 1; }
