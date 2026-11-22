@@ -395,8 +395,10 @@ enforced, and that is a debt rather than a decision.
   0700 directory; read back only when the file and its directory belong to
   netryx's own uid and no one else may write them (nor read the file), and
   the file is plain, whole and well formed, otherwise ignored with the reason
-  logged. A logout and a session rpcd has let go leave the file; rpcd still
-  decides on every request. (test: `TestASessionSurvivesARestart`,
+  logged. A logout and a session rpcd has let go leave the file, written in
+  the same critical section as the table; a write that fails removes the file
+  (fail closed); a handle twice loads once; rpcd still decides on every
+  request. (test: `TestASessionSurvivesARestart`, `TestAFailedWriteLeavesNoStaleSessions`,
   `TestTheSessionsFileIsPrivateAndWrittenWhole`, `TestASessionsFileOthersCouldTouchIsNotLoaded`,
   `TestEndedSessionsLeaveTheFile`, `TestOnlyWellFormedSessionsAreLoaded`; @decided
   2026-11-22: sessions are kept across a restart of netryx)

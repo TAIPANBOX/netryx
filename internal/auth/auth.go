@@ -20,10 +20,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"mime"
 	"net/http"
 	"net/netip"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -172,19 +175,31 @@ func (g *Gate) Wrap(next http.Handler) http.Handler {
 	return s
 }
 
-// persist writes the table of sessions to the store, when there is one. The
-// caller holds no lock: it takes the table as it is now.
-func (s *gate) persist() {
+// persistLocked writes the table of sessions to the store, when there is one,
+// in the same critical section that changed it, so no process death between
+// the two can leave a signed-out session in the file. The caller holds s.mu
+// and logs the error, if any, once it has let go.
+func (s *gate) persistLocked() error {
 	if s.g.Store == "" {
-		return
+		return nil
 	}
-	s.mu.Lock()
 	all := make([]signedIn, 0, s.order.Len())
 	for e := s.order.Front(); e != nil; e = e.Next() {
 		all = append(all, *e.Value.(*signedIn))
 	}
-	err := saveStore(s.g.Store, s.g.Secret, all)
-	s.mu.Unlock()
+	err := save(s.g.Store, s.g.Secret, all)
+	if err != nil {
+		// Fail closed: a table that could not be written must not stay
+		// behind stale, or a restart would bring back a session that
+		// signed out. Without the file a restart signs everyone out.
+		if rerr := os.Remove(s.g.Store); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+			err = fmt.Errorf("%v; and the old file could not be removed: %v", err, rerr)
+		}
+	}
+	return err
+}
+
+func (s *gate) logPersist(err error) {
 	if err != nil {
 		s.logf("sessions not kept in %s, so a restart signs everyone out: %v", s.g.Store, err)
 	}
@@ -412,8 +427,9 @@ func (s *gate) drop(handle string) (signedIn, bool) {
 	}
 	delete(s.handles, handle)
 	s.order.Remove(e)
+	err := s.persistLocked()
 	s.mu.Unlock()
-	s.persist()
+	s.logPersist(err)
 	return *e.Value.(*signedIn), true
 }
 
@@ -428,8 +444,9 @@ func (s *gate) add(si *signedIn) (evicted *signedIn) {
 		delete(s.handles, evicted.handle)
 	}
 	s.handles[si.handle] = s.order.PushBack(si)
+	err := s.persistLocked()
 	s.mu.Unlock()
-	s.persist()
+	s.logPersist(err)
 	return evicted
 }
 

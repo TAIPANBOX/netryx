@@ -163,4 +163,34 @@ func TestOnlyWellFormedSessionsAreLoaded(t *testing.T) {
 	if len(got) != 1 || got[0].handle != ok {
 		t.Errorf("loaded %+v, want the one well-formed session", got)
 	}
+	// A handle twice is one session, the later entry's.
+	got = sanitize(storedFile{Sessions: []storedSession{
+		{Handle: ok, SID: "first", User: "root"},
+		{Handle: ok, SID: "second", User: "root"},
+	}})
+	if len(got) != 1 || got[0].sid != "second" {
+		t.Errorf("a handle twice loaded %+v, want the one later entry", got)
+	}
+}
+
+// A table that cannot be written is never left behind stale: a logout that
+// could not be kept removes the file, so a restart brings nobody back,
+// least of all the session that signed out.
+func TestAFailedWriteLeavesNoStaleSessions(t *testing.T) {
+	r, path := storeRig(t)
+	sid, csrf := r.login("viewer", viewerPW, lan)
+	r.ubus.destroy = false // rpcd refuses to end it: only netryx's table stands between
+	save = func(string, []byte, []signedIn) error { return os.ErrPermission }
+	defer func() { save = saveStore }()
+	if rec := r.do(http.MethodPost, "/api/logout", lan, "", withCookie(sid), withCSRF(csrf)); rec.Code != http.StatusOK {
+		t.Fatal(rec.Code)
+	}
+	if _, err := os.Lstat(path); err == nil {
+		t.Fatal("the file with the signed-out session was left behind")
+	}
+	save = saveStore
+	r.restart()
+	if rec := r.do(http.MethodGet, "/api/overview", lan, "", withCookie(sid)); rec.Code != http.StatusUnauthorized {
+		t.Errorf("the signed-out session came back after a restart: %d", rec.Code)
+	}
 }

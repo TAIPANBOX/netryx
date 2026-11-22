@@ -44,6 +44,9 @@ func fileOwner(fi fs.FileInfo) (uint32, bool) {
 // ownerOf is fileOwner; a test stands in another owner.
 var ownerOf = fileOwner
 
+// save is saveStore; a test makes it fail.
+var save = saveStore
+
 // private says a file or directory is this process's own and no one else's:
 // owned by this uid, and neither group nor others may write it (nor, for a
 // file, read it).
@@ -113,11 +116,24 @@ func loadStore(path string) ([]byte, []signedIn, string) {
 // maxHandles of them, the newest last.
 func sanitize(sf storedFile) []signedIn {
 	var out []signedIn
+	at := map[string]int{}
 	for _, s := range sf.Sessions {
 		if !validHandle(s.Handle) || s.SID == "" || len(s.SID) > 128 || s.User == "" || len(s.User) > 64 {
 			continue
 		}
-		out = append(out, signedIn{handle: s.Handle, sid: s.SID, user: s.User})
+		si := signedIn{handle: s.Handle, sid: s.SID, user: s.User}
+		// A handle twice is one session, the later entry's: two would leave
+		// one in the order that the map no longer knows.
+		if i, seen := at[s.Handle]; seen {
+			out = append(out[:i], out[i+1:]...)
+			for h, j := range at {
+				if j > i {
+					at[h] = j - 1
+				}
+			}
+		}
+		at[s.Handle] = len(out)
+		out = append(out, si)
 	}
 	if len(out) > maxHandles {
 		out = out[len(out)-maxHandles:]

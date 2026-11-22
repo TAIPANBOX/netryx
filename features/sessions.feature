@@ -26,5 +26,6 @@ Feature: a restart of netryx signs nobody out
   Scenario: an ended session is not kept
     Given a session that was signed out, or that the router has let expire
     When netryx restarts
-    Then that session does not come back
+    Then that session does not come back, even when the kept table could not be written
     # -> TestEndedSessionsLeaveTheFile
+    # -> TestAFailedWriteLeavesNoStaleSessions
