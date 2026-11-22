@@ -24,6 +24,9 @@ import { Destinations, Destination } from "./screens/Destinations";
 import { Network } from "./screens/Network";
 import { NetworkScreen, DomainScreen, GroupScreen } from "./screens/Entities";
 import { CardsProvider } from "./screens/windows";
+import { SearchBox } from "./screens/Search";
+import { CompareScreen } from "./screens/Compare";
+import { HoverCards } from "./screens/HoverCards";
 
 // The period is a per-viewer convenience; storage may be missing (a private
 // window, a blocked site), and then the page simply starts at 24 hours.
@@ -132,6 +135,8 @@ function Signed({ info }: { info: SessionInfo }) {
       <IconContext.Provider value={icons}>
         <CardsProvider>
           <Screen />
+          <SearchBox />
+          <HoverCards />
         </CardsProvider>
       </IconContext.Provider>
     </SessionContext.Provider>
@@ -198,8 +203,10 @@ function Screen() {
       return <NetworkScreen key={route.asn} asn={route.asn} from={route.from} range={range} onRange={pick} />;
     case "domain":
       return <DomainScreen key={route.domain} domain={route.domain} from={route.from} range={range} onRange={pick} />;
+    case "compare":
+      return <CompareScreen macs={route.macs} />;
     case "group":
-      return <GroupScreen key={route.id} id={route.id} />;
+      return <GroupScreen key={route.id} id={route.id} from={route.from} />;
     case "destination":
       return <Destination key={route.cc} cc={route.cc} range={range} onRange={pick} />;
     default:

@@ -1,3 +1,4 @@
+import type { HourSpark } from "./live";
 // The JSON the router's API returns, mirrored from internal/api/types.go.
 // Bytes are counts, rates are bytes per second, times are RFC 3339 UTC.
 
@@ -47,6 +48,8 @@ export interface Device {
   /** The average over the window asked for (bytes per second), and the seconds it covers. */
   recent?: { up: number; down: number }; recentSec?: number;
   last24h: { down: number; up: number };
+  /** The last hour in steps, on the client list only. */
+  spark?: HourSpark;
   topApp: App | null; countryCount: number;
   /** Isolation (spec 6.7) and quarantine (6.8): set by the router when the rules run. */
   isolate?: boolean; quarantined?: boolean; likelySame?: string;
@@ -115,6 +118,8 @@ export interface HouseApp extends Row {
   /** How many clients used it; top names the busiest few. */
   clients: number; top: ClientRef[];
   recent?: { up: number; down: number };
+  /** The last hour in steps; none on the folded row. */
+  spark?: HourSpark;
 }
 export interface Network extends Row { cc: string; asn: string; org: string; down: number; up: number }
 export interface AppDetail {

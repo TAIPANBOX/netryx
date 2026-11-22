@@ -121,10 +121,12 @@ type deviceJSON struct {
 	Rate     rateJSON `json:"rate"`
 	// Recent is the average over the window asked for (bytes per second) and
 	// RecentSec the seconds that window covers.
-	Recent    rateJSON  `json:"recent"`
-	RecentSec float64   `json:"recentSec"`
-	Last24h   bytesJSON `json:"last24h"`
-	TopApp    *appJSON  `json:"topApp"`
+	Recent    rateJSON `json:"recent"`
+	RecentSec float64  `json:"recentSec"`
+	// Spark is the device's last hour, on the client list only.
+	Spark   *sparkJSON `json:"spark,omitempty"`
+	Last24h bytesJSON  `json:"last24h"`
+	TopApp  *appJSON   `json:"topApp"`
 	// CountryCount is how many countries the device talked to in 24 h.
 	CountryCount int `json:"countryCount"`
 	// Isolate and Quarantined are the device's isolation (spec 6.7) and

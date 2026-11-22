@@ -1224,3 +1224,63 @@ func (s *Store) Holders(dim, key string, from, to time.Time) HoldersOf {
 	}
 	return out
 }
+
+// SparksOf is each key's last span in steps, oldest first: what a list draws
+// as its rows' sparklines.
+type SparksOf struct {
+	// From is the start of the first step; the last step is still filling.
+	From time.Time
+	Step time.Duration
+	// Known is the first step the store had begun counting by: the steps
+	// before it are time nobody counted (the minutes are not saved), not a
+	// quiet house.
+	Known int
+	// Keys holds, per key, its bytes down and up together in each step.
+	Keys map[string][]uint64
+}
+
+// Sparks reads the minutes once for every key of dim (mac, app or cc) that f
+// matches, so a list of a hundred rows costs one pass, not a hundred. A span
+// shorter than its step, or another dimension, is empty.
+func (s *Store) Sparks(f Filter, dim string, span, step time.Duration) SparksOf {
+	if dim != "mac" && dim != "app" && dim != "cc" || step <= 0 || span < step {
+		return SparksOf{}
+	}
+	n := int(span / step)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := s.now().UTC()
+	from := now.Truncate(step).Add(-time.Duration(n-1) * step)
+	out := SparksOf{From: from, Step: step, Known: n, Keys: map[string][]uint64{}}
+	if s.since.IsZero() {
+		return out
+	}
+	first := s.firstAt.UTC()
+	if first.Before(from) {
+		out.Known = 0
+	} else {
+		out.Known = int(first.Sub(from) / step)
+	}
+	for _, m := range s.mins {
+		if m == nil || !s.mr.holds(m.At) || m.At.Before(from) || m.At.After(now) {
+			continue
+		}
+		i := int(m.At.Sub(from) / step)
+		if i >= n {
+			continue
+		}
+		for k, b := range m.Keys {
+			if !f.match(k) {
+				continue
+			}
+			key, _ := splitKey(k, dim)
+			v := out.Keys[key]
+			if v == nil {
+				v = make([]uint64, n)
+				out.Keys[key] = v
+			}
+			v[i] += b.Down + b.Up
+		}
+	}
+	return out
+}

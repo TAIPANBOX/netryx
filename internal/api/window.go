@@ -46,3 +46,35 @@ func (s *server) recent(r *http.Request, f rollup.Filter, dim string) (map[strin
 	}
 	return out, sec, nil
 }
+
+// The lists' sparklines: each row's last hour in steps of two minutes.
+const (
+	sparkSpan = time.Hour
+	sparkStep = 2 * time.Minute
+)
+
+// sparkJSON is one row's sparkline: bytes down and up together per step,
+// oldest first, the last step still filling; the steps before known are time
+// the router had not begun counting (its minutes are not saved).
+type sparkJSON struct {
+	StepSec int      `json:"stepSec"`
+	Known   int      `json:"known"`
+	Bytes   []uint64 `json:"bytes"`
+	// Since is when the counted part begins: the start of step Known.
+	Since string `json:"since"`
+}
+
+// sparks reads every row's hour in one pass and answers it per key; a key
+// that moved nothing has its hour too, all zero.
+func (s *server) sparks(f rollup.Filter, dim string) func(key string) *sparkJSON {
+	sp := s.h.Sparks(f, dim, sparkSpan, sparkStep)
+	n := int(sparkSpan / sparkStep)
+	return func(key string) *sparkJSON {
+		b := sp.Keys[key]
+		if len(b) != n {
+			b = make([]uint64, n)
+		}
+		since := sp.From.Add(time.Duration(sp.Known) * sparkStep).UTC().Format(time.RFC3339)
+		return &sparkJSON{StepSec: int(sparkStep / time.Second), Known: sp.Known, Bytes: b, Since: since}
+	}
+}

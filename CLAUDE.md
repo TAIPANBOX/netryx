@@ -712,6 +712,42 @@ enforced, and that is a debt rather than a decision.
   a screen opens or its question changes. (the page: `web/src/steady.test.ts`;
   the glide itself is not enforced by a test, measured in the lab)
 
+## The promise about seeing things in place
+
+- **A list row's last hour is one pass over the minutes**: `Sparks` answers
+  every client's or app's hour in steps of two minutes at once, a step is
+  bytes down and up together, and the steps before the store's first minute
+  are said (`known`), never drawn as a quiet house; a row that moved nothing
+  has its hour, all zero; the folded row has none.
+  (test: `TestSparksAreEachKeysMinutesInSteps`, `TestAnEmptyStoreKnowsNoStep`,
+  `TestTheListsCarryAnHourOfSparkline`; the page: "a list's hour is drawn only
+  from where the router began counting" in `web/src/live.test.ts`)
+
+- **Anything named can be found by typing**: Cmd+K, Ctrl+K or "/" outside a
+  text field opens a search over the clients, apps, categories, countries,
+  networks, domains, groups and rules the page can read, by name or by an
+  address, MAC, hostname or AS number; the whole name first, then its start, a
+  word's start, inside it, then what else identifies it; at most 12; folded
+  rows and unknowns are never things. (the page: `web/src/search.test.ts`)
+
+- **A name shows a card after 400 ms of a resting mouse**: the thing is read
+  from the link's own address (a screen that is not one thing has none), its
+  facts from that thing's own read over the last day, kept 30 s; a click on the
+  card keeps it until its X, Esc, a click elsewhere or another screen; touch
+  shows none. (the page: `web/src/hover.test.ts`; the timing itself is not
+  enforced by a test, seen in the lab)
+
+- **A thing's view says where it sits**: a chain of chips names the path the
+  owner took (`from`) or the screen it belongs under, then the thing, then what
+  it belongs to (an app's category, a network's countries, a domain's apps, a
+  client's group), each a link; folded rows and unknowns are no parent.
+  (the page: "a thing's view names what it belongs to, each a link" in
+  `web/src/entity.test.ts`)
+
+- **Two or three clients compare side by side** at `#/compare?mac=..`: at
+  most three, each MAC once, nothing that is not a MAC; a fourth tick is
+  refused rather than pushing one out unseen. (the page: `web/src/compare.test.ts`)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's
@@ -980,6 +1016,13 @@ enforced, and that is a debt rather than a decision.
   console is English first, a second language may come later)
 
 ## How work is done here
+
+- **A published screenshot never carries the lab line's private values**:
+  `scripts/lab/console-shots.mjs` reads `~/netryx-shots.deny` (kept off the
+  repository) and saves no page whose text holds any of them, nor anything
+  without the file or with it empty. (not enforced by a gate: @measured
+  2026-11-22 on forge, a deny list naming a value on the overview, an empty
+  list and no list each stopped the run before the first image)
 
 - Every scenario in `features/` names a test, and every named test exists.
   (gate: `scripts/scenarios-bound.sh`)

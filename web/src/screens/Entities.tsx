@@ -8,30 +8,17 @@ import { RANGES } from "../query";
 import { Header, Card, CC, Status, Loading, Empty, AppIcon, IconContext } from "../ui";
 import { Bars } from "../charts";
 import { appName, bytes, countryName, groupName, nameSource, plural } from "../format";
-import { crumbsFrom } from "../entity";
+import { parentsOf } from "../entity";
 import { describeRule, manifestName, stateOf } from "../rules";
 import { useContext } from "preact/hooks";
 import { deviceName } from "./Clients";
-import { ClientLink, EntityLink } from "./entity";
+import { ChipChain, ClientLink, EntityLink } from "./entity";
+
+const DEST = [{ label: "Destinations", href: "#/destinations" }];
 import { useRules } from "./controls";
 
 const periodOf = (r: Range) => RANGES.find((x) => x.id === r)?.label ?? r;
 
-function Crumbs({ from, last }: { from: string; last: string }) {
-  const appNames = manifestName(useContext(IconContext));
-  const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 60_000, []).data ?? [];
-  const path = crumbsFrom(from, { app: appNames, group: (id) => groupName(id, groups) });
-  return (
-    <p class="crumbs">
-      {path.map((c) => (
-        <span key={c.href}>
-          <a href={c.href}>{c.label}</a> ›{" "}
-        </span>
-      ))}
-      {last}
-    </p>
-  );
-}
 
 function ClientRows({ clients, total, from }: { clients: { mac: string; name: string; down: number; up: number }[]; total: number; from: string }) {
   if (clients.length === 0) return <Empty>No client in this period.</Empty>;
@@ -59,7 +46,7 @@ export function NetworkScreen({ asn, from, range, onRange }: { asn: number; from
       <Header section="destinations" range={range} onRange={onRange} />
       <main class="main">
         <Status polled={polled} />
-        <Crumbs from={from || "dest-root"} last={d?.org || `AS${asn}`} />
+        <ChipChain from={from} base={DEST} last={d?.org || `AS${asn}`} parents={parentsOf({ kind: "network", asn }, d)} />
         {!d ? (
           <Loading />
         ) : (
@@ -113,7 +100,7 @@ export function DomainScreen({ domain, from, range, onRange }: { domain: string;
       <Header section="destinations" range={range} onRange={onRange} />
       <main class="main">
         <Status polled={polled} />
-        <Crumbs from={from || "dest-root"} last={domain} />
+        <ChipChain from={from} base={DEST} last={domain} parents={parentsOf({ kind: "domain", name: domain }, d)} />
         {!d ? (
           <Loading />
         ) : (
@@ -150,7 +137,7 @@ export function DomainScreen({ domain, from, range, onRange }: { domain: string;
   );
 }
 
-export function GroupScreen({ id }: { id: string }) {
+export function GroupScreen({ id, from = "" }: { id: string; from?: string }) {
   const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 30_000, []);
   const devices = usePoll((s) => getJSON<Device[]>("/api/devices", s), 15_000, []);
   const { rules } = useRules();
@@ -165,9 +152,7 @@ export function GroupScreen({ id }: { id: string }) {
       <Header section="clients" />
       <main class="main">
         <Status polled={groups} />
-        <p class="crumbs">
-          <a href="#/clients">Clients</a> › {g?.name ?? id}
-        </p>
+        <ChipChain from={from} base={[{ label: "Clients", href: "#/clients" }]} last={g?.name ?? id} />
         {!groups.data ? (
           <Loading />
         ) : !g ? (

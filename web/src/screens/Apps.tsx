@@ -1,8 +1,8 @@
 // Apps: every app the house used in the period, and one app across the
 // house: who used it, where it went, how it was named, when it moved.
 
-import { filterHash } from "../entity";
-import { EntityLink, ClientNames } from "./entity";
+import { filterHash, parentsOf } from "../entity";
+import { ChipChain, EntityLink, ClientNames } from "./entity";
 import { ClientLink } from "./entity";
 import { h, type ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -11,7 +11,7 @@ import type { AppDetail, HouseApp, Range } from "../types";
 import { getJSON, usePoll } from "../api";
 import { RANGES, stepOf, windowLabel, type Win } from "../query";
 import { splitSeries, timeTicks } from "../geometry";
-import { AreaChart, Bars, Legend } from "../charts";
+import { AreaChart, Bars, HourSparkline, Legend } from "../charts";
 import { Header, Pills, Card, CC, Status, Loading, Empty, AppIcon } from "../ui";
 import { bytes, rate, share, num, appName, category, countryName, clientName, nameSource, plural } from "../format";
 import { appHref, appsSummary, categoriesIn, closesHouse, domainText, matchApp, rulesForApp } from "../house";
@@ -94,6 +94,7 @@ export function Apps({ cat0, q0, range, onRange, win, onWin }: { cat0: string; q
                     {th("Share", "share")}
                     {th(`${periodOf(range)} ↓ · ↑`, "bytes", "desc", true)}
                     {th(`Now, ${windowLabel(win)} avg`, "now", "desc", true)}
+                    <th>Last hour</th>
                     <th>Rules</th>
                   </tr>
                 </thead>
@@ -125,6 +126,7 @@ export function Apps({ cat0, q0, range, onRange, win, onWin }: { cat0: string; q
                           ↓ {rate(a.recent?.down ?? 0)}
                           <br />{" "}↑ {rate(a.recent?.up ?? 0)}
                         </td>
+                        <td>{!a.other && <HourSparkline s={a.spark} />}</td>
                         <td class="small">{a.other ? "" : <RuleTags rules={rulesForApp(rules, a.app)} names={names} />}</td>
                       </tr>
                     );
@@ -150,7 +152,7 @@ export function AppScreen({ id, range, onRange }: { id: string; range: Range; on
       <Header section="apps" range={range} onRange={onRange} />
       <main class="main">
         <Status polled={polled} />
-        <p class="crumbs"><a href="#/apps">Apps</a> / {d ? appName(d.app.name) : id}</p>
+        <ChipChain base={[{ label: "Apps", href: "#/apps" }]} last={d ? appName(d.app.name) : id} parents={parentsOf({ kind: "app", id }, d)} />
         {!d ? (
           <Loading />
         ) : (

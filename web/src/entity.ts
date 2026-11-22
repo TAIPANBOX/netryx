@@ -3,7 +3,7 @@
 // and a link from a detail carries where it came from, for the breadcrumbs.
 // No DOM here, so node tests cover it.
 
-import { countryName } from "./format";
+import { appName, category, countryName } from "./format";
 
 export type Entity =
   | { kind: "client"; mac: string }
@@ -87,4 +87,30 @@ export function stretchHref(start: string, seconds: number): string | undefined 
   if (Number.isNaN(t) || !(seconds > 0)) return undefined;
   const iso = (ms: number) => new Date(ms).toISOString().replace(".000Z", "Z");
   return "#/flows?" + new URLSearchParams({ from: iso(t), to: iso(t + seconds * 1000) }).toString();
+}
+
+/** What a thing belongs to, as chips on its view: an app's category, a network's countries, a domain's apps, a client's group. */
+export function parentsOf(e: Entity, d: unknown, names: { group?: (id: string) => string } = {}): Crumb[] {
+  // The reads are typed loosely: a view shows what is there.
+  const x = (d ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const out: Crumb[] = [];
+  const add = (to: Entity, label: string) => {
+    const href = entityHref(to);
+    if (href && label && !out.some((c) => c.href === href)) out.push({ label, href });
+  };
+  switch (e.kind) {
+    case "app":
+      if (x.app?.category) add({ kind: "category", id: x.app.category }, category(x.app.category));
+      break;
+    case "network":
+      for (const c of x.countries ?? []) add({ kind: "country", cc: c.cc }, countryName(c.cc));
+      break;
+    case "domain":
+      for (const a of x.apps ?? []) if (a.app?.id !== "unknown") add({ kind: "app", id: a.app?.id ?? "" }, appName(a.app?.name ?? ""));
+      break;
+    case "client":
+      if (x.group) add({ kind: "group", id: x.group }, names.group?.(x.group) ?? x.group);
+      break;
+  }
+  return out;
 }
