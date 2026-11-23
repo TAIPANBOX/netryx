@@ -75,6 +75,8 @@ type EngineOptions struct {
 	Roster *Roster
 	Seen   func() []Seen
 	Event  func(Event)
+	// Intervene is told each intervention the engine applies; nil tells none.
+	Intervene func(Intervention)
 	// Known is what the baseline is taken from when it differs from Seen:
 	// the house's devices and the week's history (nil: Seen).
 	Known func() []string
@@ -523,6 +525,7 @@ func (e *Engine) reload() error {
 	}
 
 	e.mu.Lock()
+	told := interventionsOf(e.inForce, cfg, spent, !e.everApplied, now)
 	e.shown, e.inForce, e.read = cfg, cfg, true
 	e.appliedOK, e.problem, e.missing = true, "", nil
 	e.cutSig = sigs
@@ -567,6 +570,7 @@ func (e *Engine) reload() error {
 	e.next = NextRecompile(e.o.Loc, now)
 	e.east, e.eastSet = east, true
 	e.mu.Unlock()
+	e.tell(told)
 
 	// The file the init loads at boot is the whole ruleset, every set
 	// written, since the kernel then holds nothing.
@@ -966,6 +970,7 @@ func (e *Engine) Named(mac string, local, remote netip.AddrPort, proto uint8, na
 	}
 	e.mu.Unlock()
 	if cover {
+		e.tell([]Intervention{blockedBy(r, mac)})
 		e.cutLater(local, remote, proto)
 	}
 }
@@ -1246,6 +1251,7 @@ func (e *Engine) cut(now time.Time) {
 	e.mu.Lock()
 	cov := map[flowKey]bool{}
 	var todo []flows.Flow
+	var told []Intervention
 	for _, f := range live {
 		if f.MAC == flows.RouterKey || f.Dir == flows.Local || (f.Proto != 6 && f.Proto != 17) {
 			continue
@@ -1267,11 +1273,13 @@ func (e *Engine) cut(now time.Time) {
 		cov[k] = true
 		if !e.covered[k] {
 			todo = append(todo, f)
+			told = append(told, blockedBy(r, f.MAC))
 			e.queueCut(r, f.MAC, f.Remote.Addr().Unmap(), f.Proto, f.Local.Port())
 		}
 	}
 	e.covered = cov
 	e.mu.Unlock()
+	e.tell(told)
 	for _, f := range todo {
 		e.del(f.Local, f.Remote, f.Proto, f.Dir == flows.In)
 	}
@@ -1995,6 +2003,112 @@ func (e *Engine) event(kind, mac, host string) {
 	if e.o.Event != nil {
 		e.o.Event(Event{Kind: kind, MAC: mac, Hostname: host})
 	}
+}
+
+// Intervention is something done to a device that the console journals: an
+// allowance in force (by the owner or the agent), a limit spent, a
+// connection a rule cut, a device let out of quarantine, isolated or
+// released. Kind is the journal's.
+type Intervention struct {
+	Kind, ID, MAC, Rule, Name, By string
+	Until                         time.Time
+}
+
+// tell hands the interventions to the journal. The caller holds no lock.
+func (e *Engine) tell(ivs []Intervention) {
+	if e.o.Intervene == nil {
+		return
+	}
+	for _, iv := range ivs {
+		e.o.Intervene(iv)
+	}
+}
+
+// ruleWhat is what a rule holds, as the journal names it, so an intervention
+// still reads once the rule is gone.
+func ruleWhat(r Rule) string {
+	if r.What == "all" {
+		return "everything"
+	}
+	w := strings.Join(r.Targets, ", ")
+	if len(w) > 64 {
+		w = w[:61] + "..."
+	}
+	return w
+}
+
+// authorOf is who wrote a section: the agent's carry its prefix.
+func authorOf(id string) string {
+	if AgentOwned(id) {
+		return "agent"
+	}
+	return "owner"
+}
+
+func blockedBy(r Rule, mac string) Intervention {
+	return Intervention{Kind: "blocked", MAC: mac, Rule: r.ID, Name: ruleWhat(r), By: authorOf(r.ID)}
+}
+
+// interventionsOf is what an apply of cfg over prev puts in force: every
+// allowance still running and every member a limit has spent (the journal
+// writes each once), and, after the first apply, the devices the owner let
+// out of quarantine, isolated or released since prev.
+func interventionsOf(prev, cfg Config, spent map[string]map[string]time.Time, first bool, now time.Time) []Intervention {
+	var out []Intervention
+	rules := map[string]Rule{}
+	for _, r := range cfg.Rules {
+		rules[r.ID] = r
+	}
+	for _, a := range cfg.Allows {
+		if !a.Until.After(now) {
+			continue
+		}
+		iv := Intervention{Kind: "allow", ID: a.ID, MAC: a.Member, Rule: a.Rule, By: authorOf(a.ID), Until: a.Until}
+		if r, ok := rules[a.Rule]; ok {
+			iv.Name = ruleWhat(r)
+		}
+		out = append(out, iv)
+	}
+	ids := make([]string, 0, len(spent))
+	for id := range spent {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		macs := make([]string, 0, len(spent[id]))
+		for m := range spent[id] {
+			macs = append(macs, m)
+		}
+		sort.Strings(macs)
+		for _, m := range macs {
+			out = append(out, Intervention{Kind: "limit_spent", MAC: m, Rule: id, Name: ruleWhat(rules[id]), By: "router", Until: spent[id][m]})
+		}
+	}
+	if first {
+		return out
+	}
+	diff := func(was, is []string, on, off string) {
+		w, n := map[string]bool{}, map[string]bool{}
+		for _, m := range was {
+			w[m] = true
+		}
+		for _, m := range is {
+			n[m] = true
+		}
+		for _, m := range is {
+			if !w[m] {
+				out = append(out, Intervention{Kind: on, MAC: m, By: "owner"})
+			}
+		}
+		for _, m := range was {
+			if !n[m] && off != "" {
+				out = append(out, Intervention{Kind: off, MAC: m, By: "owner"})
+			}
+		}
+	}
+	diff(approvedIn(prev), approvedIn(cfg), "approved", "")
+	diff(isolatedOf(prev), isolatedOf(cfg), "isolated", "released")
+	return out
 }
 
 // Event is what the engine tells the alerts; Count is how many newcomers a

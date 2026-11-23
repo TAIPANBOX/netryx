@@ -919,6 +919,36 @@ enforced, and that is a debt rather than a decision.
   `TestRhythmTrendIsTheLastWeekAgainstTheOneBefore`, `TestRhythmFindsActivityInHoursItUsuallySleeps`,
   `TestADeviceAnswersItsRhythm`; the page: the rhythm tests in `web/src/rhythm.test.ts`)
 
+## The promise about interventions
+
+- **Every intervention on a device is journalled once, in one file appended
+  to**: `<state>/interventions.jsonl` (0600, a file others could read made
+  private when opened, kept by sysupgrade with `/etc/netryx/`), one JSON line
+  each: an allowance in force (by the owner or the agent, with its rule and
+  until), a limit spent (until midnight), a device let out of quarantine,
+  isolated or released (the owner's, told after the engine's first apply,
+  which only learns how things stand), a connection a rule cut (with what the
+  rule holds and who wrote it, at most once an hour a device and rule) and a
+  connection the owner cut with the button (with whether it was held). The
+  same allowance until the same time and the same limit spent until the same
+  midnight are one line, across restarts. The newest 1000 of the last 30
+  days are kept; the file is written whole again (a temporary file renamed
+  over it) only at twice that. Every line is checked when read: a damaged
+  one, an unknown kind or an overlong field is skipped and counted, and a
+  line a power cut tore is never glued to the next. `GET
+  /api/devices/{mac}/interventions` lists a device's (and its group's) newest
+  first, at most 100, with since when the journal counts.
+  (test: the `internal/journal` tests, `TestTheEngineTellsTheAllowancesLimitsAndBlocksItApplies`,
+  `TestTheEngineTellsApprovalsAndIsolationAfterItsFirstApply`, `TestADeviceAnswersItsInterventions`,
+  `TestAButtonCutIsJournalled`, `TestTheJournalTakesWhatTheEngineApplies`;
+  the page: `web/src/interventions.test.ts`; @decided 2026-11-23: an append-only
+  file on flash, 1000 entries or 30 days)
+- **The journal fits the flash**: under 50 interventions a day for 30 days,
+  each append counted as a 4 KiB page and each rewrite at its size, it writes
+  at most `NETRYX_JOURNAL_BUDGET_KB` (256) a day. (gate: `scripts/journal-budget.sh`,
+  run as `scripts/forge.sh sh scripts/journal-budget.sh`; @measured that command
+  2026-11-23 on forge: 200.3 KB a day)
+
 ## The promise about the daily file
 
 - **One file per closed UTC day, written once and never again**:

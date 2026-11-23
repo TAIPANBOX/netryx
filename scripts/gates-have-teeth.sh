@@ -261,6 +261,13 @@ mkdir -p "$work/noflash/scripts"
 cp scripts/flash-budget.sh "$work/noflash/scripts/"
 red   "flash-budget, nothing to measure" sh "$work/noflash/scripts/flash-budget.sh"
 
+# ---- gate: the interventions journal fits the flash --------------------------
+green "journal-budget, real tree" sh scripts/journal-budget.sh
+red   "journal-budget, a budget of 1 KB" env NETRYX_JOURNAL_BUDGET_KB=1 sh scripts/journal-budget.sh
+mkdir -p "$work/nojournal/scripts"
+cp scripts/journal-budget.sh "$work/nojournal/scripts/"
+red   "journal-budget, nothing to measure" sh "$work/nojournal/scripts/journal-budget.sh"
+
 # ---- gate: everything a person reads is English ------------------------------
 # Faults go into copies of the real sources; a test file's Cyrillic is data and
 # must not trip it.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -11,9 +12,11 @@ import (
 	"netryx/internal/rules"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"netryx/internal/api"
 	"netryx/internal/auth"
@@ -586,5 +589,62 @@ func TestTheConsoleChannelSaysWhetherTheBotWasFound(t *testing.T) {
 	}
 	if ready, why = telegramState("telegram", missing); ready || !strings.HasPrefix(why, "Hermes is not installed") {
 		t.Errorf("telegram, no bot: %v %q", ready, why)
+	}
+}
+
+// The console journals what the engine applies in <state>/interventions.jsonl:
+// an allowance the agent gave reaches the file once the rules are applied.
+func TestTheJournalTakesWhatTheEngineApplies(t *testing.T) {
+	rt := &router{}
+	until := time.Now().Add(time.Hour).Unix()
+	conf := confWithPhone + fmt.Sprintf(`
+config allow 'agent_more'
+	option rule ''
+	option member '02:4e:58:00:00:03'
+	option until '%d'
+`, until)
+	c, err := buildConsole(rulesOptions(t, conf, rt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.rules.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(c.o.State, "interventions.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"kind":"allow","id":"agent_more","mac":"02:4e:58:00:00:03"`) || !strings.Contains(string(b), `"by":"agent"`) {
+		t.Errorf("the journal holds:\n%s", b)
+	}
+}
+
+// An allowance the owner writes from the page is journalled by the reload
+// the write runs.
+func TestAnAllowanceWrittenFromThePageIsJournalled(t *testing.T) {
+	rt := &router{}
+	c, err := buildConsole(rulesOptions(t, confWithPhone, rt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.rules.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	// The fake router does not apply the batch; uci on the router commits
+	// it to the file the engine reads, which this stands in for.
+	until := strconv.FormatInt(time.Now().Add(30*time.Minute).Unix(), 10)
+	f, err := os.OpenFile(c.o.RulesConfig, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Fprintf(f, "\nconfig allow 'a_more'\n\toption rule ''\n\toption member '02:4e:58:00:00:03'\n\toption until '%s'\n", until)
+	f.Close()
+	ra := &rulesAPI{eng: c.rules, conf: c.o.RulesConfig, labels: filepath.Join(c.o.State, "labels.json"), run: c.o.NFT, inv: c.inv}
+	if err := ra.Write([]uciconf.Change{{Section: "a_more", Type: "allow", Replace: true, Set: map[string][]string{"rule": {""}, "member": {"02:4e:58:00:00:03"}, "until": {until}}}}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(c.o.State, "interventions.jsonl"))
+	if !strings.Contains(string(b), `"kind":"allow","id":"a_more"`) || !strings.Contains(string(b), `"by":"owner"`) {
+		t.Errorf("the journal holds:\n%s", b)
 	}
 }
