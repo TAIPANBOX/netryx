@@ -1126,6 +1126,14 @@ enforced, and that is a debt rather than a decision.
   `/usr/share/nftables.d/chain-pre/input/netryx.nft`, accepting exactly DNS
   redirected to 553 (`ct status dnat`), and the install reloads fw4.
   (gate: `scripts/package-sane.sh`; measured docs/stage2b-measured.md section 7)
+- **The first screen stays small, whatever is added**: the page is split into
+  chunks by esbuild, every screen past the overview and the clients list
+  loaded when it is first opened (`web/src/lazy.tsx`); the first screen
+  (`app.js` and every chunk it imports statically, transitively) is held to
+  60 KB gzipped, each chunk to 24 KB and all files together to 160 KB. A chunk
+  that cannot be loaded (an upgrade under an open page) says so and offers a
+  reload. (gate: `scripts/bundle-budget.sh`, run by `web/build.sh`, with its
+  cases in `scripts/gates-have-teeth.sh`)
 - **A package never ships the "not built" page by accident.** `build.sh`
   builds the page first where node is installed and refuses to package
   without `internal/web/dist/index.html` unless `NETRYX_ALLOW_NO_UI=1`.

@@ -41,10 +41,13 @@ fi
 # and offers a reload.
 build=$(find src -type f ! -name '*.test.ts' | LC_ALL=C sort | xargs cat | sha256sum | cut -c1-12)
 printf '%s\n' "$build" >"$out/build.txt"
+# Screens past the first are split into chunks the page loads when they are
+# opened (dynamic import), so the first screen does not grow with each new one.
 npx esbuild src/main.tsx --bundle --minify --format=esm --target=es2020 \
+	--splitting --entry-names=app --chunk-names="chunks/[name]-[hash]" \
 	--define:__NETRYX_BUILD__="\"$build\"" \
 	--jsx-factory=h --jsx-fragment=Fragment --legal-comments=none \
-	--log-level=warning --outfile="$out/app.js"
+	--log-level=warning --outdir="$out"
 cp src/index.html src/style.css "$out/"
 
 rm -rf dist-test
@@ -53,10 +56,6 @@ for t in src/*.test.ts; do
 		--outfile="dist-test/$(basename "$t" .ts).mjs"
 done
 
-# The page is served from a router over Wi-Fi: the budget is on what crosses
-# the air, which is the gzipped bundle.
-raw=$(wc -c <"$out/app.js" | tr -d ' ')
-gz=$(gzip -9c "$out/app.js" | wc -c | tr -d ' ')
-budget=61440
-echo "app.js: $raw bytes, gzip $gz bytes (budget $budget, slack $((budget - gz)))"
-[ "$gz" -lt "$budget" ] || { echo "app.js is over the 60 KB gzip budget" >&2; exit 1; }
+# The page is served from a router over Wi-Fi: the budgets are on what crosses
+# the air, the gzipped bundle and its chunks (scripts/bundle-budget.sh).
+sh ../scripts/bundle-budget.sh "$out"
