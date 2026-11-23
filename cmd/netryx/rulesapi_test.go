@@ -599,7 +599,7 @@ func TestTheJournalTakesWhatTheEngineApplies(t *testing.T) {
 	until := time.Now().Add(time.Hour).Unix()
 	conf := confWithPhone + fmt.Sprintf(`
 config allow 'agent_more'
-	option rule ''
+	option rule '*'
 	option member '02:4e:58:00:00:03'
 	option until '%d'
 `, until)
@@ -637,10 +637,10 @@ func TestAnAllowanceWrittenFromThePageIsJournalled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Fprintf(f, "\nconfig allow 'a_more'\n\toption rule ''\n\toption member '02:4e:58:00:00:03'\n\toption until '%s'\n", until)
+	fmt.Fprintf(f, "\nconfig allow 'a_more'\n\toption rule '*'\n\toption member '02:4e:58:00:00:03'\n\toption until '%s'\n", until)
 	f.Close()
 	ra := &rulesAPI{eng: c.rules, conf: c.o.RulesConfig, labels: filepath.Join(c.o.State, "labels.json"), run: c.o.NFT, inv: c.inv}
-	if err := ra.Write([]uciconf.Change{{Section: "a_more", Type: "allow", Replace: true, Set: map[string][]string{"rule": {""}, "member": {"02:4e:58:00:00:03"}, "until": {until}}}}); err != nil {
+	if err := ra.Write([]uciconf.Change{{Section: "a_more", Type: "allow", Replace: true, Set: map[string][]string{"rule": {"*"}, "member": {"02:4e:58:00:00:03"}, "until": {until}}}}); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(filepath.Join(c.o.State, "interventions.jsonl"))

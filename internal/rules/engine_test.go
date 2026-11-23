@@ -1042,7 +1042,7 @@ config allow 'a1'
 	option until '%d'
 
 config allow 'agent_x'
-	option rule ''
+	option rule '*'
 	option member '02:4e:58:00:00:03'
 	option until '%d'
 

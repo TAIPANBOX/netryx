@@ -141,7 +141,7 @@ func WithRules(r Rules) Option { return func(s *server) { s.wr = r } }
 func (s *server) writeRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/rules", s.routeM(methods{http.MethodGet: s.rulesList, http.MethodPost: s.ruleCreate}))
 	mux.HandleFunc("/api/rules/{id}", s.routeM(methods{http.MethodPut: s.ruleReplace, http.MethodDelete: s.ruleDelete}))
-	mux.HandleFunc("/api/allow", s.routeM(methods{http.MethodPost: s.allowCreate}))
+	mux.HandleFunc("/api/allow", s.routeM(methods{http.MethodGet: s.allowList, http.MethodPost: s.allowCreate}))
 	mux.HandleFunc("/api/allow/{id}", s.routeM(methods{http.MethodDelete: s.allowDelete}))
 	mux.HandleFunc("/api/groups", s.routeM(methods{http.MethodGet: s.groupsList}))
 	mux.HandleFunc("/api/groups/{id}", s.routeM(methods{http.MethodPut: s.groupPut, http.MethodDelete: s.groupDelete}))
@@ -667,6 +667,29 @@ type allowBody struct {
 	Rule    string `json:"rule"`
 	MAC     string `json:"mac"`
 	Minutes int    `json:"minutes"`
+}
+
+type badAllowJSON struct {
+	ID     string `json:"id"`
+	Member string `json:"member"`
+	Why    string `json:"why"`
+}
+
+// allowList answers the allowance sections of the config that open nothing,
+// with why, read as the model reads the file now: the owner sees an
+// allowance that does not work instead of trusting it.
+func (s *server) allowList(*http.Request) (any, error) {
+	secs, err := s.wr.Sections()
+	if err != nil {
+		return nil, err
+	}
+	out := struct {
+		Invalid []badAllowJSON `json:"invalid"`
+	}{Invalid: []badAllowJSON{}}
+	for _, b := range rules.FromSections(secs, s.wr.Known(), s.now()).BadAllows {
+		out.Invalid = append(out.Invalid, badAllowJSON{ID: b.ID, Member: b.Member, Why: b.Why})
+	}
+	return out, nil
 }
 
 func (s *server) allowCreate(r *http.Request) (any, error) {

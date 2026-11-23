@@ -194,7 +194,7 @@ func TestAPassedAllowanceIsDropped(t *testing.T) {
 	c := FromSections([]uciconf.Section{
 		sec("allow", "a_old", "rule", "r1", "member", "02:4e:58:00:00:03", "until", strconv.FormatInt(now.Add(-time.Second).Unix(), 10)),
 		sec("allow", "a_live", "rule", "r1", "member", "02:4E:58:00:00:03", "until", strconv.FormatInt(now.Add(time.Minute).Unix(), 10)),
-		sec("allow", "a_all", "rule", "", "member", "02:4e:58:00:00:04", "until", strconv.FormatInt(now.Add(time.Minute).Unix(), 10)),
+		sec("allow", "a_all", "rule", "*", "member", "02:4e:58:00:00:04", "until", strconv.FormatInt(now.Add(time.Minute).Unix(), 10)),
 		sec("allow", "a_nomac", "rule", "r1", "member", "iphone", "until", strconv.FormatInt(now.Add(time.Minute).Unix(), 10)),
 	}, fake{}, now)
 	if len(c.Allows) != 2 || c.Allows[0].ID != "a_live" || c.Allows[0].Member != "02:4e:58:00:00:03" ||
@@ -229,7 +229,7 @@ func TestGroupsAndAllowancesPastTheLimitAreCut(t *testing.T) {
 		secs = append(secs, sec("group", "g"+strconv.Itoa(i), "name", "G"))
 	}
 	for i := 0; i < MaxAllows+2; i++ {
-		secs = append(secs, sec("allow", "a"+strconv.Itoa(i), "rule", "", "member", "02:4e:58:00:00:03",
+		secs = append(secs, sec("allow", "a"+strconv.Itoa(i), "rule", "*", "member", "02:4e:58:00:00:03",
 			"until", strconv.FormatInt(now.Add(time.Hour).Unix(), 10)))
 	}
 	c := FromSections(secs, fake{}, now)
@@ -271,13 +271,14 @@ func TestADeviceWithABadMACIsLeftOutOfItsGroupAndTheRuleStillApplies(t *testing.
 	}
 }
 
-func TestAnAllowNeedsItsRuleOptionButMayLeaveItEmpty(t *testing.T) {
+func TestAnAllowNeedsAnExplicitRule(t *testing.T) {
 	until := strconv.FormatInt(now.Add(time.Minute).Unix(), 10)
 	c := FromSections([]uciconf.Section{
 		sec("allow", "a_keyless", "member", "02:4e:58:00:00:03", "until", until),
 		sec("allow", "a_empty", "rule", "", "member", "02:4e:58:00:00:03", "until", until),
+		sec("allow", "a_star", "rule", "*", "member", "02:4e:58:00:00:03", "until", until),
 	}, fake{}, now)
-	if len(c.Allows) != 1 || c.Allows[0].ID != "a_empty" || c.Allows[0].Rule != "" {
+	if len(c.Allows) != 1 || c.Allows[0].ID != "a_star" || c.Allows[0].Rule != "" || len(c.BadAllows) != 2 {
 		t.Fatalf("allows %+v", c.Allows)
 	}
 }
@@ -303,28 +304,55 @@ func TestMissingOrUnknownFieldsSayWhat(t *testing.T) {
 	}
 }
 
-func TestAnAllowWithAnEmptyRuleSurvivesTheConfigFile(t *testing.T) {
+// An allowance lifts something only when it says what: every rule only as
+// an explicit '*', one rule by its id. A section with an empty rule or none
+// (an empty uci set deletes the option, a hand edit, a cut-short config)
+// opens nothing, and is listed with its reason so the owner sees it does not
+// work; so is one whose member, time or length cannot be. One that has ended
+// is neither.
+func TestAnAllowanceWithoutAnExplicitRuleIsNotInForce(t *testing.T) {
 	until := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC).Add(time.Hour).Unix()
-	text := fmt.Sprintf("config allow 'a1'\n\toption rule ''\n\toption member '02:4e:58:00:00:01'\n\toption until '%d'\n", until)
-	read := func(s string) Config {
-		secs, err := uciconf.Parse(strings.NewReader(s))
-		if err != nil {
-			t.Fatal(err)
+	sec := func(name, rule string, opts string) string {
+		return fmt.Sprintf("config allow '%s'\n%s\toption member '02:4e:58:00:00:01'\n\toption until '%d'\n%s", name, rule, until, opts)
+	}
+	text := sec("a_empty", "\toption rule ''\n", "") +
+		sec("a_none", "", "") +
+		sec("a_star", "\toption rule '*'\n", "") +
+		sec("a_one", "\toption rule 'r1'\n", "") +
+		fmt.Sprintf("config allow 'a_long'\n\toption rule '*'\n\toption member '02:4e:58:00:00:01'\n\toption until '%d'\n", until+5*3600) +
+		"config allow 'a_who'\n\toption rule '*'\n\toption member 'kids'\n\toption until '1'\n" +
+		fmt.Sprintf("config allow 'a_over'\n\toption rule '*'\n\toption member '02:4e:58:00:00:01'\n\toption until '%d'\n", until-2*3600)
+	secs, err := uciconf.Parse(strings.NewReader(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := FromSections(secs, fake{}, now)
+	in := map[string]string{}
+	for _, a := range c.Allows {
+		in[a.ID] = a.Rule
+	}
+	if len(in) != 2 || in["a_star"] != "" || in["a_one"] != "r1" {
+		t.Errorf("in force %v, want a_star for every rule and a_one for r1 alone", in)
+	}
+	bad := map[string]string{}
+	for _, b := range c.BadAllows {
+		bad[b.ID] = b.Why
+	}
+	for _, id := range []string{"a_empty", "a_none", "a_long", "a_who"} {
+		if bad[id] == "" {
+			t.Errorf("%s is not listed as not in force: %v", id, bad)
 		}
-		return FromSections(secs, fake{}, now)
 	}
-	c := read(text)
-	if len(c.Allows) != 1 || c.Allows[0].Rule != "" || c.Allows[0].Member != "02:4e:58:00:00:01" {
-		t.Fatalf("empty rule: %+v", c.Allows)
+	if !strings.Contains(bad["a_empty"], "'*'") || !strings.Contains(bad["a_none"], "'*'") {
+		t.Errorf("an allowance with no rule should say to write '*': %q, %q", bad["a_empty"], bad["a_none"])
 	}
-	if c := read(strings.Replace(text, "\toption rule ''\n", "", 1)); len(c.Allows) != 0 {
-		t.Fatalf("no rule option must open nothing: %+v", c.Allows)
+	if _, listed := bad["a_over"]; listed || len(bad) != 4 {
+		t.Errorf("an ended allowance is not a broken one: %v", bad)
 	}
 }
 
 // uci deletes an option set to an empty value, so the console writes an
-// allowance for every rule as rule '*', a name no rule can have; it reads as
-// every rule, like an empty value written by hand.
+// allowance for every rule as rule '*', a name no rule can have.
 func TestAnAllowanceForEveryRuleIsWrittenAsAStar(t *testing.T) {
 	until := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC).Add(time.Hour).Unix()
 	secs, err := uciconf.Parse(strings.NewReader(fmt.Sprintf("config allow 'a1'\n\toption rule '*'\n\toption member '02:4e:58:00:00:01'\n\toption until '%d'\n", until)))
@@ -400,7 +428,7 @@ func TestOneOptionValueMayHoldAWhitespaceSeparatedList(t *testing.T) {
 	}
 	// An allowance's member stays one MAC.
 	a := FromSections([]uciconf.Section{
-		sec("allow", "x", "rule", "", "member", "02:4e:58:00:00:03 02:4e:58:00:00:04", "until", strconv.FormatInt(now.Add(time.Hour).Unix(), 10)),
+		sec("allow", "x", "rule", "*", "member", "02:4e:58:00:00:03 02:4e:58:00:00:04", "until", strconv.FormatInt(now.Add(time.Hour).Unix(), 10)),
 	}, fake{}, now)
 	if len(a.Allows) != 0 {
 		t.Errorf("an allowance with two MACs was taken: %+v", a.Allows)
@@ -432,7 +460,7 @@ func TestAgentDeviceAndGroupSectionsAreIgnored(t *testing.T) {
 // agent cannot write an allowance that lasts for ever.
 func TestAnAllowanceLongerThanFourHoursIsDropped(t *testing.T) {
 	at := func(m int) uciconf.Section {
-		return sec("allow", "a"+strconv.Itoa(m), "rule", "", "member", "02:4e:58:00:00:03",
+		return sec("allow", "a"+strconv.Itoa(m), "rule", "*", "member", "02:4e:58:00:00:03",
 			"until", strconv.FormatInt(now.Add(time.Duration(m)*time.Minute).Unix(), 10))
 	}
 	c := FromSections([]uciconf.Section{at(240), at(241)}, fake{}, now)
