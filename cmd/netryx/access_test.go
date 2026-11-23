@@ -123,7 +123,7 @@ func TestEveryViewNeedsALogin(t *testing.T) {
 	for _, p := range []string{
 		"/api/overview", "/api/devices", "/api/devices/" + mac, "/api/devices/" + mac + "/traffic",
 		"/api/devices/" + mac + "/apps", "/api/devices/" + mac + "/destinations",
-		"/api/devices/" + mac + "/live", "/api/flows", "/api/session", "/api/nothing", "/index.html",
+		"/api/devices/" + mac + "/live", "/api/devices/" + mac + "/days", "/api/flows", "/api/session", "/api/nothing", "/index.html",
 	} {
 		rec := do(http.MethodGet, p, house, router, false)
 		var e struct {

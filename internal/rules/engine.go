@@ -743,6 +743,22 @@ func (e *Engine) counters() (bool, map[string]uint64) {
 	return true, hits
 }
 
+// Hits is every rule's hit counter as the kernel holds it now, by rule id
+// (the implicit rules too: iso, f_dot); nil when the table cannot be read.
+func (e *Engine) Hits() map[string]uint64 {
+	ok, all := e.counters()
+	if !ok {
+		return nil
+	}
+	out := map[string]uint64{}
+	for n, v := range all {
+		if id, ok := strings.CutPrefix(n, "hits_"); ok && id != "" {
+			out[id] = v
+		}
+	}
+	return out
+}
+
 // prune deletes, in a second small transaction, the chains, sets and counters
 // the applied script no longer declares: those of removed rules, and country
 // and app sets no rule uses (spec 6.4: they exist while a rule uses them).

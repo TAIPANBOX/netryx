@@ -2426,3 +2426,22 @@ func TestADeviceNamedInTheConfigIsInTheBaseline(t *testing.T) {
 		t.Fatal("a device named in the config is not in the baseline")
 	}
 }
+
+// The daily file keeps every rule's counter at a day's close, by rule id,
+// the implicit rules among them; a table that cannot be read gives none.
+func TestTheHitsAreEveryRulesCounterByID(t *testing.T) {
+	r := newRig(t, tgForPhone, winter(t))
+	r.nft.present = true
+	for n, v := range map[string]uint64{"hits_tg": 50, "hits_iso": 3, "other_counter": 9} {
+		r.nft.objects["counter "+n] = true
+		r.nft.hits[n] = v
+	}
+	got := r.e.Hits()
+	if len(got) != 2 || got["tg"] != 50 || got["iso"] != 3 {
+		t.Fatalf("hits %v, want tg 50 and iso 3 alone", got)
+	}
+	r.nft.present = false
+	if got := r.e.Hits(); got != nil {
+		t.Fatalf("no table, hits %v", got)
+	}
+}
