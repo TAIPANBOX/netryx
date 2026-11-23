@@ -206,7 +206,7 @@ export function DeviceActions({ d }: { d: Device }) {
   };
   const thirty = () =>
     void more.run(async () => {
-      const r = await sendJSON<{ id: string; until: number }>("POST", "/api/allow", { rule: "", mac, minutes: 30 });
+      const r = await sendJSON<{ id: string; until: number }>("POST", "/api/allow", { rule: "*", mac, minutes: 30 });
       return {
         note: `Allowed 30 min more, until ${time(new Date(r.until * 1000).toISOString())}.`,
         undo: r.id ? () => sendJSON("DELETE", `/api/allow/${encodeURIComponent(r.id)}`) : undefined,

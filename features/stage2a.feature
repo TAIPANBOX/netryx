@@ -218,6 +218,7 @@ Feature: the household decides what a device may reach, and the router enforces 
     When the rules are applied
     Then the one for every rule, written as '*', lifts every rule but a country's, and the one for a rule lifts that rule alone
     And the one with no rule or an empty one opens nothing and the Rules screen lists it with why
+    And the console asked for an allowance without a rule refuses it, so a client's mistake never widens access
     # -> TestAnAllowanceForEveryRuleIsWrittenAsAStar
     # -> TestAnAllowanceWithoutAnExplicitRuleIsNotInForce
     # -> TestAnAllowNeedsAnExplicitRule

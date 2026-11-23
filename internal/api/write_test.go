@@ -294,9 +294,17 @@ func TestAnAllowanceEndsOnItsOwn(t *testing.T) {
 		t.Errorf("until %v", got)
 	}
 
-	// No rule means every rule, written as '*': uci deletes an option set to
-	// an empty value, and the model drops an allowance without the key.
-	rec = send(t, h, http.MethodPost, "/api/allow", `{"mac":"`+phone+`","minutes":1}`)
+	// Every rule must be asked for as '*': a request without a rule, or with
+	// an empty one, is a client's mistake and must not widen access.
+	for _, body := range []string{`{"mac":"` + phone + `","minutes":1}`, `{"rule":"","mac":"` + phone + `","minutes":1}`} {
+		n := len(fr.writes)
+		if rec := send(t, h, http.MethodPost, "/api/allow", body); rec.Code != http.StatusBadRequest || len(fr.writes) != n || !strings.Contains(rec.Body.String(), "rule is needed") {
+			t.Errorf("%s: %d %s, %d writes; want 400 saying a rule is needed, and none", body, rec.Code, rec.Body, len(fr.writes)-n)
+		}
+	}
+	// '*' is every rule, and is written as it is: uci deletes an option set
+	// to an empty value, and the model drops an allowance without the key.
+	rec = send(t, h, http.MethodPost, "/api/allow", `{"rule":"*","mac":"`+phone+`","minutes":1}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("an allowance for every rule: %d %s", rec.Code, rec.Body)
 	}
@@ -351,7 +359,7 @@ func TestAnAllowanceEndsOnItsOwn(t *testing.T) {
 		big.secs = append(big.secs, sec("allow", "a_"+strconv.Itoa(i), "rule", "*", "member", phone, "until", strconv.FormatInt(now0.Add(time.Hour).Unix(), 10)))
 	}
 	h2, _ := writable(t, big)
-	if rec := send(t, h2, http.MethodPost, "/api/allow", `{"mac":"`+phone+`","minutes":5}`); rec.Code != http.StatusBadRequest || len(big.writes) != 0 {
+	if rec := send(t, h2, http.MethodPost, "/api/allow", `{"rule":"*","mac":"`+phone+`","minutes":5}`); rec.Code != http.StatusBadRequest || len(big.writes) != 0 || !strings.Contains(rec.Body.String(), "512") {
 		t.Errorf("the 513th allowance: %d", rec.Code)
 	}
 }
@@ -733,7 +741,7 @@ func TestAGeneratedIDNeverTakesAnExistingName(t *testing.T) {
 		t.Errorf("rule id %v, want to skip the taken r_deadbeef: %s", id, rec.Body)
 	}
 	seq = []string{"deadbeef", "00000002"}
-	rec = send(t, h, http.MethodPost, "/api/allow", `{"mac":"`+phone+`","minutes":5}`)
+	rec = send(t, h, http.MethodPost, "/api/allow", `{"rule":"*","mac":"`+phone+`","minutes":5}`)
 	if id := field(decode(t, rec), "id"); id != "a_00000002" {
 		t.Errorf("allowance id %v: %s", id, rec.Body)
 	}
@@ -749,7 +757,7 @@ func TestAnEndedAllowanceIsRemovedWithTheNextWrite(t *testing.T) {
 		sec("allow", "a_now", "rule", "*", "member", phone, "until", at),
 		sec("allow", "a_live", "rule", "*", "member", phone, "until", live))
 	h, _ := writable(t, fr)
-	if rec := send(t, h, http.MethodPost, "/api/allow", `{"mac":"`+phone+`","minutes":5}`); rec.Code != http.StatusOK {
+	if rec := send(t, h, http.MethodPost, "/api/allow", `{"rule":"*","mac":"`+phone+`","minutes":5}`); rec.Code != http.StatusOK {
 		t.Fatalf("POST: %d %s", rec.Code, rec.Body)
 	}
 	b := batchOf(t, fr.writes[0])

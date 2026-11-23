@@ -394,7 +394,7 @@ func TestAWriteRouteIsReachableOnlyThroughTheGate(t *testing.T) {
 		{http.MethodPost, "/api/rules", rule},
 		{http.MethodPut, "/api/rules/r_x", rule},
 		{http.MethodDelete, "/api/rules/r_x", ""},
-		{http.MethodPost, "/api/allow", `{"mac":"` + mac + `","minutes":5}`},
+		{http.MethodPost, "/api/allow", `{"rule":"*","mac":"` + mac + `","minutes":5}`},
 		{http.MethodDelete, "/api/allow/a_x", ""},
 		{http.MethodPut, "/api/groups/kids", `{"name":"Діти"}`},
 		{http.MethodDelete, "/api/groups/kids", ""},

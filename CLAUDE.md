@@ -1243,7 +1243,8 @@ enforced, and that is a debt rather than a decision.
   left out is gone) through `uci -q batch` with the text on stdin, after the
   model has read the would-be config and found the rule valid; an invalid rule
   is a 400 and nothing is written. An allowance always carries a `rule` option,
-  written `'*'` for every rule: only an explicit `'*'` is every rule, so a
+  written `'*'` for every rule, which `POST /api/allow` must be asked for
+  (a request without a rule or with an empty one is a 400): only an explicit `'*'` is every rule, so a
   section with an empty rule or none (an empty uci set deletes the option, a
   hand edit, a cut-short config) opens nothing, is never migrated, and is
   listed with why by `GET /api/allow` and on the Rules screen, as is one

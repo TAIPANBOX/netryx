@@ -704,13 +704,18 @@ func (s *server) allowCreate(r *http.Request) (any, error) {
 	if b.Minutes < 1 || b.Minutes > 240 {
 		return nil, bad("minutes must be from 1 to 240")
 	}
-	if b.Rule != "" && !rules.ValidID(b.Rule) {
-		return nil, bad("rule name: lowercase Latin letters, digits and _, up to 32 characters")
+	// Every rule is asked for as '*'; a request without a rule is a client's
+	// mistake, and must not become an allowance for everything.
+	if b.Rule == "" {
+		return nil, bad("rule is needed: '*' for every rule, or a rule's name")
+	}
+	if b.Rule != rules.EveryRule && !rules.ValidID(b.Rule) {
+		return nil, bad("rule name: lowercase Latin letters, digits and _, up to 32 characters, or '*' for every rule")
 	}
 	until := s.now().Add(time.Duration(b.Minutes) * time.Minute).Unix()
 	var id string
 	return s.write(func(secs []uciconf.Section, cfg rules.Config) ([]uciconf.Change, error) {
-		if b.Rule != "" {
+		if b.Rule != rules.EveryRule {
 			if _, ok := hasSection(secs, "rule", b.Rule); !ok {
 				return nil, bad("no such rule")
 			}
@@ -727,15 +732,11 @@ func (s *server) allowCreate(r *http.Request) (any, error) {
 		if id, err = freeID(secs, "a_"); err != nil {
 			return nil, err
 		}
-		// The rule option is always written: a section without the key is
-		// dropped by the model. Every rule is '*', since uci deletes an
-		// option set to an empty value.
-		rule := b.Rule
-		if rule == "" {
-			rule = rules.EveryRule
-		}
+		// The rule option is always written, every rule as '*': uci deletes
+		// an option set to an empty value, and the model drops an allowance
+		// without the key.
 		return []uciconf.Change{{Section: id, Type: "allow", Replace: true, Set: map[string][]string{
-			"rule": {rule}, "member": {mac}, "until": {strconv.FormatInt(until, 10)},
+			"rule": {b.Rule}, "member": {mac}, "until": {strconv.FormatInt(until, 10)},
 		}}}, nil
 	}, nil, func(plan) any {
 		return map[string]any{"id": id, "rule": b.Rule, "mac": mac, "until": until}
