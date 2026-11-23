@@ -888,6 +888,7 @@ enforced, and that is a debt rather than a decision.
   hour ring still reaches its first hour, and only if the router counted at
   least one hour of it. (test: `TestADayIsWrittenOnceWhenItClosesAndNeverRewritten`,
   `TestTheDailyFileIsWrittenByTheFirstTickAfterTheDayCloses`,
+  `TestTheDailyFileWaitsForHistorySetAsideAsLaterThanTheClock`,
   `TestADayIsAnsweredOnlyOnceClosedAndWholeInTheRing`)
 - **What it holds**: for every hardware address of the day (the router's own
   traffic, the catch-all and unnamed addresses are not devices; the busiest
