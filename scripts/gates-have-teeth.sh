@@ -242,6 +242,15 @@ else
 	fails=$((fails + 1))
 fi
 
+# ---- gate: the history store fits its memory budget --------------------------
+# The heavy profile is run for real: a budget too small for any store must go
+# red, and a copy of the script with no tree to measure must not say OK.
+green "memory-budget, real tree" sh scripts/memory-budget.sh
+red   "memory-budget, a budget of 1 MB" env NETRYX_HEAP_BUDGET_MB=1 sh scripts/memory-budget.sh
+mkdir -p "$work/nomem/scripts"
+cp scripts/memory-budget.sh "$work/nomem/scripts/"
+red   "memory-budget, nothing to measure" sh "$work/nomem/scripts/memory-budget.sh"
+
 # ---- gate: everything a person reads is English ------------------------------
 # Faults go into copies of the real sources; a test file's Cyrillic is data and
 # must not trip it.

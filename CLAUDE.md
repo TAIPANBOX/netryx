@@ -618,15 +618,17 @@ enforced, and that is a debt rather than a decision.
   all its rows in one bucket are held to the key cap plus one, so a flood of
   made-up MACs folds into zero rows; each distinct
   string is stored once in a table of at most four times the cap, which lets go
-  of what the rings no longer hold; a bucket that has closed, or is loaded
-  closed, has its maps rebuilt at their exact size, unchanged in content; a
-  series is never longer than its ring; a loaded file is held to the loading
-  store's bounds.
+  of what the rings no longer hold; a minute that has closed has its map
+  rebuilt at its exact size, and an hour or day that has closed, or is loaded
+  closed, is packed (varint rows, its strings numbered in its own table),
+  unchanged in content, and unpacked again before it takes more; a series is
+  never longer than its ring; a loaded file is held to the loading store's
+  bounds.
   (test: `TestKeysPastTheCapFoldIntoOther`, `TestAMinuteHoldsAtMostAThousandKeys`,
   `TestTopDomainsPerDeviceAreBounded`,
   `TestMarginalsAreBoundedInTotalUnderAFlood`, `TestStringsAreStoredOnce`,
   `TestTheInternTableIsBounded`, `TestClosingABucketCompactsWithoutChangingIt`,
-  `TestSeriesIsBoundedAndRefusesNonsense`,
+  `TestAPackedBucketHoldsEverythingItsMapsHeld`, `TestSeriesIsBoundedAndRefusesNonsense`,
   `TestALoadedFileIsHeldToTheBoundsOfTheStoreThatLoadsIt`)
 - **A ring forgets what it cannot hold, and counts it.** A reused slot never
   adds an old bucket to a new one. A delta whose hour has closed, which takes
@@ -661,6 +663,15 @@ enforced, and that is a debt rather than a decision.
   2026-11-20 on forge, 30 busy devices: 3406 KB written a day, 100.9 MB of heap
   with every ring full and closed buckets compacted, over the 64 MB budget; the
   sizing is decided on the real house's cardinality)
+- **The history store fits its memory budget**: under the heavy profile, with
+  every ring full, its live heap stays under 24 MB (`NETRYX_HEAP_BUDGET_MB`).
+  (gate: `scripts/memory-budget.sh`, run on forge as
+  `scripts/forge.sh sh scripts/memory-budget.sh`; @measured that command
+  2026-11-23 on forge: 17.9 MB with closed hours and days packed, against
+  100.9 MB when they were maps, 3406 KB written a day, unchanged; the budget
+  is 24 MB, under the 64 MB of resident memory set for a 256 MB router. The
+  price is on reads: on forge the heaviest, the top networks over 7 days,
+  takes 69 ms against 57 ms, the top domains over 7 days 26 ms against 20)
 - **History survives a restart, and one bad file never empties the store.** A
   damaged, misnamed, other-version or later-than-the-clock file is skipped and
   named, and every other file loads; a day is read from its own file only if
