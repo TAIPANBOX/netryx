@@ -17,7 +17,8 @@ import { Sankey } from "../charts";
 import { bytes, countryName, date, dayMonth, time, groupName } from "../format";
 import { alertText, type AlertsState } from "../security";
 import { connMap } from "../connmap";
-import { exposureOf, newForNote, rulesOn, usualRows, usualSentence, whereConnected, type NewFor, type Usual } from "../client360";
+import { exposureOf, newForNote, rulesOn, whereConnected, type NewFor } from "../client360";
+import { rhythmBars, rhythmSentences, usualRows, usualSentence, type Rhythm, type Usual } from "../rhythm";
 import { allowText, liveAllows, manifestName, stateOf, usageLabel, usageText, type Usage } from "../rules";
 import { deviceName } from "./Clients";
 import { RuleTitle } from "./Rules";
@@ -226,6 +227,7 @@ function History({ mac, range, onRange, win }: { mac: string; range: Range; onRa
             <Where dest={got.dest} />
             <NewForDevice mac={mac} />
             <UsualWeek mac={mac} />
+            <RhythmCard mac={mac} />
           </div>
         )}
       </Section>
@@ -336,6 +338,46 @@ function UsualWeek({ mac }: { mac: string }) {
                 <span class="usual-swatch usual-unknown" aria-hidden="true" /> too few days
                 <span class="usual-swatch usual-c0 usual-now" aria-hidden="true" /> the hour that just closed
               </span>
+            </Fragment>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** This device's days against its own median day, from the daily files. */
+function RhythmCard({ mac }: { mac: string }) {
+  const polled = usePoll((s) => getJSON<Rhythm>(`/api/devices/${enc(mac)}/rhythm`, s), 300_000, [mac]);
+  const r = polled.data;
+  const W = 10, G = 3, H = 40;
+  return (
+    <Card label="Rhythm" title="Rhythm" aside={<span class="muted small">last 30 days, UTC days</span>}>
+      {!r ? (
+        <Loading />
+      ) : (
+        <div class="col-tight">
+          {rhythmSentences(r).map((t, i) => <span key={i} class={i === 0 ? "small" : "small soft"}>{t}</span>)}
+          {r.confidence !== "no_data" && (
+            <Fragment>
+              <svg class="rhythm-bars" viewBox={`0 0 ${r.days.length * (W + G)} ${H}`} preserveAspectRatio="xMinYMax meet" role="img" aria-label="What this device moved each day, oldest first">
+                {rhythmBars(r).map((b, i) =>
+                  b.height === null ? (
+                    <rect key={b.date} x={i * (W + G)} y={H - 6} width={W} height={6} rx={2} class="rhythm-unknown"><title>{b.title}</title></rect>
+                  ) : (
+                    <rect key={b.date} x={i * (W + G)} y={H - Math.max(b.height > 0 ? 2 : 1, b.height * H)} width={W} height={Math.max(b.height > 0 ? 2 : 1, b.height * H)} rx={2}
+                      class={`rhythm-bar rhythm-${b.kind}${b.yesterday ? " rhythm-yesterday" : ""}`}><title>{b.title}</title></rect>
+                  ),
+                )}
+              </svg>
+              <span class="row-wrap muted small">
+                <span>whole days <b class="soft">{r.wholeDays}</b></span>
+                {r.confidence === "normal" && r.medianDay !== null && <span>median day <b class="soft">{bytes(r.medianDay)}</b></span>}
+                {r.yesterday.bytes !== null && <span>yesterday <b class="soft">{bytes(r.yesterday.bytes)}</b></span>}
+                <span title="The last 7 days against the 7 before them.">trend <b class="soft">{r.trend}</b></span>
+                {r.confidence === "normal" && r.busiestShare > 0 && <span title="The busiest whole day's share of all whole days: a bad day against a bad month.">busiest day <b class="soft">{Math.round(r.busiestShare * 100)}% of the month</b></span>}
+              </span>
+              <span class="muted small">Yesterday is the light bar; a faint bar is a day the router was not counting all of; an outline is a day with nothing counted for this device.</span>
             </Fragment>
           )}
         </div>

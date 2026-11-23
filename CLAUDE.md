@@ -896,7 +896,28 @@ enforced, and that is a debt rather than a decision.
   `TestTheUsualStartsWhenTheDeviceWasFirstSeen`, `TestAnHourIsPlacedByItsMiddleInTheRoutersZone`,
   `TestADeviceAnswersItsUsualWeekAndTheLastHour`, `TestADeviceWithLessThanAWeekOfDaysHasNoUsualYet`,
   `TestTheUsualWeekIsReadInTheRoutersZone`; the page: "the usual says both sides" and
-  "the week grid runs Monday to Sunday" in `web/src/client360.test.ts`)
+  "the week grid runs Monday to Sunday" in `web/src/rhythm.test.ts`)
+
+## The promise about a device's rhythm
+
+- **Yesterday is set against the device's own median day**: `GET
+  /api/devices/{mac}/rhythm` reads the 30 days of daily files since the hour
+  the device was first seen (the earlier of the inventory's and the files'),
+  a day whole only when every hour of it was counted; the median of the whole
+  days, yesterday's bytes and the multiple (to two places), refused (null)
+  when the device has fewer than seven whole days (`too_new`), yesterday was
+  not whole, or the median day is nothing; `no_data` with no counted day. The
+  trend is the last seven days' mean whole day against the seven before
+  (rising at a quarter more, falling at a fifth less, unknown with fewer than
+  four whole days in either). Drift: yesterday's hours, in the router's zone,
+  that moved at least 1 MiB while the usual week's median for that slot is
+  nothing. The page puts the sentence first with both sides named, a bar a
+  day with yesterday marked, a partly counted day faint and a day with
+  nothing counted for the device an outline, never a quiet bar; while too new
+  it shows no median day nor busiest share. Nothing new is written.
+  (test: `TestRhythmComparesYesterdayWithTheMedianDay`, `TestRhythmRefusesAComparisonItCannotMake`,
+  `TestRhythmTrendIsTheLastWeekAgainstTheOneBefore`, `TestRhythmFindsActivityInHoursItUsuallySleeps`,
+  `TestADeviceAnswersItsRhythm`; the page: the rhythm tests in `web/src/rhythm.test.ts`)
 
 ## The promise about the daily file
 
