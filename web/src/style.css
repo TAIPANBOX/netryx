@@ -442,3 +442,20 @@ a.chip:hover { color: var(--link-hover); border-color: var(--link); }
 .ask-card { min-width: 280px; max-width: 460px; }
 .ask-q { width: 100%; font: inherit; color: var(--text); background: var(--bg, #0f141b); border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: vertical; }
 .ask-answer { white-space: pre-wrap; line-height: 1.5; margin: 4px 0; }
+
+/* A device's usual week: one blue, darkest near nothing, lightest at the
+   busiest slot; a slot with too few days is an outline, never a quiet fill. */
+.usual-week { width: 100%; max-width: 520px; height: auto; }
+.usual-axis { fill: var(--muted); font-size: 9px; }
+.usual-c0 { fill: var(--raised); background: var(--raised); }
+.usual-c1 { fill: #184f95; background: #184f95; }
+.usual-c2 { fill: #256abf; background: #256abf; }
+.usual-c3 { fill: #3987e5; background: #3987e5; }
+.usual-c4 { fill: #6da7ec; background: #6da7ec; }
+.usual-c5 { fill: #b7d3f6; background: #b7d3f6; }
+.usual-unknown { fill: none; stroke: var(--edge); stroke-dasharray: 2 2; border: 1px dashed var(--edge); }
+.usual-now { stroke: var(--text); stroke-width: 2; outline: 2px solid var(--text); outline-offset: -2px; }
+.usual-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.usual-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.usual-swatch.usual-unknown { margin-left: 10px; }
+.usual-swatch.usual-now { margin-left: 10px; }

@@ -80,3 +80,20 @@ Feature: a client's name opens its card, and its card opens its full view
     # -> TestTheViewCarriesUPnPMappingsOrSaysThereAreNone
     # -> TestAUPnPMappingNamesItsDevice
     # (the page: "what reaches a device from the internet: forwards, UPnP mappings and connections from outside" in web/src/client360.test.ts)
+
+  Scenario: a client's view shows its usual week and sets the last hour beside it
+    Given a client the router has counted on seven days or more of the last 30
+    When the owner opens its full view
+    Then a grid of the week, in the router's zone, shades each hour of each weekday by the median of what the client moved then
+    And a sentence gives both sides: what the hour that just closed moved, and what that hour of the week usually moves, of how many days
+    And an hour the router was not counting is no sample, and a side it cannot know is said, never read as zero
+    And a client counted on fewer than seven days says it has no usual week yet
+    # -> TestTheUsualIsTheMedianOfEachHourOfTheWeekInTheRoutersZone
+    # -> TestTheUsualStartsWhenTheDeviceWasFirstSeen
+    # -> TestAnHourIsPlacedByItsMiddleInTheRoutersZone
+    # -> TestADeviceAnswersItsUsualWeekAndTheLastHour
+    # -> TestADeviceWithLessThanAWeekOfDaysHasNoUsualYet
+    # -> TestTheUsualWeekIsReadInTheRoutersZone
+    # (the page: "the usual says both sides: what the last hour moved and what that hour of the week usually moves" in web/src/client360.test.ts)
+    # (the page: "the usual says when a side is missing, never reading it as zero" in web/src/client360.test.ts)
+    # (the page: "the week grid runs Monday to Sunday, shades by the busiest slot, keeps unknown slots apart and marks the hour that closed" in web/src/client360.test.ts)

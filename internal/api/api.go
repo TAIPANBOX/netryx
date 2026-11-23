@@ -145,6 +145,8 @@ type server struct {
 	agent Agent
 	// daily is the store of daily files; nil answers every day unknown.
 	daily Daily
+	// loc is the router's zone, in which a device's week is read; nil is UTC.
+	loc *time.Location
 }
 
 // Option configures the API beyond what every caller passes.
@@ -174,6 +176,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/live", s.route(s.live))
 	mux.HandleFunc("/api/devices/{mac}/new", s.route(s.newFor))
 	mux.HandleFunc("/api/devices/{mac}/days", s.route(s.days))
+	mux.HandleFunc("/api/devices/{mac}/usual", s.route(s.usual))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
 	s.agentRoutes(mux)
 	s.houseRoutes(mux)

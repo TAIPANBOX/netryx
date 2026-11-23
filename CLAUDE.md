@@ -876,6 +876,25 @@ enforced, and that is a debt rather than a decision.
   `TestADeviceSaysWhatIsNewForIt`, `TestADeviceSeenForLessThanAWeekIsTooNewToTell`;
   the page: "what is new for a device says when it cannot tell" in `web/src/client360.test.ts`)
 
+## The promise about a device's usual week
+
+- **Usual is the median of each hour of the router's week, from the daily
+  files**: `GET /api/devices/{mac}/usual` places every counted hour of the 30
+  days since the hour the device was first seen in the weekday and hour of the
+  router's zone (by the hour's middle, so DST and half-hour zones place it
+  right), and answers each slot's median of down and up together, null with
+  fewer than two samples; an hour the router was not counting and a day with
+  no file are no sample, a counted quiet hour is a zero. Fewer than seven
+  counted days is too new, said so, with no grid. Beside it, the hour that
+  just closed, from the history, null when the service did not see all of it;
+  the page says both sides and of how many days, and a slot with too few days
+  is an outline, never a quiet fill. Nothing new is written.
+  (test: `TestTheUsualIsTheMedianOfEachHourOfTheWeekInTheRoutersZone`,
+  `TestTheUsualStartsWhenTheDeviceWasFirstSeen`, `TestAnHourIsPlacedByItsMiddleInTheRoutersZone`,
+  `TestADeviceAnswersItsUsualWeekAndTheLastHour`, `TestADeviceWithLessThanAWeekOfDaysHasNoUsualYet`,
+  `TestTheUsualWeekIsReadInTheRoutersZone`; the page: "the usual says both sides" and
+  "the week grid runs Monday to Sunday" in `web/src/client360.test.ts`)
+
 ## The promise about the daily file
 
 - **One file per closed UTC day, written once and never again**:
