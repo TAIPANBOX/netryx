@@ -293,18 +293,18 @@ func TestAnAllowanceEndsOnItsOwn(t *testing.T) {
 		t.Errorf("until %v", got)
 	}
 
-	// No rule means every rule, and the config must say so with an explicit
-	// empty option: a section without the key is dropped by the model.
+	// No rule means every rule, written as '*': uci deletes an option set to
+	// an empty value, and the model drops an allowance without the key.
 	rec = send(t, h, http.MethodPost, "/api/allow", `{"mac":"`+phone+`","minutes":1}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("an allowance for every rule: %d %s", rec.Code, rec.Body)
 	}
 	last := fr.writes[len(fr.writes)-1][0]
-	if v, has := last.Set["rule"]; !has || len(v) != 1 || v[0] != "" {
-		t.Errorf("rule option %v (present %v): must be written as an explicit empty value", v, has)
+	if v, has := last.Set["rule"]; !has || len(v) != 1 || v[0] != "*" {
+		t.Errorf("rule option %v (present %v): must be written as '*'", v, has)
 	}
-	if b := batchOf(t, fr.writes[len(fr.writes)-1]); !strings.Contains(b, ".rule=''\n") {
-		t.Errorf("the batch has no `rule=''` line:\n%s", b)
+	if b := batchOf(t, fr.writes[len(fr.writes)-1]); !strings.Contains(b, ".rule='*'\n") {
+		t.Errorf("the batch has no `rule='*'` line:\n%s", b)
 	}
 
 	for name, body := range map[string]string{

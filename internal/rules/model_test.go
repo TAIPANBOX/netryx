@@ -322,6 +322,24 @@ func TestAnAllowWithAnEmptyRuleSurvivesTheConfigFile(t *testing.T) {
 	}
 }
 
+// uci deletes an option set to an empty value, so the console writes an
+// allowance for every rule as rule '*', a name no rule can have; it reads as
+// every rule, like an empty value written by hand.
+func TestAnAllowanceForEveryRuleIsWrittenAsAStar(t *testing.T) {
+	until := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC).Add(time.Hour).Unix()
+	secs, err := uciconf.Parse(strings.NewReader(fmt.Sprintf("config allow 'a1'\n\toption rule '*'\n\toption member '02:4e:58:00:00:01'\n\toption until '%d'\n", until)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := FromSections(secs, fake{}, now)
+	if len(c.Allows) != 1 || c.Allows[0].Rule != "" {
+		t.Fatalf("rule '*': %+v", c.Allows)
+	}
+	if ValidID("*") {
+		t.Error("'*' could be a rule's name")
+	}
+}
+
 func TestARuleNeedsALowerCaseName(t *testing.T) {
 	const want = "a rule needs a name of lowercase Latin letters, digits and _"
 	long := strings.Repeat("a", 33)

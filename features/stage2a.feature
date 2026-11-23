@@ -55,6 +55,7 @@ Feature: the household decides what a device may reach, and the router enforces 
     When the time passes
     Then the device is blocked again and the finished allowance is removed with the next write
     # -> TestAnAllowanceEndsOnItsOwn
+    # -> TestAnAllowanceForEveryRuleIsWrittenAsAStar
     # -> TestAnEndedAllowanceIsRemovedWithTheNextWrite
 
   Scenario: an allowance lifts only the rule it names

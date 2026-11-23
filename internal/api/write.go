@@ -705,9 +705,14 @@ func (s *server) allowCreate(r *http.Request) (any, error) {
 			return nil, err
 		}
 		// The rule option is always written: a section without the key is
-		// dropped by the model, and an empty value means every rule.
+		// dropped by the model. Every rule is '*', since uci deletes an
+		// option set to an empty value.
+		rule := b.Rule
+		if rule == "" {
+			rule = rules.EveryRule
+		}
 		return []uciconf.Change{{Section: id, Type: "allow", Replace: true, Set: map[string][]string{
-			"rule": {b.Rule}, "member": {mac}, "until": {strconv.FormatInt(until, 10)},
+			"rule": {rule}, "member": {mac}, "until": {strconv.FormatInt(until, 10)},
 		}}}, nil
 	}, nil, func(plan) any {
 		return map[string]any{"id": id, "rule": b.Rule, "mac": mac, "until": until}
