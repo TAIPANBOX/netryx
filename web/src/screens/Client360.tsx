@@ -17,7 +17,7 @@ import { Sankey } from "../charts";
 import { bytes, countryName, date, dayMonth, time, groupName } from "../format";
 import { alertText, type AlertsState } from "../security";
 import { connMap } from "../connmap";
-import { newForNote, rulesOn, whereConnected, type NewFor } from "../client360";
+import { exposureOf, newForNote, rulesOn, whereConnected, type NewFor } from "../client360";
 import { allowText, liveAllows, manifestName, stateOf, usageLabel, usageText, type Usage } from "../rules";
 import { deviceName } from "./Clients";
 import { RuleTitle } from "./Rules";
@@ -111,11 +111,27 @@ function Connected({ d }: { d: Device }) {
   );
 }
 
+/** What reaches the device from the internet: forwards, UPnP mappings, connections from outside. */
+function Exposure({ mac }: { mac: string }) {
+  const net = usePoll((s) => getJSON<NetworkView>("/api/network", s), 30_000, []).data;
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const inbound = usePoll((s) => getJSON<FlowsPage>(`/api/flows?mac=${encodeURIComponent(mac)}&dir=in&from=${encodeURIComponent(since)}&limit=500`, s), 120_000, [mac]).data;
+  if (!net || !inbound) return <Loading />;
+  const e = exposureOf(mac, net, inbound.rows);
+  return (
+    <div class="col-tight">
+      {e.lines.map((l) => <span key={l} class={e.quiet ? "muted small" : "small"}>{l}</span>)}
+    </div>
+  );
+}
+
 function SecuritySection({ d }: { d: Device }) {
   const alerts = usePoll((s) => getJSON<AlertsState>("/api/alerts", s), 60_000, [d.mac]);
   return (
     <Card label="Security" title="Security" aside={<a class="small" href="#/security">Security</a>}>
       <DeviceSecurity d={d} />
+      <span class="muted small">From the internet</span>
+      <Exposure mac={d.mac} />
       <span class="muted small">Alerts about this device</span>
       <Section polled={alerts} empty={(a) => (a.alerts.some((x) => x.mac === d.mac.toLowerCase()) ? "" : "No alerts about this device.")}>
         {(a) =>

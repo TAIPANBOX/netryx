@@ -6,6 +6,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
@@ -84,6 +85,13 @@ type forwardJSON struct {
 type forwardsJSON struct {
 	Why   string        `json:"why"`
 	Rules []forwardJSON `json:"rules"`
+	UPnP  []upnpJSON    `json:"upnp"`
+}
+
+type upnpJSON struct {
+	netview.UPnP
+	// Device is the device that holds DestIP now, or null.
+	Device *netDeviceJSON `json:"device"`
 }
 
 type netViewJSON struct {
@@ -132,7 +140,7 @@ func (s *server) network(r *http.Request) (any, error) {
 		InterfacesWhy: v.IfacesWhy, Interfaces: v.Interfaces, Ports: []portJSON{},
 		WiFi:      wifiJSON{Why: v.WiFi.Why, Note: v.WiFi.Note, Radios: v.WiFi.Radios, APs: v.WiFi.APs, Live: []liveAPJSON{}},
 		WireGuard: wgJSON{Why: v.WireGuard.Why, Note: v.WireGuard.Note, Interfaces: []wgIfaceJSON{}},
-		Forwards:  forwardsJSON{Why: v.Forwards.Why, Rules: []forwardJSON{}},
+		Forwards:  forwardsJSON{Why: v.Forwards.Why, Rules: []forwardJSON{}, UPnP: []upnpJSON{}},
 	}
 	if out.Interfaces == nil {
 		out.Interfaces = []netview.Iface{}
@@ -175,6 +183,16 @@ func (s *server) network(r *http.Request) (any, error) {
 			}
 		}
 		out.Forwards.Rules = append(out.Forwards.Rules, fj)
+	}
+	for _, u := range v.Forwards.UPnP {
+		uj := upnpJSON{UPnP: u}
+		for _, d := range devs {
+			if uj.Device == nil && slices.Contains(d.IPv4, u.DestIP) {
+				n := view(d)
+				uj.Device = &n
+			}
+		}
+		out.Forwards.UPnP = append(out.Forwards.UPnP, uj)
 	}
 	return out, nil
 }

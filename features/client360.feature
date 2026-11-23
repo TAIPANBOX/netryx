@@ -70,3 +70,13 @@ Feature: a client's name opens its card, and its card opens its full view
     # -> TestADeviceSaysWhatIsNewForIt
     # -> TestADeviceSeenForLessThanAWeekIsTooNewToTell
     # (the page: "what is new for a device says when it cannot tell, when nothing is new, and since when" in web/src/client360.test.ts)
+
+  Scenario: a client's view says what reaches it from the internet
+    Given a client with a port forwarded to it, a UPnP mapping it opened, or connections from outside
+    When the owner opens its full view
+    Then the security part lists each forward and mapping and how many connections came from the internet in the last 24 hours, from which countries
+    And a client nothing reaches says so
+    # -> TestUPnPMappingsAreReadFromTheLeaseFile
+    # -> TestTheViewCarriesUPnPMappingsOrSaysThereAreNone
+    # -> TestAUPnPMappingNamesItsDevice
+    # (the page: "what reaches a device from the internet: forwards, UPnP mappings and connections from outside" in web/src/client360.test.ts)

@@ -156,12 +156,13 @@ export interface NetAP { name: string; radio: string; ssid: string; mode: string
 export interface NetLiveAP { iface: string; ssid: string; band: string; channel: number; clients: NetDevice[] }
 export interface NetPeer { name: string; publicKey: string; endpoint: string; allowedIps: string[] | null; handshake: string | null; rx: number; tx: number }
 export interface NetWG { name: string; listenPort: number; addresses: string[]; publicKey: string; up: boolean; peers: NetPeer[] }
+export interface NetUPnP { proto: string; port: string; destIp: string; destPort: string; desc: string; device: NetDevice | null }
 export interface NetForward { name: string; from: string; proto: string; port: string; destIp: string; destPort: string; enabled: boolean; device: NetDevice | null }
 export interface NetworkView {
   interfacesWhy: string; interfaces: NetIface[]; ports: NetPort[];
   wifi: { why: string; note: string; radios: NetRadio[]; aps: NetAP[]; live: NetLiveAP[] };
   wireguard: { why: string; note: string; interfaces: NetWG[] };
-  forwards: { why: string; rules: NetForward[] };
+  forwards: { why: string; rules: NetForward[]; upnp?: NetUPnP[] };
 }
 
 // GET /api/networks/{asn} and /api/domains/{name}, mirrored from internal/api/entity.go.
