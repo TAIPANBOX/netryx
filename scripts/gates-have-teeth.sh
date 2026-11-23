@@ -157,6 +157,39 @@ else
 	fails=$((fails + 1))
 fi
 
+# ---- gate: the page stays small on the air ----------------------------------
+# The first screen's bundle, each chunk loaded on demand and all of them
+# together each have a gzip budget; planted faults go into copies.
+if [ -s internal/web/dist/app.js ]; then
+	green "bundle-budget, real build" sh scripts/bundle-budget.sh internal/web/dist
+	mkdir -p "$work/bb/chunks"
+	head -c 200000 /dev/urandom >"$work/bb/app.js"
+	red   "bundle-budget, a first bundle over 60 KB" sh scripts/bundle-budget.sh "$work/bb"
+	printf 'x' >"$work/bb/app.js"
+	head -c 30000 /dev/urandom >"$work/bb/chunks/big.js"
+	red   "bundle-budget, a chunk over its budget" sh scripts/bundle-budget.sh "$work/bb"
+	rm "$work/bb/chunks/big.js"
+	for i in 1 2 3 4 5 6 7 8; do head -c 22000 /dev/urandom >"$work/bb/chunks/c$i.js"; done
+	red   "bundle-budget, chunks over the total" sh scripts/bundle-budget.sh "$work/bb"
+	rm -r "$work/bb/chunks"; mkdir "$work/bb/chunks"
+	green "bundle-budget, a small page" sh scripts/bundle-budget.sh "$work/bb"
+	# Chunks each within their budget, but all imported by the first screen.
+	for i in 1 2 3 4; do head -c 20000 /dev/urandom >"$work/bb/chunks/s$i.js"; done
+	printf 'import"./chunks/s1.js";import{a}from"./chunks/s2.js";' >"$work/bb/app.js"
+	printf 'import"./s3.js";import{b as c}from"./s4.js";' >>"$work/bb/chunks/s2.js"
+	red   "bundle-budget, a first screen over 60 KB through its static imports" sh scripts/bundle-budget.sh "$work/bb"
+	printf 'import("./chunks/s1.js");import("./chunks/s2.js");' >"$work/bb/app.js"
+	green "bundle-budget, the same chunks loaded on demand" sh scripts/bundle-budget.sh "$work/bb"
+	printf 'import"./chunks/gone.js";' >"$work/bb/app.js"
+	red   "bundle-budget, a static import of a chunk that is not there" sh scripts/bundle-budget.sh "$work/bb"
+	rm -r "$work/bb/chunks"; mkdir "$work/bb/chunks"; printf 'x' >"$work/bb/app.js"
+	rm "$work/bb/app.js"
+	red   "bundle-budget, bundle missing" sh scripts/bundle-budget.sh "$work/bb"
+else
+	echo "SKIPPED: bundle-budget has no build to check (run web/build.sh first)"
+	fails=$((fails + 1))
+fi
+
 # ---- gate: the console fetches nothing from outside the router ---------------
 # Checked against the real build (web/build.sh), so the green case proves the
 # namespace names Preact carries are not a false alarm; faults go into copies.
