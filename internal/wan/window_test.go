@@ -28,6 +28,11 @@ func TestTheWindowAveragesTheLineOverItsSpan(t *testing.T) {
 	if cov != 30*time.Second || rx != (200*10+400*20)/30.0 {
 		t.Fatalf("over 30 s: %v over %v", rx, cov)
 	}
+	// A window that starts inside a reading takes only its part of it.
+	rx, _, cov = w.Average(now, 25*time.Second)
+	if cov != 25*time.Second || rx != (200*5+400*20)/25.0 {
+		t.Fatalf("over 25 s: %v over %v, want 360 over 25s", rx, cov)
+	}
 	if rx, _, cov := (&Window{}).Average(now, time.Minute); rx != 0 || cov != 0 {
 		t.Fatal("an empty window reads something")
 	}
@@ -53,6 +58,9 @@ func TestAClockSetBackStartsTheWindowAgain(t *testing.T) {
 	w.Add(w0, 0, 0)
 	w.Add(w0.Add(10*time.Second), 100, 0)
 	w.Add(w0.Add(-time.Hour), 999, 0)
+	if len(w.s) != 0 {
+		t.Fatalf("%d readings from before the clock went back are kept", len(w.s))
+	}
 	w.Add(w0.Add(-time.Hour+10*time.Second), 50, 0)
 	rx, _, cov := w.Average(w0.Add(-time.Hour+10*time.Second), time.Minute)
 	if rx != 50 || cov != 10*time.Second {
