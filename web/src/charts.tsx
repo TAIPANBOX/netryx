@@ -184,7 +184,7 @@ export function AreaChart(p: Omit<StackedProps, "layers"> & { down: number[] }) 
  * layer, a double click shows it alone (or all again), and pointing at an
  * entry fades the others. "What made this spike?" picks the busiest step.
  */
-export function TimeChart(p: StackedProps & { legend: LegendItem[]; ticks?: string[]; spike?: boolean }) {
+export function TimeChart(p: StackedProps & { legend: LegendItem[]; ticks?: string[]; spike?: boolean; actions?: ComponentChildren }) {
   const [hidden, setHidden] = useState<string[]>([]);
   const [focus, setFocus] = useState("");
   const ids = p.layers.map(layerId);
@@ -204,11 +204,14 @@ export function TimeChart(p: StackedProps & { legend: LegendItem[]; ticks?: stri
         onToggle={(id, how) => setHidden(legendAfter(hidden, id, how, ids))}
         onFocus={setFocus}
         extra={
-          peak >= 0 && t.length > 1 && step > 0 ? (
-            <button type="button" class="link-btn small" onClick={() => { const sp = brushSpan(t, step, peak, peak); if (sp) setSpan(sp); }}>
-              What made this spike? ({stepSpan(t[peak], step)})
-            </button>
-          ) : undefined
+          <Fragment>
+            {peak >= 0 && t.length > 1 && step > 0 && (
+              <button type="button" class="link-btn small" onClick={() => { const sp = brushSpan(t, step, peak, peak); if (sp) setSpan(sp); }}>
+                What made this spike? ({stepSpan(t[peak], step)})
+              </button>
+            )}
+            {p.actions}
+          </Fragment>
         }
       />
     </Fragment>

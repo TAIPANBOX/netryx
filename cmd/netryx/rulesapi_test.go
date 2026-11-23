@@ -399,6 +399,7 @@ func TestAWriteRouteIsReachableOnlyThroughTheGate(t *testing.T) {
 		{http.MethodDelete, "/api/people/sam", ""},
 		{http.MethodPut, "/api/devices/" + mac, `{"name":"x"}`},
 		{http.MethodPost, "/api/devices/" + mac + "/conns/cut", `{"local":"192.168.50.10:1","remote":"1.1.1.1:443","proto":6}`},
+		{http.MethodPost, "/api/agent/ask", `{"question":"q","from":"2026-11-20T09:00:00Z","to":"2026-11-20T10:00:00Z"}`},
 	}
 	for _, w := range writes {
 		if code := do(w.method, w.path, w.body, false, false); code != http.StatusUnauthorized {

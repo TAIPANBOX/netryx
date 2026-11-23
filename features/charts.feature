@@ -63,3 +63,28 @@ Feature: the traffic charts can be read and explored in place
     When the owner presses "What made this spike?"
     Then the screen shows the busiest step of the chart as its stretch, with who and what moved in it
     # (the spike: "the spike is the busiest column, the first of equals, none on a quiet chart" in web/src/cursor.test.ts)
+
+  Scenario: the owner can ask the router's agent about a stretch
+    Given a stretch picked on a chart, by a session that may change things
+    And Hermes on the router has its questions turned on
+    When the owner presses "Ask the router's agent" and asks
+    Then the agent gets the question and a short summary the router computed of the stretch, never its key
+    And the answer opens in a card that says a model wrote it, what it cost and what is left
+    # -> TestAQuestionCarriesASummaryOfTheStretch
+    # -> TestAQuestionCarriesTheKeyAndNothingButTheQuestionAndContext
+    # -> TestTheKeyIsReadForEveryQuestion
+    # -> TestAQuestionIsHeldToTheContractBeforeItIsSent
+    # -> TestAQuestionNeedsAStretch
+    # -> TestAViewerCannotAskTheAgent
+    # (the page: "an answer says it is the model's, what it cost and what is left" in web/src/ask.test.ts)
+
+  Scenario: a question the agent refuses, or cannot take, says why
+    Given the agent refuses (busy, the hour's questions used, the day's budget spent, a timeout, a failure) or is not enabled
+    Then the card shows the agent's own words, and when to try again where it says
+    And with the questions off or the agent not running the chart says the agent is not enabled on this router
+    # -> TestEveryRefusalIsPassedOnInTheAgentsWords
+    # -> TestARefusalOfTheAgentReachesThePageInItsWords
+    # -> TestARefusedConnectionIsAnAgentNotEnabled
+    # -> TestTheAgentIsOffUnlessHermesTurnsItOn
+    # -> TestTheAgentSaysWhetherItCanBeAsked
+    # (the page: "a refusal says when to try again, in minutes past a minute" in web/src/ask.test.ts)

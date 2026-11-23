@@ -852,6 +852,35 @@ enforced, and that is a debt rather than a decision.
   (the page: `web/src/cursor.test.ts`; the drawing itself is not enforced by a
   test, seen in the lab)
 
+## The promise about the router's agent
+
+- **A question goes to the agent by its contract, with the router's own
+  summary and nothing else**: POST `http://127.0.0.1:<hermes.api.port>/v1/ask`
+  only while `hermes.api.enabled` is '1' in `/etc/config/hermes`, the key read
+  from `hermes.api.key_file` for every question (a plain file, no link, nobody
+  but its owner may read it, root's when netryx runs as root, at least 32
+  characters), sent only in the Authorization header and never to the page, a
+  log or an error. The body is the question (1 to 2000 characters) and the
+  summary of the stretch the router computed (its UTC times, the busiest
+  clients, apps, countries and connections with bytes), cut to 8000
+  characters and to a body of 16384 bytes, never inside a character.
+  (test: the `internal/askagent` tests, `TestAQuestionCarriesASummaryOfTheStretch`)
+- **The agent's answer and refusals reach the person in its words**: a 200
+  carries the answer, its cost and what is left; every refusal of the contract
+  (400, 401, 404, 405, 409, 413, 429, 502, 503, 504) comes back at status 200
+  with ok false, its code, message and retry time, so the agent's 401 never
+  reads as a lost console session; a refused connection, questions off or a
+  key that cannot be read is "agent not enabled on this router" with why.
+  (test: `TestEveryRefusalIsPassedOnInTheAgentsWords`, `TestARefusedConnectionIsAnAgentNotEnabled`,
+  `TestTheAgentIsOffUnlessHermesTurnsItOn`, `TestARefusalOfTheAgentReachesThePageInItsWords`,
+  `TestTheAgentSaysWhetherItCanBeAsked`, `TestAQuestionNeedsAStretch`)
+- **Only a session that may write asks**: `POST /api/agent/ask` is behind the
+  write grant and the CSRF token; the button shows only with a stretch picked
+  and that right. (test: `TestAWriteRouteIsReachableOnlyThroughTheGate`, `TestAViewerCannotAskTheAgent`; the page:
+  `web/src/ask.test.ts`; @measured netryx-lab 2026-11-23 against
+  `scripts/lab/fake-hermes-api`: the answer with its footer, all eight
+  refusals in the agent's words, the agent down and the questions off)
+
 ## The promise about the Network screen
 
 - **Network shows how the router is wired, and only reads it**: netifd's

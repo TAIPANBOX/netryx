@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"netryx/internal/askagent"
 	"netryx/internal/auth"
 	"netryx/internal/collect"
 	"netryx/internal/ct"
@@ -350,7 +351,7 @@ func main() {
 			log.Printf("state directory %s: %v; history will not survive a restart", *stateDir, err)
 		}
 		con, err := buildConsole(Options{
-			Geo: *geoPath, Apps: *appsPath, OUI: *ouiPath, State: *stateDir, Minutes: minutesFile,
+			Geo: *geoPath, Apps: *appsPath, OUI: *ouiPath, State: *stateDir, Minutes: minutesFile, AgentConfig: askagent.HermesConfig,
 			WAN: *wanIface, Leases: *leases, PingTarget: *pingTarget, Listen: *addr,
 			LAN: ifs, Sync: *syncEvery, Collector: col,
 			Meta: *metaPath, FetchIcons: *fetchIcons,
