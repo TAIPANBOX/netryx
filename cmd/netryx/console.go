@@ -34,6 +34,7 @@ import (
 	"netryx/internal/auth"
 	"netryx/internal/collect"
 	"netryx/internal/ct"
+	"netryx/internal/daily"
 	"netryx/internal/device"
 	"netryx/internal/enrich"
 	"netryx/internal/export"
@@ -232,6 +233,28 @@ type console struct {
 	rules *rules.Engine
 	// alerts is what the owner is told (spec 6.9), kept in <state>/alerts.json.
 	alerts *alerts.Store
+	// daily is one file per closed UTC day, kept in <state>/daily.
+	daily *daily.Store
+	// netv reads the router's wiring, for the Network screen and the
+	// interface counters at a day's close.
+	netv *netview.Source
+}
+
+// dayCounters reads what a day's file keeps of its close: every rule's hit
+// counter and every network's byte counters, as the Network screen reads them.
+func (c *console) dayCounters() daily.Counters {
+	out := daily.Counters{At: c.o.Now(), Ifaces: map[string][2]uint64{}}
+	if c.rules != nil {
+		out.Hits = c.rules.Hits()
+	}
+	if c.netv != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for _, f := range c.netv.View(ctx).Interfaces {
+			out.Ifaces[f.Name] = [2]uint64{f.RxBytes, f.TxBytes}
+		}
+	}
+	return out
 }
 
 // Started and LostEvents report the service to the API.
@@ -351,6 +374,13 @@ func buildConsole(o Options) (*console, error) {
 	dir := filepath.Join(o.State, "history")
 	c.hist = &history{s: c.store, dir: dir, saved: o.Now(), minutes: o.Minutes}
 	c.hist.load()
+	// One file per closed day, for comparing a device with its own month.
+	var derr error
+	c.daily, derr = daily.Open(filepath.Join(o.State, "daily"), o.Now())
+	if derr != nil {
+		log.Printf("daily files: %v", derr)
+	}
+	c.hist.daily, c.hist.counters = c.daily, c.dayCounters
 	c.macs = &macResolver{col: c.col, local: c.local, neigh: o.Neigh, leases: o.Leases, now: o.Now}
 	c.macs.refresh()
 	// One answer to "whose is this address", for the finished totals and
@@ -440,11 +470,13 @@ func buildConsole(o Options) (*console, error) {
 		conf:    o.RulesConfig,
 		bridges: o.LAN, oui: oui, every: 30 * time.Second,
 	}
+	// The Network screen reads the router's wiring only: ubus, sysfs, the UCI
+	// files and `wg show`, never a key or a password.
+	c.netv = &netview.Source{FS: o.FS, Run: netview.Runner(o.Run), Bridges: o.LAN, WAN: wanNames(o.WAN), Now: o.Now}
 	apiOpts := []api.Option{
 		api.OnLivePoll(c.livePolled),
-		// The Network screen reads the router's wiring only: ubus, sysfs,
-		// the UCI files and `wg show`, never a key or a password.
-		api.WithNetwork(&netview.Source{FS: o.FS, Run: netview.Runner(o.Run), Bridges: o.LAN, WAN: wanNames(o.WAN), Now: o.Now}),
+		api.WithNetwork(c.netv),
+		api.WithDaily(c.daily),
 	}
 	if c.rules != nil {
 		// The console writes the config the agent writes, and the engine
@@ -629,6 +661,11 @@ type history struct {
 	closed  bool // the stop has written it; nothing is written after that
 	// minutes is the file in RAM the last hour of minutes is kept in.
 	minutes string
+	// daily takes each closed day from the hour ring, on the tick that
+	// writes the closed day of the history; counters reads its close.
+	daily    *daily.Store
+	counters func() daily.Counters
+	dailyErr string
 }
 
 // saveLag is how long after an hour's end the tick writes it: a bucket
@@ -708,6 +745,19 @@ func (h *history) tick(now time.Time) {
 	h.saved = now
 	if _, err := rollup.SaveClosed(h.s, h.dir); err != nil {
 		h.log("writing history: %v", err)
+	}
+	// A day is taken only once every history file has been read: one set
+	// aside as later than the clock may still hold its hours.
+	if h.daily != nil && !h.pending {
+		_, err := h.daily.CloseDays(h.s, h.counters, now)
+		msg := ""
+		if err != nil {
+			msg = err.Error()
+		}
+		if msg != "" && msg != h.dailyErr {
+			h.log("daily files: %v", err)
+		}
+		h.dailyErr = msg
 	}
 }
 

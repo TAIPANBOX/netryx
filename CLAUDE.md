@@ -876,6 +876,62 @@ enforced, and that is a debt rather than a decision.
   `TestADeviceSaysWhatIsNewForIt`, `TestADeviceSeenForLessThanAWeekIsTooNewToTell`;
   the page: "what is new for a device says when it cannot tell" in `web/src/client360.test.ts`)
 
+## The promise about the daily file
+
+- **One file per closed UTC day, written once and never again**:
+  `<state>/daily/YYYY-MM-DD.day`, made from the hour ring by the first history
+  tick after the day closed (a minute past midnight, the tick that writes the
+  closed day of the history), through a temporary file renamed over its name.
+  A day already held, or with any file under its name (a damaged one too), is
+  never written; a day is taken only while no history file is set aside as
+  later than the clock, only once the clock is past 2026-01-01, only if the
+  hour ring still reaches its first hour, and only if the router counted at
+  least one hour of it. (test: `TestADayIsWrittenOnceWhenItClosesAndNeverRewritten`,
+  `TestTheDailyFileIsWrittenByTheFirstTickAfterTheDayCloses`,
+  `TestADayIsAnsweredOnlyOnceClosedAndWholeInTheRing`)
+- **What it holds**: for every hardware address of the day (the router's own
+  traffic, the catch-all and unnamed addresses are not devices; the busiest
+  512, with the number left out), 24 hourly totals down and up as uint32 KiB
+  (the unit is in the body: 1024), rounded up so a byte is never a quiet hour
+  and held at the top past 4 TiB an hour rather than wrapping; the 24-bit mask
+  of the hours the hour ring holds; and, in yesterday's file only, every rule's
+  hit counter (`hits_<id>`, by id) and every netifd network's rx/tx bytes as
+  the Network screen reads them, with the time they were read. No domain,
+  nothing per destination.
+  (test: `TestADayKeepsOnlyHardwareAddressesAndAtMostTheBusiest512`,
+  `TestAnHourOverFourGiBDoesNotWrap`, `TestRuleHitsAndInterfaceCountersRoundTrip`,
+  `TestTheHitsAreEveryRulesCounterByID`)
+- **A router switched off is never read as a quiet house**: an hour outside
+  the mask is unknown, a counted quiet hour is zero, a day with no file is
+  unknown, and a restart mid-day keeps every hour the ring takes back from the
+  history files. (test: `TestHoursTheRouterWasOffAreNotInTheMask`,
+  `TestADayWrittenAfterAMidDayRestartHoldsEveryHourTheRingHolds`)
+- **A file is checked whole before it is believed**: the packfile frame
+  (magic `NRXDAILY`, version 1, SHA-256 at its end), then the unit, the date
+  against the name, every count against the bytes left and its bound, the
+  order of devices and names, no bytes in an hour outside the mask, counters
+  read after the close, nothing after the end. A damaged, cut-short,
+  other-version or misnamed file is skipped and named in the log, its day
+  unknown, and every other file loads; only the newest 30 are read.
+  (test: `TestADamagedFileIsSkippedAndNamedAndTheRestLoad`, `TestAFileThatCannotBeADayIsRefused`)
+- **A month is kept**: files of days more than 30 days before today are
+  deleted, with any temporary file a power cut left, after every write; a
+  clock before 2026-01-01 deletes nothing. (test: `TestFilesPastThirtyDaysAreDeleted`)
+- **One read, behind the login**: `GET /api/devices/{mac}/days` answers the 30
+  days before today oldest first, in bytes, an unknown day with no hours and
+  an hour outside the mask as null; an unknown device is a 404, a malformed
+  MAC a 400. (test: `TestADeviceAnswersItsDaysWithUnknownDaysAsUnknown`,
+  `TestEveryViewNeedsALogin`)
+- **The daily file fits a small router**: under the profile of 64 busy
+  devices a day's file is at most `NETRYX_DAILY_BUDGET_KB` (16) and the 30
+  days loaded at most `NETRYX_DAILY_HEAP_BUDGET_KB` (1024) of heap.
+  (gate: `scripts/flash-budget.sh`, run as
+  `FORGE_DIR=netryx-daily scripts/forge.sh sh scripts/flash-budget.sh`;
+  @measured that command and
+  `scripts/forge.sh go test -count=1 -tags heavyprofile -run '^TestDailyProfile$' -v ./internal/daily/`
+  2026-11-23 on forge: 13305 bytes a day for 64 devices, 6573 for 30, 436.0 KB
+  of heap for the 30 days loaded)
+
 ## The promise about the router's agent
 
 - **A question goes to the agent by its contract, with the router's own

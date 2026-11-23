@@ -1947,3 +1947,43 @@ func TestTheMinutesAreKeptInRAMAcrossARestart(t *testing.T) {
 		t.Errorf("the file read at the start is still there: %v", err)
 	}
 }
+
+// The day's file is written by the first tick after the day has closed, the
+// tick that writes the closed day of the history, into <state>/daily; a tick
+// before midnight writes none.
+func TestTheDailyFileIsWrittenByTheFirstTickAfterTheDayCloses(t *testing.T) {
+	o := testOptions(t)
+	start := time.Date(2026, 11, 20, 10, 30, 0, 0, time.UTC)
+	clk := &clock{t: start}
+	o.Now = clk.Now
+	c, err := buildConsole(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addDelta(c.store, start)
+	file := filepath.Join(o.State, "daily", "2026-11-20.day")
+	for _, at := range []time.Time{
+		time.Date(2026, 11, 20, 23, 30, 0, 0, time.UTC),
+		time.Date(2026, 11, 21, 0, 0, 30, 0, time.UTC),
+	} {
+		clk.Set(at)
+		c.hist.tick(at)
+		if _, err := os.Stat(file); err == nil {
+			t.Fatalf("at %v the open day is on flash", at)
+		}
+	}
+	at := time.Date(2026, 11, 21, 0, 2, 30, 0, time.UTC)
+	clk.Set(at)
+	c.hist.tick(at)
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("the first tick after the day closed did not write it: %v", err)
+	}
+	days := c.daily.Days([6]byte{0x02, 0, 0, 0, 0, 0x01}, at)
+	if len(days) == 0 {
+		t.Fatal("no days")
+	}
+	last := days[len(days)-1]
+	if !last.Known || last.Mask != 1<<10 || last.Down[10] != 1024 || last.Up[10] != 1024 {
+		t.Errorf("the day as read: known %v mask %024b down %d up %d", last.Known, last.Mask, last.Down[10], last.Up[10])
+	}
+}

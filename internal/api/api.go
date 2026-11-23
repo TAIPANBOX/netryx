@@ -143,6 +143,8 @@ type server struct {
 	net Network
 	// agent is the router's agent for the ask button; nil says it is not enabled.
 	agent Agent
+	// daily is the store of daily files; nil answers every day unknown.
+	daily Daily
 }
 
 // Option configures the API beyond what every caller passes.
@@ -171,6 +173,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/destinations", s.route(s.destinations))
 	mux.HandleFunc("/api/devices/{mac}/live", s.route(s.live))
 	mux.HandleFunc("/api/devices/{mac}/new", s.route(s.newFor))
+	mux.HandleFunc("/api/devices/{mac}/days", s.route(s.days))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
 	s.agentRoutes(mux)
 	s.houseRoutes(mux)

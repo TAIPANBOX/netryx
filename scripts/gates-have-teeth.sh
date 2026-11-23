@@ -251,6 +251,16 @@ mkdir -p "$work/nomem/scripts"
 cp scripts/memory-budget.sh "$work/nomem/scripts/"
 red   "memory-budget, nothing to measure" sh "$work/nomem/scripts/memory-budget.sh"
 
+# ---- gate: the daily file fits its flash and memory budgets ------------------
+# The daily profile is run for real: a file budget too small for any day must
+# go red, and a copy of the script with no tree to measure must not say OK.
+green "flash-budget, real tree" sh scripts/flash-budget.sh
+red   "flash-budget, a file budget of 1 KB" env NETRYX_DAILY_BUDGET_KB=1 sh scripts/flash-budget.sh
+red   "flash-budget, a heap budget of 1 KB" env NETRYX_DAILY_HEAP_BUDGET_KB=1 sh scripts/flash-budget.sh
+mkdir -p "$work/noflash/scripts"
+cp scripts/flash-budget.sh "$work/noflash/scripts/"
+red   "flash-budget, nothing to measure" sh "$work/noflash/scripts/flash-budget.sh"
+
 # ---- gate: everything a person reads is English ------------------------------
 # Faults go into copies of the real sources; a test file's Cyrillic is data and
 # must not trip it.
