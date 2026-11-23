@@ -91,20 +91,20 @@ function Interfaces({ d }: { d: NetworkView }) {
                     <span class="strong">{i.name}</span>
                     {i.wan && <span class="tag">internet</span>}
                   </td>
-                  <td>
+                  <td class="nowrap-cell">
                     <span class={i.up ? "dot dot-on" : "dot dot-off"} aria-hidden="true" /> {i.up ? "up" : "down"}
                   </td>
                   <td class="soft">{i.proto || "-"}</td>
-                  <td class="mono small">{i.device || "-"}</td>
-                  <td class="mono small">
+                  <td class="mono small nowrap-cell">{i.device || "-"}</td>
+                  <td class="mono small addr">
                     {[...(i.ipv4 ?? []), ...(i.ipv6 ?? [])].map((a) => (
-                      <div key={a}>{a}</div>
+                      <div key={a}>{breakable(a)}</div>
                     ))}
                     {!(i.ipv4?.length || i.ipv6?.length) && "-"}
                   </td>
-                  <td class="mono small">{i.gateway || "-"}</td>
+                  <td class="mono small nowrap-cell">{i.gateway || "-"}</td>
                   <td class="soft small">{i.up ? duration(i.uptimeSec) : "-"}</td>
-                  <td class="num small">
+                  <td class="num small nowrap-cell">
                     ↓ {bytes(i.rxBytes)}
                     <br />{" "}↑ {bytes(i.txBytes)}
                   </td>
@@ -300,4 +300,15 @@ function BackupLine() {
       )}
     </Card>
   );
+}
+
+/** An address that may break only after a colon or a slash, never inside a
+ *  number; <wbr> adds no character, so a copied address is the address. */
+function breakable(a: string) {
+  return a.split(/(?<=[:/])/).map((p, i) => (
+    <Fragment key={i}>
+      {i > 0 && <wbr />}
+      {p}
+    </Fragment>
+  ));
 }
