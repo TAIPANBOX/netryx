@@ -2022,3 +2022,31 @@ func TestTheDailyFileIsWrittenByTheFirstTickAfterTheDayCloses(t *testing.T) {
 		t.Errorf("the day as read: known %v mask %024b down %d up %d", last.Known, last.Mask, last.Down[10], last.Up[10])
 	}
 }
+
+// A device's usual week is read in the zone the router names, the zone the
+// page shows its times in; a process left in its own zone ("Local") reads
+// it in UTC, as the login says.
+func TestTheUsualWeekIsReadInTheRoutersZone(t *testing.T) {
+	for _, c := range []struct {
+		loc  *time.Location
+		want string
+	}{{time.FixedZone("UTC+2", 2*3600), "UTC+2"}, {time.Local, "UTC"}, {nil, "UTC"}} {
+		o := testOptions(t)
+		o.Now = (&clock{t: noon}).Now
+		o.Loc = c.loc
+		o.Leases = filepath.Join(t.TempDir(), "dhcp.leases")
+		write(t, o.Leases, "1893456000 8c:79:f5:00:00:02 192.168.50.20 desk-pc *\n")
+		con, err := buildConsole(o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec := httptest.NewRecorder()
+		con.handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/devices/8c:79:f5:00:00:02/usual", nil))
+		var v struct {
+			Zone string `json:"zone"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &v); rec.Code != 200 || err != nil || v.Zone != c.want {
+			t.Errorf("Loc %v: %d %s, want the zone %q", c.loc, rec.Code, rec.Body, c.want)
+		}
+	}
+}

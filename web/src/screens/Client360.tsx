@@ -17,7 +17,7 @@ import { Sankey } from "../charts";
 import { bytes, countryName, date, dayMonth, time, groupName } from "../format";
 import { alertText, type AlertsState } from "../security";
 import { connMap } from "../connmap";
-import { exposureOf, newForNote, rulesOn, whereConnected, type NewFor } from "../client360";
+import { exposureOf, newForNote, rulesOn, usualRows, usualSentence, whereConnected, type NewFor, type Usual } from "../client360";
 import { allowText, liveAllows, manifestName, stateOf, usageLabel, usageText, type Usage } from "../rules";
 import { deviceName } from "./Clients";
 import { RuleTitle } from "./Rules";
@@ -225,6 +225,7 @@ function History({ mac, range, onRange, win }: { mac: string; range: Range; onRa
             <Apps apps={got.apps} mac={mac} win={win} />
             <Where dest={got.dest} />
             <NewForDevice mac={mac} />
+            <UsualWeek mac={mac} />
           </div>
         )}
       </Section>
@@ -293,6 +294,50 @@ function NewForDevice({ mac }: { mac: string }) {
               <span class="soft nowrap">first {dayMonth(c.first)} {time(c.first)} · ↓ {bytes(c.down)}</span>
             </span>
           ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** This device's usual week from the daily files, and the hour that just
+ *  closed set beside the usual of its slot. */
+function UsualWeek({ mac }: { mac: string }) {
+  const polled = usePoll((s) => getJSON<Usual>(`/api/devices/${enc(mac)}/usual`, s), 300_000, [mac]);
+  const u = polled.data;
+  const C = 14, G = 2, L = 30, T = 14;
+  return (
+    <Card label="Usual for this device" title="Usual for this device" aside={u ? <span class="muted small">{u.zone}, last 30 days</span> : undefined}>
+      {!u ? (
+        <Loading />
+      ) : (
+        <div class="col-tight">
+          <span class="small">{usualSentence(u)}</span>
+          {!u.tooNew && (
+            <Fragment>
+              <svg class="usual-week" viewBox={`0 0 ${L + 24 * (C + G)} ${T + 7 * (C + G)}`} role="img" aria-label="What this device usually moves in each hour of the week">
+                {[0, 6, 12, 18].map((hr) => (
+                  <text key={hr} x={L + hr * (C + G)} y={10} class="usual-axis">{String(hr).padStart(2, "0")}:00</text>
+                ))}
+                {usualRows(u).map((r, i) => (
+                  <g key={r.day}>
+                    <text x={0} y={T + i * (C + G) + 11} class="usual-axis">{r.day}</text>
+                    {r.cells.map((c, hr) => (
+                      <rect key={hr} x={L + hr * (C + G)} y={T + i * (C + G)} width={C} height={C} rx={3}
+                        class={`usual-cell ${c.level < 0 ? "usual-unknown" : `usual-c${c.level}`}${c.now ? " usual-now" : ""}`}>
+                        <title>{c.title}</title>
+                      </rect>
+                    ))}
+                  </g>
+                ))}
+              </svg>
+              <span class="usual-legend muted small">
+                quiet {[0, 1, 2, 3, 4, 5].map((l) => <span key={l} class={`usual-swatch usual-c${l}`} aria-hidden="true" />)} busiest
+                <span class="usual-swatch usual-unknown" aria-hidden="true" /> too few days
+                <span class="usual-swatch usual-c0 usual-now" aria-hidden="true" /> the hour that just closed
+              </span>
+            </Fragment>
+          )}
         </div>
       )}
     </Card>

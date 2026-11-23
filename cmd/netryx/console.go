@@ -478,6 +478,10 @@ func buildConsole(o Options) (*console, error) {
 		api.WithNetwork(c.netv),
 		api.WithDaily(c.daily),
 	}
+	// A device's week is read in the zone the page shows its times in.
+	if o.Loc != nil && o.Loc.String() != "Local" {
+		apiOpts = append(apiOpts, api.WithZone(o.Loc))
+	}
 	if c.rules != nil {
 		// The console writes the config the agent writes, and the engine
 		// reads it back: names and rules from the page and from Hermes are
