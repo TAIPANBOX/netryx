@@ -967,3 +967,23 @@ func TestTheSessionCarriesTheRoutersZone(t *testing.T) {
 		t.Errorf("without rpcd the session route lost the zone: %s", rec.Body)
 	}
 }
+
+// The login form's script imports chunks of its own (the shared code the
+// bundler splits out); those exact files are open as /app.js is, so the form
+// can load before anyone signs in. No other chunk, and no path that is not
+// clean, passes for one.
+func TestTheLoginFormsOwnChunksAreOpen(t *testing.T) {
+	r := newRig(t)
+	r.gate.LoginFiles = []string{"/chunks/chunk-AAAA.js", "/chunks/chunk-BBBB.js"}
+	for _, p := range r.gate.LoginFiles {
+		if rec := r.do(http.MethodGet, p, lan, ""); rec.Code != http.StatusOK || !r.didReach() {
+			t.Errorf("%s is imported by the login form's script and must be open: %d", p, rec.Code)
+		}
+	}
+	for _, p := range []string{"/chunks/chunk-CCCC.js", "/chunks/", "/chunks", "/chunks/chunk-AAAA.js/../../api/overview", "/chunks/../api/overview", "/CHUNKS/chunk-AAAA.js"} {
+		wantError(t, r.do(http.MethodGet, p, lan, ""), http.StatusUnauthorized, "login", p+" without a session")
+		if r.didReach() {
+			t.Errorf("%s reached the console without a session", p)
+		}
+	}
+}

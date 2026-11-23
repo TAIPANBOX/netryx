@@ -114,6 +114,9 @@ Feature: the household decides what a device may reach, and the router enforces 
     Then the answer is 401
     # -> TestEveryViewNeedsALogin
     # -> TestOnlyTheLoginFormIsOpen
+    # -> TestTheLoginFormsOwnChunksAreOpen
+    # -> TestTheFirstScreensChunksAreReadFromBesideThePage
+    # -> TestTheLoginFormLoadsWithoutASession
 
   Scenario: a change without the grant or the token is refused
     Given a session that may only view, or a write without the session's token

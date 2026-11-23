@@ -192,3 +192,21 @@ func TestEveryAnswerNamesTheBuildServed(t *testing.T) {
 		t.Errorf("a binary without a page build named one")
 	}
 }
+
+// The first screen's files are the chunks the page's script imports
+// statically, listed by build.sh beside it; each is a clean path under
+// /chunks/, and a line that is not one is no file.
+func TestTheFirstScreensChunksAreReadFromBesideThePage(t *testing.T) {
+	fsys := fstest.MapFS{
+		"index.html":       {Data: []byte("<html>")},
+		"app.js":           {Data: []byte("")},
+		"first-screen.txt": {Data: []byte("chunks/chunk-AAAA.js\nchunks/chunk-BBBB.js\n../api/x.js\nchunks/../../etc/passwd\nicons/x.svg\n\n")},
+	}
+	got := firstScreen(fsys)
+	if len(got) != 2 || got[0] != "/chunks/chunk-AAAA.js" || got[1] != "/chunks/chunk-BBBB.js" {
+		t.Errorf("first screen %v, want the two chunks alone", got)
+	}
+	if got := firstScreen(fstest.MapFS{"index.html": {Data: []byte("x")}}); got != nil {
+		t.Errorf("without the list: %v", got)
+	}
+}

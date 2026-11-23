@@ -203,6 +203,22 @@ if [ -s internal/web/dist/app.js ]; then
 	rm -r "$work/bb/chunks"; mkdir "$work/bb/chunks"; printf 'x' >"$work/bb/app.js"
 	rm "$work/bb/app.js"
 	red   "bundle-budget, bundle missing" sh scripts/bundle-budget.sh "$work/bb"
+	# The login form's files: every static import of the page's script is
+	# opened without a session, and nothing else is.
+	green "login-assets, real build" sh scripts/login-assets.sh internal/web/dist
+	rm -rf "$work/la"; cp -R internal/web/dist "$work/la"
+	if [ -s "$work/la/first-screen.txt" ]; then
+		sed '1d' internal/web/dist/first-screen.txt >"$work/la/first-screen.txt"
+		red   "login-assets, a static import not opened" sh scripts/login-assets.sh "$work/la"
+	else
+		printf 'import"./chunks/la.js";' >>"$work/la/app.js"; printf 'x' >"$work/la/chunks/la.js"
+		red   "login-assets, a static import not opened" sh scripts/login-assets.sh "$work/la"
+	fi
+	cp internal/web/dist/first-screen.txt "$work/la/first-screen.txt"
+	echo "chunks/chunk-OTHER.js" >>"$work/la/first-screen.txt"
+	red   "login-assets, a chunk opened that is not imported" sh scripts/login-assets.sh "$work/la"
+	rm "$work/la/app.js"
+	red   "login-assets, nothing to measure" sh scripts/login-assets.sh "$work/la"
 else
 	echo "SKIPPED: bundle-budget has no build to check (run web/build.sh first)"
 	fails=$((fails + 1))

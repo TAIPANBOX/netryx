@@ -81,9 +81,12 @@ var rpcTimeout = 5 * time.Second
 // read back at the next start, so a restart signs nobody out while rpcd keeps
 // their sessions; without it, both live and die with the process.
 type Gate struct {
-	RPC    RPC
-	Now    func() time.Time
-	Secret []byte
+	// LoginFiles are the chunks the login form's script imports statically
+	// (web.FirstScreen), open as /app.js is.
+	LoginFiles []string
+	RPC        RPC
+	Now        func() time.Time
+	Secret     []byte
 	// MetricsToken opens /metrics and the Zabbix routes from the house
 	// side; empty, they answer on loopback only.
 	MetricsToken string
@@ -252,6 +255,21 @@ func open(p string) bool {
 	return path.Clean(p) == p
 }
 
+// loginFile reports whether p is one of the chunks the login form's script
+// imports statically: exactly a listed path, and only a clean one under
+// /chunks/.
+func (g *Gate) loginFile(p string) bool {
+	if !strings.HasPrefix(p, "/chunks/") || path.Clean(p) != p {
+		return false
+	}
+	for _, f := range g.LoginFiles {
+		if f == p {
+			return true
+		}
+	}
+	return false
+}
+
 // scrape reports whether p is one of the scrape endpoints.
 func scrape(p string) bool {
 	return p == "/metrics" || p == "/api/snapshot" || p == "/api/zabbix/discovery"
@@ -298,7 +316,7 @@ func (s *gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case p == "/api/session" && r.Method == http.MethodGet:
 		s.session(w, r)
 		return
-	case open(p):
+	case open(p) || s.g.loginFile(p):
 		s.next.ServeHTTP(w, r)
 		return
 	}
