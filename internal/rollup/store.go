@@ -5,6 +5,8 @@
 package rollup
 
 import (
+	"iter"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,24 +108,20 @@ func exact[K comparable, V any](m map[K]V) map[K]V {
 	return out
 }
 
-func exactMargins[K comparable](ms map[string]*margin[K]) map[string]*margin[K] {
-	out := make(map[string]*margin[K], len(ms))
-	for mac, m := range ms {
-		out[mac] = &margin[K]{Rows: exact(m.Rows), Other: m.Other}
-	}
-	return out
-}
-
+// A closed hour or day is packed (packed.go) instead: far smaller than any
+// map, and it too takes nothing new.
 func (bk *bucket) compactNow() {
-	bk.Keys = exact(bk.Keys)
-	bk.ASN = exactMargins(bk.ASN)
-	bk.Dom = exactMargins(bk.Dom)
+	if bk.pk == nil {
+		bk.pk = pack(bk)
+		bk.Keys, bk.ASN, bk.Dom = nil, nil, nil
+	}
 	bk.compact = true
 }
 
 // bucket is one hour or one day: the same keys as a minute, plus the
 // marginals. Exported fields are what gob saves; the row counts are
-// rebuilt when a bucket is loaded.
+// rebuilt when a bucket is loaded. A closed bucket keeps its content in pk
+// and its maps are nil; read it through keys, asnMargins and domMargins.
 type bucket struct {
 	At   time.Time
 	Keys map[Key]Bytes
@@ -131,9 +129,10 @@ type bucket struct {
 	Dom  map[string]*margin[domKey] // by MAC
 
 	asnRows, domRows int
-	// compact says the maps were rebuilt at their exact size once the
-	// bucket closed. A merge into it clears it, so it is rebuilt again.
+	// compact says the bucket was packed once it closed. A merge into it
+	// clears it, so it is packed again.
 	compact bool
+	pk      *packed
 }
 
 // bucketV1 is a bucket as version 1 files hold it: organisations by number
@@ -280,6 +279,7 @@ func fold(keys map[Key]Bytes, k Key, limit int) Key {
 // countInto adds one delta (its strings already interned) to an hour or a
 // day, and returns the key it was counted under.
 func (bk *bucket) countInto(d flows.Delta, b Bytes, o Options) Key {
+	bk.unpack()
 	k := fold(bk.Keys, Key{MAC: d.MAC, App: d.App, CC: d.CC}, o.MaxKeysPerHour)
 	bk.Keys[k] = add(bk.Keys[k], b)
 	// The marginals follow the key's device, so a device folded into the
@@ -502,6 +502,12 @@ func (s *Store) reintern() {
 				c.b[i] = nil
 				continue
 			}
+			if bk.pk != nil {
+				for _, x := range bk.pk.strs {
+					keep(x)
+				}
+				continue
+			}
 			for k := range bk.Keys {
 				keep(k.MAC)
 				keep(k.App)
@@ -648,6 +654,7 @@ func (s *Store) sweep(now time.Time) {
 // forged, cannot grow the store past its own.
 func (s *Store) merge(dst, src *bucket) {
 	s.reopen(&dst.compact)
+	dst.unpack()
 	for k, b := range src.Keys {
 		k = Key{MAC: s.intern(k.MAC), App: s.intern(k.App), CC: s.intern(k.CC)}
 		fk := fold(dst.Keys, k, s.o.MaxKeysPerHour)
@@ -741,17 +748,17 @@ func (s *Store) coarseOf(l level) *coarse {
 
 // eachKeys calls fn for every bucket of the ring whose start lies in
 // [first, last] and which the ring still holds.
-func (s *Store) eachKeys(l level, first, last time.Time, fn func(at time.Time, keys map[Key]Bytes)) {
+func (s *Store) eachKeys(l level, first, last time.Time, fn func(at time.Time, keys iter.Seq2[Key, Bytes])) {
 	if l == minutes {
 		for _, m := range s.mins {
 			if m != nil && s.mr.holds(m.At) && !m.At.Before(first) && !m.At.After(last) {
-				fn(m.At, m.Keys)
+				fn(m.At, maps.All(m.Keys))
 			}
 		}
 		return
 	}
 	for _, bk := range s.coarseOf(l).each(first, last) {
-		fn(bk.At, bk.Keys)
+		fn(bk.At, bk.keys())
 	}
 }
 
@@ -849,7 +856,7 @@ func (s *Store) part(f Filter, split string, l level, start, to time.Time, step 
 		ps[i] = s.point(start.Add(time.Duration(i)*step), step, split)
 	}
 	last := ps[n-1].At.Add(step - time.Nanosecond)
-	s.eachKeys(l, start, last, func(at time.Time, keys map[Key]Bytes) {
+	s.eachKeys(l, start, last, func(at time.Time, keys iter.Seq2[Key, Bytes]) {
 		addKeys(ps[int(at.Sub(start)/step)].By, keys, f, split)
 	})
 	return ps
@@ -863,7 +870,7 @@ func (s *Store) point(at time.Time, step time.Duration, split string) Point {
 	return p
 }
 
-func addKeys(by map[string]Bytes, keys map[Key]Bytes, f Filter, split string) {
+func addKeys(by map[string]Bytes, keys iter.Seq2[Key, Bytes], f Filter, split string) {
 	for k, b := range keys {
 		if f.match(k) {
 			sk, _ := splitKey(k, split)
@@ -893,13 +900,13 @@ func (s *Store) coarsePart(f Filter, split string, cl, fl level, start, b, to ti
 		}
 		p := s.point(t, end.Sub(t), split)
 		if bk := c.get(t); bk != nil {
-			addKeys(p.By, bk.Keys, f, split)
+			addKeys(p.By, bk.keys(), f, split)
 		}
 		if end.Before(t.Add(cs)) {
 			// The finer ring holds [b, t+cs) of this bucket; this point is the
 			// rest of it.
 			finer := map[string]Bytes{}
-			s.eachKeys(fl, b, t.Add(cs-time.Nanosecond), func(_ time.Time, keys map[Key]Bytes) {
+			s.eachKeys(fl, b, t.Add(cs-time.Nanosecond), func(_ time.Time, keys iter.Seq2[Key, Bytes]) {
 				addKeys(finer, keys, f, split)
 			})
 			for k, v := range finer {
@@ -951,7 +958,7 @@ func (s *Store) Top(f Filter, dim string, from, to time.Time, n int) []Row {
 	switch dim {
 	case "mac", "app", "cc":
 		l := s.finest(from, 0)
-		s.eachKeys(l, from.Truncate(s.ringOf(l).step), to, func(_ time.Time, keys map[Key]Bytes) {
+		s.eachKeys(l, from.Truncate(s.ringOf(l).step), to, func(_ time.Time, keys iter.Seq2[Key, Bytes]) {
 			for k, b := range keys {
 				if f.match(k) {
 					key, _ := splitKey(k, dim)
@@ -964,7 +971,7 @@ func (s *Store) Top(f Filter, dim string, from, to time.Time, n int) []Row {
 		// Organisations add up over the countries an app reached them in;
 		// places keep each country and organisation apart.
 		for _, bk := range margins() {
-			for mac, m := range bk.ASN {
+			for mac, m := range bk.asnMargins() {
 				if f.MAC != "" && f.MAC != mac {
 					continue
 				}
@@ -1006,7 +1013,7 @@ func (s *Store) Top(f Filter, dim string, from, to time.Time, n int) []Row {
 		// of the newest bucket that has one.
 		srcAt := map[*Row]time.Time{}
 		for _, bk := range margins() {
-			for mac, m := range bk.Dom {
+			for mac, m := range bk.domMargins() {
 				if f.MAC != "" && f.MAC != mac {
 					continue
 				}
@@ -1077,7 +1084,7 @@ func (s *Store) Pairs(f Filter, dim, by string, from, to time.Time) map[string][
 	acc := map[string]map[string]*Row{}
 	from, to = from.UTC(), to.UTC()
 	l := s.finest(from, 0)
-	s.eachKeys(l, from.Truncate(s.ringOf(l).step), to, func(_ time.Time, keys map[Key]Bytes) {
+	s.eachKeys(l, from.Truncate(s.ringOf(l).step), to, func(_ time.Time, keys iter.Seq2[Key, Bytes]) {
 		for k, b := range keys {
 			if !f.match(k) {
 				continue
@@ -1193,7 +1200,7 @@ func (s *Store) Holders(dim, key string, from, to time.Time) HoldersOf {
 	l := s.finest(from, time.Hour)
 	for _, bk := range s.coarseOf(l).each(from.Truncate(s.ringOf(l).step), to) {
 		if dim == "asn" {
-			for mac, m := range bk.ASN {
+			for mac, m := range bk.asnMargins() {
 				for ak, c := range m.Rows {
 					if uint64(ak.ASN) != asn {
 						continue
@@ -1208,7 +1215,7 @@ func (s *Store) Holders(dim, key string, from, to time.Time) HoldersOf {
 			}
 			continue
 		}
-		for mac, m := range bk.Dom {
+		for mac, m := range bk.domMargins() {
 			for dk, c := range m.Rows {
 				if !strings.EqualFold(dk.Domain, key) {
 					continue

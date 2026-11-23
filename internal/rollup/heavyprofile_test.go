@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
+	"strconv"
 	"testing"
 	"time"
 
@@ -55,6 +57,32 @@ func TestHeavyProfile(t *testing.T) {
 	t.Logf("heap with every ring full (1440 minutes, 168 hours, 30 days): %.1f MB", float64(heap)/(1<<20))
 	t.Logf("on disk: %d hour files, %.0f KB each; %d day files, %.0f KB each", hn, float64(hb)/1024/float64(hn), dn, float64(db)/1024/float64(dn))
 	t.Logf("written a day: %.0f KB (24 hours and 1 day)", perDay/1024)
+	// The heap budget for the full store, in MB: NETRYX_HEAP_BUDGET_MB, 24 by
+	// default. scripts/memory-budget.sh reads the line above and this verdict.
+	budget := 24.0
+	if v := os.Getenv("NETRYX_HEAP_BUDGET_MB"); v != "" {
+		b, err := strconv.ParseFloat(v, 64)
+		if err != nil || b <= 0 {
+			t.Fatalf("NETRYX_HEAP_BUDGET_MB=%q is not a number of MB above zero", v)
+		}
+		budget = b
+	}
+	if mb := float64(heap) / (1 << 20); mb > budget {
+		t.Errorf("the heap is over its budget: %.1f MB, budget %.0f MB", mb, budget)
+	} else {
+		t.Logf("heap budget: %.0f MB, slack %.1f MB", budget, budget-mb)
+	}
+	// NETRYX_HEAPPROFILE=<file> writes what the full store holds, by where it
+	// was allocated: go tool pprof -top -sample_index=inuse_space <file>.
+	if p := os.Getenv("NETRYX_HEAPPROFILE"); p != "" {
+		f, err := os.Create(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		runtime.GC()
+		pprof.WriteHeapProfile(f)
+		f.Close()
+	}
 	runtime.KeepAlive(s)
 }
 
