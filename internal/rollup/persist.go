@@ -245,7 +245,9 @@ func (s *Store) encodeBucket(c *coarse, at time.Time, hd header) ([]byte, error)
 	if err := enc.Encode(hd); err != nil {
 		return nil, err
 	}
-	if err := enc.Encode(bk); err != nil {
+	// A packed bucket is written from a copy in maps: the file is the same
+	// whichever form the bucket is kept in.
+	if err := enc.Encode(bk.expanded()); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil

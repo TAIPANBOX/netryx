@@ -909,7 +909,9 @@ func TestALoadedFileIsHeldToTheBoundsOfTheStoreThatLoadsIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, b := range map[string]*bucket{"hour": small.hourAt(base), "day": small.dayAt(base)} {
-		if n := len(b.Dom[phone].Rows); n > 5 {
+		// The loaded hour has closed, so it is packed: its rows are read
+		// in maps through expanded.
+		if n := len(b.expanded().Dom[phone].Rows); n > 5 {
 			t.Fatalf("a smaller bound applies to the loaded %s: %d rows", name, n)
 		}
 	}
