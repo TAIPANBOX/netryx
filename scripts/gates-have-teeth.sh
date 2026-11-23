@@ -20,6 +20,11 @@ red() { # red <name> <command...>: the command MUST fail
 	fi
 }
 
+flip() { # flip <file> <offset>: change one byte in place, whatever it held
+	b=$(od -An -tu1 -j "$2" -N1 "$1" | tr -d ' ')
+	printf "\\$(printf '%03o' $((b ^ 1)))" | dd of="$1" bs=1 seek="$2" conv=notrunc 2>/dev/null
+}
+
 green() { # green <name> <command...>: the command MUST pass
 	name=$1; shift
 	if "$@" >"$work/out" 2>&1; then
@@ -62,6 +67,10 @@ red   "elf-arch, subject missing"   sh scripts/elf-arch.sh "$work/gone" arm64
 if [ -d build/aarch64_cortex-a53/tree ] && ls build/aarch64_cortex-a53/*.apk >/dev/null 2>&1; then
 	real_tree=build/aarch64_cortex-a53/tree
 	real_pkg=$(ls -S build/aarch64_cortex-a53/*.apk | head -1)
+	# The data packs are checked by tools/datapack; built once here rather
+	# than compiled again by every run below.
+	go build -o "$work/datapack" ./tools/datapack
+	export NETRYX_DATAPACK="$work/datapack"
 	green "package-sane, real package"   sh scripts/package-sane.sh "$real_tree" "$real_pkg"
 	printf 'not a package' >"$work/tiny.apk"
 	red   "package-sane, empty package"  sh scripts/package-sane.sh "$real_tree" "$work/tiny.apk"
@@ -99,18 +108,27 @@ if [ -d build/aarch64_cortex-a53/tree ] && ls build/aarch64_cortex-a53/*.apk >/d
 	chmod 0644 "$work/tree4h/usr/libexec/rpcd/luci.netryx"
 	red   "package-sane, LuCI handoff plugin not executable" sh scripts/package-sane.sh "$work/tree4h" "$real_pkg"
 	cp -R "$real_tree" "$work/tree5"
-	printf 'not the registry\n' >"$work/tree5/usr/share/netryx/oui.txt"
-	red   "package-sane, vendor list not the registry" sh scripts/package-sane.sh "$work/tree5" "$real_pkg"
-	rm -f "$work/tree5/usr/share/netryx/oui.txt"
+	# One byte of a vendor name changed: only the checksum can see it.
+	oui=$work/tree5/usr/share/netryx/oui.pack
+	size=$(wc -c <"$oui" | tr -d ' ')
+	flip "$oui" $((size - 100))
+	red   "package-sane, vendor list pack damaged" sh scripts/package-sane.sh "$work/tree5" "$real_pkg"
+	cp "$real_tree/usr/share/netryx/ip2asn.pack" "$oui"
+	red   "package-sane, address table where the vendor list belongs" sh scripts/package-sane.sh "$work/tree5" "$real_pkg"
+	rm -f "$oui"
 	red   "package-sane, no vendor list" sh scripts/package-sane.sh "$work/tree5" "$real_pkg"
 	cp -R "$real_tree" "$work/tree6"
 	rm -f "$work/tree6/usr/share/netryx/appmap.tsv"
 	red   "package-sane, no app map" sh scripts/package-sane.sh "$work/tree6" "$real_pkg"
 	cp -R "$real_tree" "$work/tree7"
-	rm -f "$work/tree7/usr/share/netryx/ip2asn-combined.tsv.gz"
+	geo=$work/tree7/usr/share/netryx/ip2asn.pack
+	head -c 1000000 "$real_tree/usr/share/netryx/ip2asn.pack" >"$geo"
+	red   "package-sane, address table pack cut short" sh scripts/package-sane.sh "$work/tree7" "$real_pkg"
+	cp "$real_tree/usr/share/netryx/ip2asn.pack" "$geo"
+	flip "$geo" 5000
+	red   "package-sane, address table pack damaged" sh scripts/package-sane.sh "$work/tree7" "$real_pkg"
+	rm -f "$geo"
 	red   "package-sane, no address table" sh scripts/package-sane.sh "$work/tree7" "$real_pkg"
-	printf 'not gzip' >"$work/tree7/usr/share/netryx/ip2asn-combined.tsv.gz"
-	red   "package-sane, address table not gzip" sh scripts/package-sane.sh "$work/tree7" "$real_pkg"
 	cp -R "$real_tree" "$work/tree8"
 	sed -i.bak '/Permission is hereby granted/d' "$work/tree8/usr/share/netryx/NOTICE"
 	rm -f "$work/tree8/usr/share/netryx/NOTICE.bak"

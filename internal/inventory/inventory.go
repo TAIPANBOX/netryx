@@ -66,7 +66,7 @@ type Sources struct {
 	Collected []collect.Device
 	Leases    *device.Table
 	Neigh     *neigh.Registry
-	OUI       map[string]string
+	OUI       Vendors
 	WiFi      map[string]Link
 	Labels    map[string]Label
 }
@@ -254,12 +254,12 @@ func splitAddrs(all []string) (v4, v6 []string) {
 }
 
 // vendorOf looks the first three bytes of a MAC up in the registry.
-func vendorOf(oui map[string]string, mac string) string {
+func vendorOf(oui Vendors, mac string) string {
 	hex := strings.ReplaceAll(mac, ":", "")
-	if len(hex) < 6 {
+	if len(hex) < 6 || oui == nil {
 		return ""
 	}
-	return oui[strings.ToUpper(hex[:6])]
+	return oui.Vendor(strings.ToUpper(hex[:6]))
 }
 
 // IsRandom reports whether a MAC is locally administered. Phones use such

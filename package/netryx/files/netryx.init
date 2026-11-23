@@ -30,9 +30,9 @@ start_service() {
 	config_get_bool capture main capture 1
 	local pdns
 	config_get_bool pdns main passive_dns 1
-	config_get geo main geo '/usr/share/netryx/ip2asn-combined.tsv.gz'
+	config_get geo main geo '/usr/share/netryx/ip2asn.pack'
 	config_get apps main apps '/usr/share/netryx/appmap.tsv'
-	config_get oui main oui '/usr/share/netryx/oui.txt'
+	config_get oui main oui '/usr/share/netryx/oui.pack'
 	config_get meta main meta '/usr/share/netryx/apps-meta.json'
 	config_get_bool fetch main fetch_icons 1
 	config_get state main state '/etc/netryx'

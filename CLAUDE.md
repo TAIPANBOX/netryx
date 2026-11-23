@@ -929,6 +929,43 @@ enforced, and that is a debt rather than a decision.
   network with a default route; a tunnel's default route is not.
   (test: `TestTheWANIsTheConfiguredLineAndNotATunnel`)
 
+## The promise about the fixed tables
+
+- **The address table and the vendor list cost the heap nothing**: the
+  package ships them as packs (`ip2asn.pack`, `oui.pack`) that `build.sh`
+  makes with `tools/datapack`, which reads each back and compares it with its
+  source before writing it; the service maps them read-only, never unmaps
+  them, and its lookups allocate nothing. Measured live heap after opening
+  both: at most `NETRYX_FIXED_BUDGET_MB` (2).
+  (test: `TestTheFixedTablesFitTheirBudget`, heavyprofile, with NETRYX_DATA;
+  `TestAPackLookupDoesNotAllocate`, `TestAVendorLookupDoesNotAllocate`;
+  @measured `NETRYX_DATA=$HOME/netryx-geo/data go test -tags heavyprofile -run TestTheFixedTablesFitTheirBudget -v ./internal/enrich/`
+  2026-11-23 on forge: 720 bytes with the packs, 26.30 MB with the text files)
+- **A pack answers exactly as the text file did**, for every address and
+  hardware address, and the country rules get the same ranges.
+  (test: `TestThePackAnswersAsTheLoaderForEveryAddress`, `TestTheVendorPackAnswersAsTheListForEveryPrefix`,
+  with NETRYX_DATA: every range's ends and their neighbours, two million random
+  addresses, every country's ranges, every registration and its neighbours;
+  `TestAPackAnswersAsTheTableItWasWrittenFrom`, `TestAVendorPackAnswersAsTheList`)
+- **A pack is checked whole before it answers**: magic, version, the SHA-256
+  at its end, every count against the file's size, every index and offset, and
+  the order of its records. One that fails is refused with the reason and the
+  service runs as it does without the file (no country, no maker; a country
+  rule says the address table is missing). A path ending in `.pack` is never
+  read as text. (test: `TestADamagedPackIsRefusedWithItsReason`,
+  `TestADamagedVendorPackIsRefusedWithItsReason`, `TestADamagedDataPackDegradesLikeAMissingOne`)
+- **An install configured before the packs keeps its countries and makers**:
+  a configured text file is loaded the old way; the old default path, gone
+  after the upgrade, reads the pack beside it.
+  (test: `TestOpenGeoReadsAPackAndTheOldFile`, `TestOpenOUIReadsAPackAndTheOldFile`,
+  `TestAnOldConfigsTextPathFindsThePack`)
+
+- **The service's resident memory in the lab**: @measured netryx-lab
+  2026-11-23 (6 devices, memory_limit 160MiB, `grep -E 'VmRSS|RssAnon|RssFile'
+  /proc/$(pidof netryx)/status` 25 s after a restart): with the text files
+  loaded 86.5 MB resident, 76.1 MB of it anonymous; with the packs mapped
+  50.7 MB, 25.6 MB anonymous and 25.1 MB file pages the kernel may reclaim.
+  The target is 64 MB resident under the heavy profile on a 256 MB router.
 ## The promise about the running console
 
 - **The console runs without its data files.** A missing or unreadable
@@ -1112,8 +1149,9 @@ enforced, and that is a debt rather than a decision.
 
 - **A package is a package**: the tree carries the service, its config, the
   binary and the three data files the config names, each what it claims to be
-  (`oui.txt` with registrations, a non-empty `appmap.tsv` with the v2fly MIT
-  licence text in `NOTICE`, `ip2asn-combined.tsv.gz` a valid gzip); every mode
+  (`oui.pack` and `ip2asn.pack` each passing `tools/datapack -verify` of its
+  own kind, a non-empty `appmap.tsv` with the v2fly MIT licence text in
+  `NOTICE`); every mode
   is set by `build.sh` (binary and init script 0755, nothing group- or
   world-writable); and the file is not smaller than a quarter of the binary.
   (gate: `scripts/package-sane.sh`)

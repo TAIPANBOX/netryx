@@ -57,6 +57,9 @@ type GeoDB struct {
 	v6      []v6Range
 	infos   []ASInfo
 	skipped int
+	// pk is set when the table was read from a pack (pack.go); the slices
+	// above are then empty.
+	pk *geoPack
 }
 
 // LoadIP2ASN reads an iptoasn TSV file, gzipped or not. A line that cannot be
@@ -206,6 +209,13 @@ func (g *GeoDB) Lookup(a netip.Addr) (ASInfo, bool) {
 	// A dual-stack socket reports IPv4 peers in their mapped IPv6 form, and
 	// the table holds them as plain IPv4.
 	a = a.Unmap()
+	if g.pk != nil {
+		if a.Is4() {
+			return g.pk.lookup4(addr4(a))
+		}
+		b := a.As16()
+		return g.pk.lookup6(&b)
+	}
 	if a.Is4() {
 		x := addr4(a)
 		// Find the last range that starts at or before x; it is the only one
@@ -237,6 +247,9 @@ func (g *GeoDB) Skipped() int {
 func (g *GeoDB) Len() int {
 	if g == nil {
 		return 0
+	}
+	if g.pk != nil {
+		return g.pk.n4 + g.pk.n6
 	}
 	return len(g.v4) + len(g.v6)
 }
@@ -292,6 +305,9 @@ type Range struct{ Lo, Hi netip.Addr }
 func (g *GeoDB) Ranges(match func(ASInfo) bool) (v4, v6 []Range) {
 	if g == nil || match == nil {
 		return nil, nil
+	}
+	if g.pk != nil {
+		return g.pk.ranges(match)
 	}
 	for _, r := range g.v4 {
 		if match(g.infos[r.info]) {
