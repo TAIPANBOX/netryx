@@ -146,6 +146,8 @@ type server struct {
 	agent Agent
 	// daily is the store of daily files; nil answers every day unknown.
 	daily Daily
+	// journal is the interventions on the devices; nil keeps none.
+	journal Journal
 	// loc is the router's zone, in which a device's week is read; nil is UTC.
 	loc *time.Location
 }
@@ -179,6 +181,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/days", s.route(s.days))
 	mux.HandleFunc("/api/devices/{mac}/usual", s.route(s.usual))
 	mux.HandleFunc("/api/devices/{mac}/rhythm", s.route(s.rhythm))
+	mux.HandleFunc("/api/devices/{mac}/interventions", s.route(s.interventions))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
 	s.agentRoutes(mux)
 	s.houseRoutes(mux)

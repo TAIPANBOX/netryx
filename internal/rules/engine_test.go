@@ -196,6 +196,7 @@ type rig struct {
 	roster  *Roster
 	seen    []Seen
 	events  []string
+	told    []Intervention
 }
 
 // fakeSafe stands in for the safe-search resolver's manager.
@@ -278,6 +279,11 @@ func newRig(t *testing.T, conf string, now time.Time) *rig {
 			r.mu.Lock()
 			defer r.mu.Unlock()
 			r.events = append(r.events, ev.Kind+" "+ev.MAC)
+		},
+		Intervene: func(iv Intervention) {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			r.told = append(r.told, iv)
 		},
 		HousePrefixes: func() []netip.Prefix {
 			r.mu.Lock()
@@ -2444,4 +2450,100 @@ func TestTheHitsAreEveryRulesCounterByID(t *testing.T) {
 	if got := r.e.Hits(); got != nil {
 		t.Fatalf("no table, hits %v", got)
 	}
+}
+
+// interventions takes what the engine told since the last call.
+func (r *rig) interventions() []Intervention {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := r.told
+	r.told = nil
+	return out
+}
+
+func toldOne(t *testing.T, got []Intervention, want Intervention) {
+	t.Helper()
+	for _, g := range got {
+		u := g.Until
+		g.Until = want.Until
+		if g == want && u.Equal(want.Until) {
+			return
+		}
+	}
+	t.Errorf("not told %+v; told %+v", want, got)
+}
+
+// The engine tells the journal each intervention it applies: an allowance
+// in force, by the owner or the agent; a limit spent, until midnight; a
+// connection it cut, with the rule and who wrote it.
+func TestTheEngineTellsTheAllowancesLimitsAndBlocksItApplies(t *testing.T) {
+	at := summer(t)
+	until := at.Add(30 * time.Minute).Truncate(time.Second)
+	conf := ytLimitLaptop + fmt.Sprintf(`
+config allow 'agent_a1'
+	option rule 'ytlim'
+	option member '%s'
+	option until '%d'
+config allow 'old'
+	option rule 'ytlim'
+	option member '%s'
+	option until '%d'
+`, phoneMAC, until.Unix(), phoneMAC, at.Add(-time.Minute).Unix())
+	r := newRig(t, conf, at)
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	first := r.interventions()
+	toldOne(t, first, Intervention{Kind: "allow", ID: "agent_a1", MAC: phoneMAC, Rule: "ytlim", Name: "youtube", By: "agent", Until: until})
+	for _, iv := range first {
+		if iv.ID == "old" {
+			t.Errorf("an allowance that has ended was told: %+v", iv)
+		}
+	}
+	r.mu.Lock()
+	r.live = []flows.Flow{flow(1, laptopMAC, "192.168.50.20:50000", "142.250.1.1:443", "youtube", "US")}
+	r.mu.Unlock()
+	r.useMinute(laptopMAC, "youtube")
+	r.set(at.Add(time.Minute), time.Minute)
+	r.e.Tick(at.Add(time.Minute))
+	r.settle()
+	got := r.interventions()
+	midnight := NextMidnight(london(t), at.Add(time.Minute))
+	toldOne(t, got, Intervention{Kind: "limit_spent", MAC: laptopMAC, Rule: "ytlim", Name: "youtube", By: "router", Until: midnight})
+	toldOne(t, got, Intervention{Kind: "blocked", MAC: laptopMAC, Rule: "ytlim", Name: "youtube", By: "owner"})
+}
+
+// Letting a device out of quarantine and isolating it are the owner's (the
+// agent cannot write them); the engine tells each change of the config
+// after the first apply, which only learns how things stand.
+func TestTheEngineTellsApprovalsAndIsolationAfterItsFirstApply(t *testing.T) {
+	at := summer(t)
+	r := newRig(t, `
+config device 'd_024e58000004'
+	option mac '02:4e:58:00:00:04'
+	option isolate '1'
+`, at)
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	for _, iv := range r.interventions() {
+		if iv.Kind == "isolated" {
+			t.Errorf("the first apply told how things already stood: %+v", iv)
+		}
+	}
+	r.write(`
+config device 'd_024e58000004'
+	option mac '02:4e:58:00:00:04'
+	option approved '1'
+config device 'd_024e58000005'
+	option mac '02:4e:58:00:00:05'
+	option isolate '1'
+`)
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	got := r.interventions()
+	toldOne(t, got, Intervention{Kind: "approved", MAC: "02:4e:58:00:00:04", By: "owner"})
+	toldOne(t, got, Intervention{Kind: "released", MAC: "02:4e:58:00:00:04", By: "owner"})
+	toldOne(t, got, Intervention{Kind: "isolated", MAC: "02:4e:58:00:00:05", By: "owner"})
 }

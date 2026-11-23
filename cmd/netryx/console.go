@@ -41,6 +41,7 @@ import (
 	"netryx/internal/flows"
 	"netryx/internal/icons"
 	"netryx/internal/inventory"
+	"netryx/internal/journal"
 	"netryx/internal/neigh"
 	"netryx/internal/netview"
 	"netryx/internal/ramfile"
@@ -235,6 +236,8 @@ type console struct {
 	alerts *alerts.Store
 	// daily is one file per closed UTC day, kept in <state>/daily.
 	daily *daily.Store
+	// journal is the interventions on the devices (<state>/interventions.jsonl).
+	journal *journal.Store
 	// netv reads the router's wiring, for the Network screen and the
 	// interface counters at a day's close.
 	netv *netview.Source
@@ -411,6 +414,16 @@ func buildConsole(o Options) (*console, error) {
 			o.NFT = nftRun
 		}
 		c.alerts = alerts.NewStore(filepath.Join(o.State, "alerts.json"), o.Now, o.Loc)
+		// The interventions on the devices, appended to one file in the
+		// state; without it the rules still run and the page says so.
+		if j, err := journal.Open(filepath.Join(o.State, "interventions.jsonl"), o.Now); err != nil {
+			log.Printf("the interventions journal is not kept (%v)", err)
+		} else {
+			c.journal = j
+			if n := j.Skipped(); n > 0 {
+				log.Printf("the interventions journal had %d line(s) it could not read: skipped", n)
+			}
+		}
 		c.rules = rules.NewEngine(rules.EngineOptions{
 			ConfigPath: o.RulesConfig, StateDir: o.State, Run: o.NFT, Now: o.Now, Loc: o.Loc,
 			Geo: geo, Apps: c.apps, Live: c.table.Live,
@@ -447,6 +460,14 @@ func buildConsole(o Options) (*console, error) {
 				}
 				c.alerts.Raise(alerts.Alert{Kind: ev.Kind, MAC: ev.MAC, Count: ev.Count})
 			},
+			Intervene: func(iv rules.Intervention) {
+				if c.journal == nil {
+					return
+				}
+				if _, err := c.journal.Add(journal.Entry{Kind: iv.Kind, ID: iv.ID, MAC: iv.MAC, Rule: iv.Rule, Name: iv.Name, By: iv.By, Until: iv.Until}); err != nil {
+					log.Printf("intervention not journalled: %v", err)
+				}
+			},
 			LogGroup: o.LogGroup,
 		})
 		// The capture tells the engine what the resolver answered and what
@@ -477,6 +498,9 @@ func buildConsole(o Options) (*console, error) {
 		api.OnLivePoll(c.livePolled),
 		api.WithNetwork(c.netv),
 		api.WithDaily(c.daily),
+	}
+	if c.journal != nil {
+		apiOpts = append(apiOpts, api.WithJournal(c.journal))
 	}
 	// A device's week is read in the zone the page shows its times in.
 	if o.Loc != nil && o.Loc.String() != "Local" {

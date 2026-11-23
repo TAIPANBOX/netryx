@@ -18,6 +18,7 @@ import { bytes, countryName, date, dayMonth, time, groupName } from "../format";
 import { alertText, type AlertsState } from "../security";
 import { connMap } from "../connmap";
 import { exposureOf, newForNote, rulesOn, whereConnected, type NewFor } from "../client360";
+import { interventionText, interventionsNote, type Interventions } from "../interventions";
 import { rhythmBars, rhythmSentences, usualRows, usualSentence, type Rhythm, type Usual } from "../rhythm";
 import { allowText, liveAllows, manifestName, stateOf, usageLabel, usageText, type Usage } from "../rules";
 import { deviceName } from "./Clients";
@@ -62,7 +63,10 @@ export function Client360({ mac, from = "", range, onRange, win, onWin }: { mac:
             <ConnectionMap mac={mac} name={name} win={win} />
             <Now mac={mac} win={win} avg={d.recent} />
             <History mac={mac} range={range} onRange={onRange} win={win} />
-            <RulesSection d={d} />
+            <div class="grid-2">
+              <RulesSection d={d} />
+              <InterventionsCard mac={mac} />
+            </div>
           </div>
         )}
       </main>
@@ -232,6 +236,32 @@ function History({ mac, range, onRange, win }: { mac: string; range: Range; onRa
         )}
       </Section>
     </section>
+  );
+}
+
+/** What was done to this device, from the router's journal of interventions. */
+function InterventionsCard({ mac }: { mac: string }) {
+  const polled = usePoll((s) => getJSON<Interventions>(`/api/devices/${enc(mac)}/interventions`, s), 60_000, [mac]);
+  const j = polled.data;
+  return (
+    <Card label="Interventions" title="Interventions">
+      {!j ? (
+        polled.error ? <Empty>{polled.error}</Empty> : <Loading />
+      ) : (
+        <div class="col-tight">
+          <span class="muted small">{interventionsNote(j, date)}</span>
+          {j.entries.map((e, i) => (
+            <div key={i} class="row-between small-13 intervention">
+              <span class="break">
+                {interventionText(e, time)}
+                {e.rule ? <span class="muted"> · <EntityLink e={{ kind: "rule", id: e.rule }}>open the rule</EntityLink></span> : null}
+              </span>
+              <span class="soft nowrap">{dayMonth(e.at)} {time(e.at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

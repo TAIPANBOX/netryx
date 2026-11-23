@@ -116,3 +116,22 @@ Feature: a client's name opens its card, and its card opens its full view
     # (the page: "the rhythm sets yesterday against the device's own median day, both sides named" in web/src/rhythm.test.ts)
     # (the page: "the rhythm refuses a comparison it cannot make, and says why" in web/src/rhythm.test.ts)
     # (the page: "the rhythm's days are drawn oldest first, yesterday marked, a day with no file apart from a quiet one" in web/src/rhythm.test.ts)
+
+  Scenario: a client's view lists the interventions on it, who made them and when
+    Given an owner who lets a device out of quarantine, isolates it or cuts its connection, an agent that gives it more time, a limit that runs out and a rule that blocks it
+    When the owner opens the device's full view
+    Then each intervention is listed newest first with when, what, which rule and who did it, and until when for an allowance or a spent limit
+    And the same allowance, the same spent limit and a rule blocking it again within the hour are listed once
+    And the journal survives a restart, keeps the newest 1000 of the last 30 days, and a damaged line is skipped and counted
+    # -> TestAnInterventionIsAppendedAndReadBackAfterARestart
+    # -> TestAnInterventionIsWrittenOnce
+    # -> TestADamagedLineIsSkippedAndCountedAndTheRestLoad
+    # -> TestTheJournalIsBoundedAndRewrittenOnlyAtTwiceItsSize
+    # -> TestAJournalOthersCanReadIsMadePrivate
+    # -> TestTheEngineTellsTheAllowancesLimitsAndBlocksItApplies
+    # -> TestTheEngineTellsApprovalsAndIsolationAfterItsFirstApply
+    # -> TestADeviceAnswersItsInterventions
+    # -> TestAButtonCutIsJournalled
+    # -> TestTheJournalTakesWhatTheEngineApplies
+    # (the page: "each intervention says who did what, which rule, and until when" in web/src/interventions.test.ts)
+    # (the page: "the journal says when it keeps nothing, since when it counts, and what it could not read" in web/src/interventions.test.ts)

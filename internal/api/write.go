@@ -1128,6 +1128,7 @@ func (s *server) connCut(r *http.Request) (any, error) {
 			if err != nil {
 				return nil, httpError{http.StatusInternalServerError, "the connection was not cut"}
 			}
+			s.journalCut(mac, f.Proto, f.Remote.String(), f.App.ID, note)
 			// held says whether the router keeps the flow from coming back;
 			// a cut it could not hold carries the engine's note.
 			return cutAnswer{Cut: true, Held: note == "", Note: note}, nil
