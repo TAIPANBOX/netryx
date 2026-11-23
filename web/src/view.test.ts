@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { AppUsage, FlowRow, Wan } from "./types";
-import { countryList, isRealCountry, lineQuality, sankeyOf, flowKey, selectFlow } from "./view";
+import { countryList, isRealCountry, lineQuality, sankeyOf, flowKey, selectFlow, speedTile } from "./view";
 
 test("a client's countries leave out the unknown country", () => {
   assert.equal(countryList(["US", "--", "IE"]), "US, IE");
@@ -108,4 +108,13 @@ test("the Sankey's app nodes carry their app id for the icon; the folded 'others
   const apps = s.nodes.filter((n) => n.col === 1);
   assert.deepEqual(apps.map((n) => n.icon), ["yt", "nf", "sp", "other"]);
   assert.equal(apps[0].name, "yt");
+});
+
+test("Speed now is the line's average over the window, with the last reading small beside it", () => {
+  const t = speedTile(wan({ rxRate: 85_250, txRate: 1_250, avg: { rx: 28_125, tx: 625, sec: 180 } }), "3m");
+  assert.deepEqual(t, { value: "↓ 225 · ↑ 5", sub: "kbit/s · 3 min avg · now ↓ 682 ↑ 10 · eth1" });
+  // Fewer seconds read than the window: says how long it covers.
+  assert.equal(speedTile(wan({ avg: { rx: 1000, tx: 0, sec: 40 } }), "3m").sub, "kbit/s · 40 s avg · now ↓ 0 ↑ 0 · eth1");
+  // No readings yet: the last one, said as such.
+  assert.deepEqual(speedTile(wan({ rxRate: 1000, avg: null }), "3m"), { value: "↓ 8 · ↑ 0", sub: "kbit/s · last 10 s · eth1" });
 });

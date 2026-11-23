@@ -53,6 +53,12 @@ type Inventory interface{ Devices() []inventory.Device }
 // WAN reports the internet line.
 type WAN interface{ Status() wan.Status }
 
+// wanAverager is a line that keeps its recent readings: the overview's Speed
+// now tile is its average over the window rather than the last reading.
+type wanAverager interface {
+	Average(span time.Duration) (rx, tx float64, covered time.Duration)
+}
+
 // Service reports on the running service itself: when it started, and how
 // many connection events the kernel numbered and could not deliver.
 type Service interface {
@@ -479,8 +485,26 @@ func wanView(st wan.Status) wanJSON {
 	return j
 }
 
+// withAvg adds the line's average over the window, when the line keeps readings.
+func withAvg(j wanJSON, w WAN, win time.Duration) wanJSON {
+	a, ok := w.(wanAverager)
+	if !ok {
+		return j
+	}
+	rx, tx, cov := a.Average(win)
+	if cov <= 0 {
+		return j
+	}
+	j.Avg = &wanAvgJSON{Rx: rx, Tx: tx, Sec: cov.Seconds()}
+	return j
+}
+
 func (s *server) overview(r *http.Request) (any, error) {
 	p, err := s.period(r)
+	if err != nil {
+		return nil, err
+	}
+	win, err := windowOf(r)
 	if err != nil {
 		return nil, err
 	}
@@ -570,7 +594,7 @@ func (s *server) overview(r *http.Request) (any, error) {
 	}
 
 	return overviewJSON{
-		WAN:        wanView(s.w.Status()),
+		WAN:        withAvg(wanView(s.w.Status()), s.w, win),
 		Clients:    cl,
 		Series:     s.seriesOf(rollup.Filter{NotCC: lanCC}, p, seriesSplit(split)),
 		TopClients: topClients,

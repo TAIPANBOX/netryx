@@ -454,8 +454,12 @@ func main() {
 		// check: a page elsewhere must not reach any of it by rebinding a
 		// name. Behind it, the LuCI login: every view needs a session.
 		// Sessions as long as LuCI's, not rpcd's five minutes.
-		rpc := auth.NewRPC(*f.ubusURL, nil, auth.SessionTime(luciSessionTime(os.DirFS("/"))))
+		sessionTime := luciSessionTime(os.DirFS("/"))
+		rpc := auth.NewRPC(*f.ubusURL, nil, auth.SessionTime(sessionTime))
 		gate := con.newGate(rpc, *f.metricsToken)
+		// A session nobody uses the page in for LuCI's session time ends, as
+		// in LuCI: polling by an open tab does not keep it alive.
+		gate.IdleLimit = sessionTime
 		// Sessions outlive a restart of netryx in RAM only: /tmp is gone
 		// with a reboot, and rpcd still decides on every request.
 		gate.Store = sessionsFile

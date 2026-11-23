@@ -483,6 +483,33 @@ func TestTheWANTileGetsLatencyFromTheProber(t *testing.T) {
 	}
 }
 
+// The Speed now tile is the line's average over the window, from every
+// reading of its counters, not the last 10 s alone.
+func TestTheWANTileAveragesTheLineOverTheWindow(t *testing.T) {
+	o := testOptions(t)
+	run := &fakeRun{}
+	run.set("ubus call network.interface.wan status", wanStatus)
+	o.Run = run.run
+	fsys := routes()
+	o.FS = fsys
+	c, err := buildConsole(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	for i, b := range []string{"0", "10000", "40000"} {
+		fsys["sys/class/net/eth0/statistics/rx_bytes"] = &fstest.MapFile{Data: []byte(b + "\n")}
+		fsys["sys/class/net/eth0/statistics/tx_bytes"] = &fstest.MapFile{Data: []byte("0\n")}
+		c.wan.tick(context.Background(), now.Add(time.Duration(i)*10*time.Second))
+	}
+	w := overviewWAN(t, c)
+	avg, _ := w["avg"].(map[string]any)
+	// 10000 then 30000 bytes over 20 s: the last reading says 3000 B/s, the window 2000.
+	if w["rxRate"] != 3000.0 || avg == nil || avg["rx"] != 2000.0 || avg["sec"] != 20.0 {
+		t.Fatalf("wan %v, want the last reading 3000 and the window's average 2000 over 20 s", w)
+	}
+}
+
 // brforward is the kernel's binary forwarding table: 6 bytes of address, the
 // port number, a local flag, the age, and the port's high byte.
 func fdbEntry(mac string, port uint16, local bool) []byte {

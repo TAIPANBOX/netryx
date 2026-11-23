@@ -451,6 +451,17 @@ enforced, and that is a debt rather than a decision.
   `TestASilentConnectionIsLetGo`, `TestRunningOutOfDescriptorsDoesNotCloseThePort`; @measured netryx-lab 2026-11-22: own certificate
   made, https on :8788, plain http from the router 200, to the LAN address 308, a
   foreign Host 421)
+- **A session nobody uses ends**: the page sends the seconds since a person
+  last used it (`X-Netryx-Activity`: mouse, key, focus, the tab shown) with
+  every request, a change counts as use only with the session's token, and a session with no use for
+  LuCI's session time (`IdleLimit`) is ended before rpcd is asked anything,
+  answering 401 `idle`: netryx's own rpcd session is destroyed, a lent one
+  only let go, so LuCI's timeout ends it once nothing touches it. Polling
+  alone moves nothing, the last use is kept across a restart, and use reported
+  after the limit revives nothing. (test: `TestPollingAloneDoesNotKeepASessionAlive`,
+  `TestActivityKeepsTheSessionAlive`, `TestActivityAfterTheLimitDoesNotReviveTheSession`,
+  `TestAWriteIsActivity`, `TestAChangeWithoutTheTokenIsNotActivity`, `TestAnIdleLentSessionIsLetGoNotEnded`, `TestIdleTimeSurvivesARestart`;
+  the page: "each request says how long ago a person last used the page" in `web/src/api.test.ts`)
 - **A session lasts as long as LuCI's**: the login asks rpcd for
   `luci.sauth.sessiontime` (an hour when unset or not between five minutes and
   a day), not rpcd's five minutes. (test: `TestASessionLastsTheSessionTimeAsked`,
@@ -942,6 +953,14 @@ enforced, and that is a debt rather than a decision.
   (test: `TestTheMemoryLimitReachesTheServiceAsGOMEMLIMIT`;
   measured on the Flint 2, docs/flint2-measured.md sections 6 and 8: the
   all-countries apply peaked at 241.9 MB without the limit and 158.0 MB with it)
+- **Speed now is the line's average over the window** (1, 3 or 10 minutes),
+  from every 10 s reading of the WAN counters (at most 64 kept, a clock set
+  back or another device starting afresh), each weighted by the seconds it
+  covers; the last reading is shown small beside it, and before any reading
+  the tile says it is the last 10 s. (test: `TestTheWindowAveragesTheLineOverItsSpan`,
+  `TestTheWindowKeepsTenMinutesAtMost`, `TestAClockSetBackStartsTheWindowAgain`,
+  `TestTheSpeedTileIsTheWindowsAverage`, `TestTheWANTileAveragesTheLineOverTheWindow`;
+  the page: "Speed now is the line's average over the window" in `web/src/view.test.ts`)
 - **One answer to "whose is this address"**, shared by the flow table, the
   finished totals and the client list: the router's own addresses are the
   device `router`, else the hardware address the capture saw, else the

@@ -45,6 +45,9 @@ const (
 	// HandoffCookie is the nonce LuCI's page puts in the browser before it
 	// asks for a code; the code opens only together with it.
 	HandoffCookie = "netryx_handoff"
+	// ActivityHeader carries the seconds since a person last used the page
+	// (a mouse, a key, the tab in focus); only that keeps a session alive.
+	ActivityHeader = "X-Netryx-Activity"
 	// CSRFHeader carries hex(HMAC-SHA256(Secret, handle)) on every change.
 	CSRFHeader = "X-Netryx-CSRF"
 	// Scope is the ACL scope netryx's grants live in
@@ -96,6 +99,9 @@ type Gate struct {
 	Zone string
 	// Store keeps the sessions in a file across a restart; empty keeps them in memory only.
 	Store string
+	// IdleLimit ends a session nobody has used the page in for that long
+	// (LuCI's session time); zero ends none for idleness.
+	IdleLimit time.Duration
 	// Handoff is the directory of the codes LuCI's page mints
 	// (internal/handoff); empty, POST /api/login/luci opens nothing.
 	Handoff string
@@ -144,6 +150,8 @@ type keptKey struct{ sid, object, function string }
 type signedIn struct {
 	handle, sid, user string
 	lent              bool
+	// active is when a person last used the page; polling alone leaves it.
+	active time.Time
 }
 
 type gate struct {
@@ -177,6 +185,9 @@ func (g *Gate) Wrap(next http.Handler) http.Handler {
 			g.Secret = secret
 			for i := range kept {
 				si := kept[i]
+				if si.active.IsZero() {
+					si.active = s.now()
+				}
 				s.handles[si.handle] = s.order.PushBack(&si)
 			}
 		}
@@ -291,6 +302,9 @@ func (s *gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.next.ServeHTTP(w, r)
 		return
 	}
+	if !s.awake(w, r) {
+		return
+	}
 	si, ok := s.viewer(w, r)
 	if !ok {
 		return
@@ -310,6 +324,64 @@ func (s *gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.next.ServeHTTP(w, r)
+}
+
+// maxActivity bounds the seconds a page may report since its last use: more
+// is no use anyway, and the bound keeps the arithmetic small.
+const maxActivity = 24 * time.Hour
+
+// awake ends the request's session when nobody has used the page for
+// IdleLimit, before rpcd is asked anything (an idle session is not touched in
+// rpcd again, so LuCI's own timeout ends a lent one), and otherwise moves its
+// last activity forward to the use the request carries: a change, or the
+// page's report of when a mouse, a key or focus last came. Polling alone
+// moves nothing. A request with no session is the viewer check's to answer.
+func (s *gate) awake(w http.ResponseWriter, r *http.Request) bool {
+	c, err := r.Cookie(CookieName)
+	if err != nil || !validHandle(c.Value) || s.g.IdleLimit <= 0 {
+		return true
+	}
+	now := s.now()
+	s.mu.Lock()
+	e, ok := s.handles[c.Value]
+	if !ok {
+		s.mu.Unlock()
+		return true
+	}
+	si := e.Value.(*signedIn)
+	if now.Sub(si.active) > s.g.IdleLimit {
+		s.mu.Unlock()
+		gone, _ := s.drop(c.Value)
+		if !gone.lent {
+			if err := s.destroy(gone.sid); err != nil {
+				s.logf("an idle session ended; rpcd did not end it: %v", err)
+			}
+		}
+		s.logf("the console session of %q ended after %v without use", gone.user, s.g.IdleLimit)
+		writeErr(w, http.StatusUnauthorized, "idle")
+		return false
+	}
+	at := time.Time{}
+	if r.Method != http.MethodGet {
+		// A change is use only with the session's token; the gate refuses it otherwise.
+		if s.csrfOK(r, c.Value) {
+			at = now
+		}
+	} else if v, err := strconv.Atoi(r.Header.Get(ActivityHeader)); err == nil && v >= 0 && time.Duration(v)*time.Second <= maxActivity {
+		at = now.Add(-time.Duration(v) * time.Second)
+	}
+	var perr error
+	if at.After(si.active) {
+		// Kept in the file a minute at a time, so a restart keeps it too.
+		save := at.Sub(si.active) >= time.Minute
+		si.active = at
+		if save {
+			perr = s.persistLocked()
+		}
+	}
+	s.mu.Unlock()
+	s.logPersist(perr)
+	return true
 }
 
 // validHandle reports whether h has the shape of a handle: 64 lower-case
@@ -606,7 +678,7 @@ func (s *gate) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	canWrite, _ := s.access(ctx, sid, "control", "write")
-	si := &signedIn{handle: newHandle(), sid: sid, user: in.User}
+	si := &signedIn{handle: newHandle(), sid: sid, user: in.User, active: s.now()}
 	s.open(w, r, si)
 	s.logf("login for %q from %s", in.User, src)
 	writeJSON(w, http.StatusOK, map[string]any{"csrf": s.g.CSRF(si.handle), "user": in.User, "canWrite": canWrite, "zone": s.g.zone()})
@@ -690,13 +762,16 @@ func (s *gate) luci(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	canWrite, _ := s.access(ctx, c.SID, "control", "write")
-	si := &signedIn{handle: newHandle(), sid: c.SID, user: c.User, lent: true}
+	si := &signedIn{handle: newHandle(), sid: c.SID, user: c.User, lent: true, active: s.now()}
 	s.open(w, r, si)
 	s.logf("login for %q from %s through LuCI", c.User, src)
 	writeJSON(w, http.StatusOK, map[string]any{"csrf": s.g.CSRF(si.handle), "user": c.User, "canWrite": canWrite, "zone": s.g.zone()})
 }
 
 func (s *gate) session(w http.ResponseWriter, r *http.Request) {
+	if !s.awake(w, r) {
+		return
+	}
 	si, ok := s.viewer(w, r)
 	if !ok {
 		return

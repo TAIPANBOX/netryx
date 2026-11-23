@@ -53,3 +53,15 @@ Feature: the live figures settle, hold their order and sort as the owner likes
     Then nothing on the page is asked again until they press it once more, except what they change while paused
     # (the pause: "Pause freezes every poll until it is lifted" in web/src/steady.test.ts and
     #  "a page that turns still between polls asks no more until it moves again" in web/src/poll.test.ts)
+
+  Scenario: the line's Speed now holds still
+    Given the overview's Speed now tile
+    When the line is read every 10 seconds
+    Then the tile shows the average over the window picked, 1, 3 or 10 minutes
+    And the last reading is shown small beside it, and before any reading the tile says it is the last 10 s
+    # -> TestTheWindowAveragesTheLineOverItsSpan
+    # -> TestTheWindowKeepsTenMinutesAtMost
+    # -> TestAClockSetBackStartsTheWindowAgain
+    # -> TestTheSpeedTileIsTheWindowsAverage
+    # -> TestTheWANTileAveragesTheLineOverTheWindow
+    # (the page: "Speed now is the line's average over the window" in web/src/view.test.ts)

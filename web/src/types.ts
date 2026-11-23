@@ -14,6 +14,8 @@ export interface Wan {
   up: boolean; device: string; ipv4: string; ipv6: string; uptimeSec: number;
   rxRate: number; txRate: number;
   latencyMs: number | null; jitterMs: number | null; lossPct: number;
+  /** The line's average over the window asked for (bytes per second) and the seconds it covers; null before a reading. */
+  avg?: { rx: number; tx: number; sec: number } | null;
 }
 
 // other marks a rollup catch-all row (the "other" key or country "--"): it is

@@ -45,6 +45,15 @@ type wanJSON struct {
 	LatencyMs *float64 `json:"latencyMs"`
 	JitterMs  *float64 `json:"jitterMs"`
 	LossPct   float64  `json:"lossPct"`
+	// Avg is the line's average over the window asked for; null when the
+	// line keeps no readings yet.
+	Avg *wanAvgJSON `json:"avg"`
+}
+
+type wanAvgJSON struct {
+	Rx  float64 `json:"rx"`
+	Tx  float64 `json:"tx"`
+	Sec float64 `json:"sec"`
 }
 
 type clientsJSON struct {

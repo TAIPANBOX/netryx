@@ -67,6 +67,21 @@ Feature: the console is opened from LuCI without a second login, and over https
     # -> TestLeavingTheConsoleKeepsTheLuCISession
     # -> TestALentSessionStaysLentAcrossARestart
 
+  Scenario: a console nobody uses signs itself out
+    Given a console session, from LuCI or from the login form
+    When nobody moves the mouse, types or brings the tab into focus for LuCI's session time, an hour by default
+    Then the session ends, even though the open tab kept polling the router
+    And a session that came from LuCI is let go, so LuCI's own timeout ends it, while netryx's own is ended
+    And coming back after that asks for a sign-in, saying why
+    # -> TestPollingAloneDoesNotKeepASessionAlive
+    # -> TestActivityKeepsTheSessionAlive
+    # -> TestActivityAfterTheLimitDoesNotReviveTheSession
+    # -> TestAWriteIsActivity
+    # -> TestAChangeWithoutTheTokenIsNotActivity
+    # -> TestAnIdleLentSessionIsLetGoNotEnded
+    # -> TestIdleTimeSurvivesARestart
+    # (the page: "each request says how long ago a person last used the page, in whole seconds" in web/src/api.test.ts)
+
   Scenario: LuCI's page says when the console cannot be opened from the house
     Given the console listens on the router itself only, or is not running
     When the user opens Network console

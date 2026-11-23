@@ -55,6 +55,12 @@ export function rate(bytesPerSec: number): string {
   return short(bits / 1000 ** i) + " " + RATE_UNITS[i];
 }
 
+/** Rates said in the unit ref (bytes per second) would be said in: "now" beside an average. */
+export function ratesIn(ref: number, ...bytesPerSec: number[]): string[] {
+  const i = rateUnit(Math.max(0, ref || 0) * 8);
+  return bytesPerSec.map((v) => short((Math.max(0, v || 0) * 8) / 1000 ** i));
+}
+
 /** Down and up in one unit, chosen by the larger, for "↓ 312 · ↑ 41 Mbit/s". */
 export function ratePair(down: number, up: number): { down: string; up: string; unit: string } {
   const d = Math.max(0, down || 0) * 8;
