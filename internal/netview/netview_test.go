@@ -370,3 +370,35 @@ func TestTheWANIsTheConfiguredLineAndNotATunnel(t *testing.T) {
 		t.Errorf("a second uplink with a default route: %+v", by["wwan"])
 	}
 }
+
+// UPnP mappings a device opened for itself, as miniupnpd keeps them
+// (proto:outside port:device address:device port:expiry:description).
+func TestUPnPMappingsAreReadFromTheLeaseFile(t *testing.T) {
+	leases := []byte("TCP:51413:192.168.50.105:51413:1763900000:Transmission at 192.168.50.105:51413 TCP\n" +
+		"UDP:3478:192.168.50.20:3478:0:Xbox\n" +
+		"garbage line\n" +
+		"TCP:notaport:192.168.50.20:1:0:x\n")
+	got := ParseUPnP(leases)
+	if len(got) != 2 {
+		t.Fatalf("mappings %+v, want the two well-formed lines", got)
+	}
+	tr, xb := got[0], got[1]
+	if tr.Proto != "tcp" || tr.Port != "51413" || tr.DestIP != "192.168.50.105" || tr.DestPort != "51413" || tr.Desc != "Transmission at 192.168.50.105:51413 TCP" || tr.Expires.Unix() != 1763900000 {
+		t.Errorf("transmission %+v", tr)
+	}
+	if xb.Proto != "udp" || !xb.Expires.IsZero() || xb.Desc != "Xbox" {
+		t.Errorf("xbox %+v", xb)
+	}
+}
+
+func TestTheViewCarriesUPnPMappingsOrSaysThereAreNone(t *testing.T) {
+	fsys := fstest.MapFS{"var/run/miniupnpd.leases": {Data: []byte("UDP:3478:192.168.50.20:3478:0:Xbox\n")}}
+	s := &Source{FS: fsys, Run: fakeRun{}.run}
+	if v := s.read(context.Background()); len(v.Forwards.UPnP) != 1 || v.Forwards.UPnP[0].DestIP != "192.168.50.20" {
+		t.Fatalf("upnp %+v", v.Forwards.UPnP)
+	}
+	s = &Source{FS: fstest.MapFS{}, Run: fakeRun{}.run}
+	if v := s.read(context.Background()); v.Forwards.UPnP == nil || len(v.Forwards.UPnP) != 0 {
+		t.Fatalf("no lease file: %+v, want an empty list", v.Forwards.UPnP)
+	}
+}

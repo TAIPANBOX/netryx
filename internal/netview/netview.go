@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/netip"
 	"regexp"
 	"slices"
 	"sort"
@@ -17,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"netryx/internal/uciconf"
 )
@@ -153,6 +155,58 @@ type Forward struct {
 type Forwards struct {
 	Why   string    `json:"why"`
 	Rules []Forward `json:"rules"`
+	// UPnP is the mappings devices opened for themselves through miniupnpd.
+	UPnP []UPnP `json:"upnp"`
+}
+
+// UPnP is one mapping miniupnpd holds: a port outside led to a device port.
+type UPnP struct {
+	Proto    string    `json:"proto"`
+	Port     string    `json:"port"`
+	DestIP   string    `json:"destIp"`
+	DestPort string    `json:"destPort"`
+	Desc     string    `json:"desc"`
+	Expires  time.Time `json:"-"`
+}
+
+// upnpLeases is where miniupnpd keeps its mappings by default (upnpd's
+// upnp_lease_file); a router without UPnP has no such file.
+const upnpLeases = "var/run/miniupnpd.leases"
+
+// ParseUPnP reads miniupnpd's lease file, one mapping a line:
+// proto:outside port:device address:device port:expiry:description, the
+// expiry in Unix seconds or 0 for none. A line not of that shape is skipped,
+// and at most maxForwards are kept.
+func ParseUPnP(b []byte) []UPnP {
+	out := []UPnP{}
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.SplitN(strings.TrimSpace(line), ":", 6)
+		if len(f) != 6 || len(out) >= maxForwards {
+			continue
+		}
+		proto := strings.ToLower(f[0])
+		ep, e1 := strconv.Atoi(f[1])
+		ip, e2 := netip.ParseAddr(f[2])
+		dp, e3 := strconv.Atoi(f[3])
+		exp, e4 := strconv.ParseInt(f[4], 10, 64)
+		if (proto != "tcp" && proto != "udp") || e1 != nil || e2 != nil || e3 != nil || e4 != nil || ep < 1 || ep > 65535 || dp < 1 || dp > 65535 {
+			continue
+		}
+		u := UPnP{Proto: proto, Port: f[1], DestIP: ip.String(), DestPort: f[3], Desc: strings.Map(func(r rune) rune {
+			if unicode.IsControl(r) {
+				return ' '
+			}
+			return r
+		}, f[5])}
+		if len(u.Desc) > 128 {
+			u.Desc = u.Desc[:128]
+		}
+		if exp > 0 {
+			u.Expires = time.Unix(exp, 0)
+		}
+		out = append(out, u)
+	}
+	return out
 }
 
 // View is the whole reading.
@@ -249,7 +303,10 @@ func (s *Source) read(ctx context.Context) View {
 	v.Ports = s.ports()
 	v.WiFi = s.wifi(ctx)
 	v.WireGuard = s.wireguard(ctx)
-	v.Forwards = Forwards{Rules: []Forward{}}
+	v.Forwards = Forwards{Rules: []Forward{}, UPnP: []UPnP{}}
+	if b, err := fs.ReadFile(s.FS, upnpLeases); err == nil {
+		v.Forwards.UPnP = ParseUPnP(b)
+	}
 	b, err := s.config("firewall")
 	if err == nil && b != nil {
 		var rules []Forward

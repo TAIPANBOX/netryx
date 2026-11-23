@@ -129,3 +129,16 @@ func TestTheNetworkViewNeverCarriesASecret(t *testing.T) {
 		t.Errorf("the interface's public key is missing: %s", body)
 	}
 }
+
+// A UPnP mapping names the device that holds its address now, as a forward does.
+func TestAUPnPMappingNamesItsDevice(t *testing.T) {
+	fl, h, inv, w, ap := fixture()
+	v := netFixture()
+	v.Forwards.UPnP = []netview.UPnP{{Proto: "tcp", Port: "51413", DestIP: inv.devs[0].IPv4[0], DestPort: "51413", Desc: "Transmission"}}
+	rec := get(t, New(fl, h, inv, w, ap, clock, nil, WithNetwork(fakeNet{v})), http.MethodGet, "/api/network")
+	body := decode(t, rec)
+	up := arr(field(body, "forwards", "upnp"))
+	if len(up) != 1 || str(field(up[0], "desc")) != "Transmission" || str(field(field(up[0], "device"), "mac")) != inv.devs[0].MAC {
+		t.Fatalf("upnp %v, want the mapping with its device", field(body, "forwards", "upnp"))
+	}
+}
