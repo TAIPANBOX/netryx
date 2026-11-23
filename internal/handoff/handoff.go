@@ -13,6 +13,7 @@ package handoff
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -52,6 +53,8 @@ type pending struct {
 	SID  string `json:"sid"`
 	User string `json:"user"`
 	At   int64  `json:"at"` // unix nanoseconds, when it was minted
+	// Nonce is the SHA-256 of the browser's nonce: the code opens only with it.
+	Nonce string `json:"nonce"`
 }
 
 func hex32(s string) bool {
@@ -96,6 +99,12 @@ func prune(dir string, now time.Time) int {
 	n := 0
 	for _, e := range ents {
 		p := filepath.Join(dir, e.Name())
+		// Another mint's file, still being written: not ours to judge yet.
+		if strings.HasPrefix(e.Name(), ".") {
+			if fi, err := e.Info(); err == nil && time.Since(fi.ModTime()) < TTL {
+				continue
+			}
+		}
 		b, _ := ramfile.Read(p, 1024)
 		var pd pending
 		if b != nil && json.Unmarshal(b, &pd) == nil && live(time.Unix(0, pd.At), now) {
@@ -108,9 +117,10 @@ func prune(dir string, now time.Time) int {
 	return n
 }
 
-// Mint returns a new code for the session and the user.
-func Mint(dir, sid, user string, now time.Time) (string, error) {
-	if !hex32(sid) || !ValidUser(user) {
+// Mint returns a new code for the session and the user, bound to the nonce
+// LuCI's page put in the asking browser's cookie.
+func Mint(dir, sid, user, nonce string, now time.Time) (string, error) {
+	if !hex32(sid) || !ValidUser(user) || !hex32(nonce) {
 		return "", ErrBad
 	}
 	if prune(dir, now) >= MaxPending {
@@ -121,7 +131,7 @@ func Mint(dir, sid, user string, now time.Time) (string, error) {
 		return "", err
 	}
 	code := hex.EncodeToString(b)
-	body, err := json.Marshal(pending{SID: sid, User: user, At: now.UnixNano()})
+	body, err := json.Marshal(pending{SID: sid, User: user, At: now.UnixNano(), Nonce: nameOf(nonce)})
 	if err != nil {
 		return "", err
 	}
@@ -131,8 +141,9 @@ func Mint(dir, sid, user string, now time.Time) (string, error) {
 	return code, nil
 }
 
-// Redeem takes the code: once, and only while it is good.
-func Redeem(dir, code string, now time.Time) (Claim, error) {
+// Redeem takes the code: once, only while it is good, and only from the
+// browser holding the nonce it was minted for. A wrong nonce spends it too.
+func Redeem(dir, code, nonce string, now time.Time) (Claim, error) {
 	if !hex32(code) {
 		return Claim{}, ErrNoCode
 	}
@@ -147,6 +158,9 @@ func Redeem(dir, code string, now time.Time) (Claim, error) {
 	_ = ramfile.Remove(taken)
 	var pd pending
 	if b == nil || json.Unmarshal(b, &pd) != nil || !hex32(pd.SID) || !ValidUser(pd.User) || !live(time.Unix(0, pd.At), now) {
+		return Claim{}, ErrNoCode
+	}
+	if !hex32(nonce) || subtle.ConstantTimeCompare([]byte(nameOf(nonce)), []byte(pd.Nonce)) != 1 {
 		return Claim{}, ErrNoCode
 	}
 	return Claim{SID: pd.SID, User: pd.User}, nil

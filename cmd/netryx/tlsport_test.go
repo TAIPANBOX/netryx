@@ -233,3 +233,42 @@ func TestARequestArrivingOnTheWANAddressIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// errListener fails Accept with a temporary error a few times (EMFILE when
+// the router runs out of file descriptors), then hands out real connections.
+type errListener struct {
+	net.Listener
+	fails int
+}
+
+type tempErr struct{}
+
+func (tempErr) Error() string   { return "too many open files" }
+func (tempErr) Timeout() bool   { return false }
+func (tempErr) Temporary() bool { return true }
+
+func (l *errListener) Accept() (net.Conn, error) {
+	if l.fails > 0 {
+		l.fails--
+		return nil, tempErr{}
+	}
+	return l.Listener.Accept()
+}
+
+// Running out of file descriptors is a pause, not the end: the port keeps
+// answering once descriptors are free again, so nobody in the house can stop
+// the console by opening connections.
+func TestRunningOutOfDescriptorsDoesNotCloseThePort(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	_, plainLn := splitTLS(&errListener{Listener: ln, fails: 3})
+	go (&http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })}).Serve(plainLn)
+	res, err := (&http.Client{Timeout: 5 * time.Second}).Get("http://" + ln.Addr().String() + "/")
+	if err != nil {
+		t.Fatalf("after three EMFILE: %v", err)
+	}
+	res.Body.Close()
+}

@@ -73,7 +73,7 @@ func sessionUser(sid string) (string, error) {
 // netryx, so the agent's grant for netryx.* never reaches it.
 func runRpcdLuci(d luciDeps, args []string, stdin io.Reader, stdout io.Writer) int {
 	if len(args) == 1 && args[0] == "list" {
-		json.NewEncoder(stdout).Encode(map[string]any{"handoff": map[string]string{}})
+		json.NewEncoder(stdout).Encode(map[string]any{"handoff": map[string]string{"nonce": "str"}})
 		return 0
 	}
 	v, err := luciCall(d, args, stdin)
@@ -97,17 +97,27 @@ func luciCall(d luciDeps, args []string, stdin io.Reader) (map[string]any, error
 	if json.Unmarshal(bytes.TrimSpace(raw), &in) != nil {
 		return nil, errors.New("the arguments are not a JSON object")
 	}
-	var sid string
+	var sid, nonce string
 	for k, v := range in {
-		if k != "ubus_rpc_session" {
+		var dst *string
+		switch k {
+		case "ubus_rpc_session":
+			dst = &sid
+		case "nonce":
+			dst = &nonce
+		default:
 			return nil, fmt.Errorf("handoff takes no argument %q", k)
 		}
-		if json.Unmarshal(v, &sid) != nil {
-			return nil, errors.New("the session is not a string")
+		if json.Unmarshal(v, dst) != nil {
+			return nil, fmt.Errorf("%s is not a string", k)
 		}
 	}
 	if !validSID(sid) {
 		return nil, errors.New("handoff is called from a signed-in LuCI page")
+	}
+	// The nonce the page put in the browser's cookie: the code opens only there.
+	if !validSID(nonce) {
+		return nil, errors.New("handoff needs the page's nonce, 32 hex digits")
 	}
 	b, why := ramfile.Read(d.State, 4096)
 	var st consoleState
@@ -135,7 +145,7 @@ func luciCall(d luciDeps, args []string, stdin io.Reader) (map[string]any, error
 	if err != nil {
 		return nil, err
 	}
-	code, err := handoff.Mint(d.Dir, sid, user, d.Now())
+	code, err := handoff.Mint(d.Dir, sid, user, nonce, d.Now())
 	if err != nil {
 		return nil, err
 	}

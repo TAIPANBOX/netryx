@@ -126,15 +126,26 @@ func splitTLS(ln net.Listener) (net.Listener, net.Listener) {
 	go func() {
 		defer t.Close()
 		defer p.Close()
+		var pause time.Duration
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
-				var ne net.Error
-				if errors.As(err, &ne) && ne.Timeout() {
-					continue
+				if errors.Is(err, net.ErrClosed) {
+					return
 				}
-				return
+				// Out of file descriptors, or any other error short of the
+				// listener closing: wait and try again, as http.Server does,
+				// so connections opened to exhaust the router cannot end the
+				// console.
+				if pause == 0 {
+					pause = 5 * time.Millisecond
+				} else if pause *= 2; pause > time.Second {
+					pause = time.Second
+				}
+				time.Sleep(pause)
+				continue
 			}
+			pause = 0
 			go func() {
 				conn.SetReadDeadline(time.Now().Add(peekTimeout))
 				br := bufio.NewReader(conn)

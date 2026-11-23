@@ -34,6 +34,14 @@ Feature: the console is opened from LuCI without a second login, and over https
     # -> TestAPendingFileOthersCouldTouchIsNoCode
     # (the page: "a code from LuCI is read from the address fragment only, and only in its exact shape" in web/src/api.test.ts)
 
+  Scenario: a code opens only in the browser that asked for it
+    Given LuCI's page left a random value in the browser's cookie before it asked for the code
+    When the code is brought by another browser, without that value or with another
+    Then it opens nothing, and it is spent
+    # -> TestACodeOpensOnlyInTheBrowserThatAskedForIt
+    # -> TestAMintNeedsTheBrowsersNonce
+    # -> TestACodeSentToAnotherBrowserOpensNothing
+
   Scenario: a code for the wrong session opens nothing
     Given a code made for a LuCI session that has since ended, that rpcd never issued, or whose user may not view netryx
     When it is brought to the console
@@ -43,6 +51,7 @@ Feature: the console is opened from LuCI without a second login, and over https
     # -> TestACodeForAUserWithoutTheViewGrantOpensNothing
     # -> TestAHandoffWithoutAGoodSessionMintsNothing
     # -> TestAMintRefusesWhatIsNotASessionOrAUser
+    # -> TestAMintLeavesAnotherMintsFileAlone
 
   Scenario: guessing codes is limited and bounded
     Given someone sending made-up codes
@@ -80,8 +89,10 @@ Feature: the console is opened from LuCI without a second login, and over https
     And with the redirect turned off it is refused with a line saying to use https
     And plain http from the router itself is served, so the SSH tunnel keeps working
     And a connection that says nothing is let go
+    And running out of connections pauses the port, never closes it
     # -> TestPlainHTTPOnTheHTTPSPortIsSentToHTTPS
     # -> TestASilentConnectionIsLetGo
+    # -> TestRunningOutOfDescriptorsDoesNotCloseThePort
     # -> TestTheInitCommandLineIsParsedAsWritten
 
   Scenario: a console listening on every address still serves the house only

@@ -29,9 +29,16 @@ func (r *rig) luciSession(user, pass string) string {
 	return sid
 }
 
+// testNonce is what LuCI's page put in this browser's netryx_handoff cookie.
+const testNonce = "fedcba9876543210fedcba9876543210"
+
+func withNonce(n string) opt {
+	return func(q *http.Request) { q.AddCookie(&http.Cookie{Name: HandoffCookie, Value: n}) }
+}
+
 func (r *rig) mint(sid, user string) string {
 	r.t.Helper()
-	code, err := handoff.Mint(r.gate.Handoff, sid, user, r.clock.Now())
+	code, err := handoff.Mint(r.gate.Handoff, sid, user, testNonce, r.clock.Now())
 	if err != nil {
 		r.t.Fatal(err)
 	}
@@ -56,7 +63,7 @@ func TestASignedInLuCIUserOpensTheConsoleWithACode(t *testing.T) {
 	r := luciRig(t)
 	luci := r.luciSession("root", adminPW)
 	code := r.mint(luci, "root")
-	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code))
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code), withNonce(testNonce))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("redeem: %d %s", rec.Code, rec.Body)
 	}
@@ -84,10 +91,10 @@ func TestASignedInLuCIUserOpensTheConsoleWithACode(t *testing.T) {
 func TestACodeOpensOneSessionOnly(t *testing.T) {
 	r := luciRig(t)
 	code := r.mint(r.luciSession("root", adminPW), "root")
-	if rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code)); rec.Code != http.StatusOK {
+	if rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code), withNonce(testNonce)); rec.Code != http.StatusOK {
 		t.Fatalf("first: %d", rec.Code)
 	}
-	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code))
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code), withNonce(testNonce))
 	wantError(t, rec, http.StatusUnauthorized, "login", "the same code again")
 	if cookieOf(rec) != "" {
 		t.Error("a used code set a cookie")
@@ -98,7 +105,7 @@ func TestAnExpiredCodeOpensNothing(t *testing.T) {
 	r := luciRig(t)
 	code := r.mint(r.luciSession("root", adminPW), "root")
 	r.clock.Add(handoff.TTL)
-	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code))
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code), withNonce(testNonce))
 	wantError(t, rec, http.StatusUnauthorized, "login", "a code 30 s old")
 	if cookieOf(rec) != "" {
 		t.Error("an expired code set a cookie")
@@ -114,15 +121,15 @@ func TestACodeForADeadOrForeignSessionOpensNothing(t *testing.T) {
 	if err := r.gate.RPC.Destroy(context.Background(), luci); err != nil {
 		t.Fatal(err)
 	}
-	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code)), http.StatusUnauthorized, "login", "LuCI logged out")
+	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code), withNonce(testNonce)), http.StatusUnauthorized, "login", "LuCI logged out")
 	forged := r.mint("ffffffffffffffffffffffffffffffff", "root")
-	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody(forged)), http.StatusUnauthorized, "login", "a session rpcd never issued")
+	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody(forged), withNonce(testNonce)), http.StatusUnauthorized, "login", "a session rpcd never issued")
 }
 
 func TestACodeForAUserWithoutTheViewGrantOpensNothing(t *testing.T) {
 	r := luciRig(t)
 	code := r.mint(r.luciSession("nobody", "nobody-pw"), "nobody")
-	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code))
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code), withNonce(testNonce))
 	wantError(t, rec, http.StatusForbidden, "forbidden", "a LuCI user without the netryx grant")
 	if cookieOf(rec) != "" {
 		t.Error("a user without the grant got a cookie")
@@ -132,7 +139,7 @@ func TestACodeForAUserWithoutTheViewGrantOpensNothing(t *testing.T) {
 // The user is the one the code was minted for, and a viewer stays a viewer.
 func TestAHandedOffViewerCannotWrite(t *testing.T) {
 	r := luciRig(t)
-	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(r.luciSession("viewer", viewerPW), "viewer")))
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(r.luciSession("viewer", viewerPW), "viewer")), withNonce(testNonce))
 	var ans struct {
 		User     string `json:"user"`
 		CSRF     string `json:"csrf"`
@@ -150,7 +157,7 @@ func TestAHandedOffViewerCannotWrite(t *testing.T) {
 func TestLeavingTheConsoleKeepsTheLuCISession(t *testing.T) {
 	r := luciRig(t)
 	luci := r.luciSession("root", adminPW)
-	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(luci, "root")))
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(luci, "root")), withNonce(testNonce))
 	var ans struct {
 		CSRF string `json:"csrf"`
 	}
@@ -177,8 +184,8 @@ func TestTheCodeIsNeverLoggedAndOnlyTakenAsJSON(t *testing.T) {
 	r.h.ServeHTTP(rec, q)
 	wantError(t, rec, http.StatusUnsupportedMediaType, "json", "a plain form")
 	wantError(t, r.do(http.MethodGet, "/api/login/luci?code="+code, lan, ""), http.StatusMethodNotAllowed, "method not allowed", "a GET with the code in the query")
-	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody("../../etc/passwd")), http.StatusUnauthorized, "login", "a malformed code")
-	if rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code)); rec.Code != http.StatusOK {
+	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody("../../etc/passwd"), withNonce(testNonce)), http.StatusUnauthorized, "login", "a malformed code")
+	if rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(code), withNonce(testNonce)); rec.Code != http.StatusOK {
 		t.Fatalf("the code after the refusals: %d", rec.Code)
 	}
 	r.mu.Lock()
@@ -194,9 +201,9 @@ func TestTheCodeIsNeverLoggedAndOnlyTakenAsJSON(t *testing.T) {
 func TestHandoffRedeemsAreRateLimited(t *testing.T) {
 	r := luciRig(t)
 	for i := 0; i < loginBurst; i++ {
-		r.do(http.MethodPost, "/api/login/luci", lan, codeBody(strings.Repeat("0", 32)))
+		r.do(http.MethodPost, "/api/login/luci", lan, codeBody(strings.Repeat("0", 32)), withNonce(testNonce))
 	}
-	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody(strings.Repeat("0", 32))), http.StatusTooManyRequests, "rate", "past the burst")
+	wantError(t, r.do(http.MethodPost, "/api/login/luci", lan, codeBody(strings.Repeat("0", 32)), withNonce(testNonce)), http.StatusTooManyRequests, "rate", "past the burst")
 }
 
 // A handed-off session is kept across a restart as a lent one, so a later
@@ -206,7 +213,7 @@ func TestALentSessionStaysLentAcrossARestart(t *testing.T) {
 	r.gate.Store = t.TempDir() + "/s/sessions.json"
 	r.h = r.gate.Wrap(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) { w.WriteHeader(http.StatusOK) }))
 	luci := r.luciSession("root", adminPW)
-	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(luci, "root")))
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(luci, "root")), withNonce(testNonce))
 	var ans struct {
 		CSRF string `json:"csrf"`
 	}
@@ -221,4 +228,29 @@ func TestALentSessionStaysLentAcrossARestart(t *testing.T) {
 		t.Fatal("a logout after a restart ended the LuCI session")
 	}
 	_ = time.Second
+}
+
+// A link with a code, sent to somebody else's browser, opens nothing there:
+// their browser does not hold the nonce the code was made for.
+func TestACodeSentToAnotherBrowserOpensNothing(t *testing.T) {
+	r := luciRig(t)
+	luci := r.luciSession("viewer", viewerPW)
+	rec := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(luci, "viewer")))
+	wantError(t, rec, http.StatusUnauthorized, "login", "a code without the browser's nonce")
+	rec = r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(luci, "viewer")), withNonce("0000000000000000000000000000000f"))
+	wantError(t, rec, http.StatusUnauthorized, "login", "a code with another browser's nonce")
+	if cookieOf(rec) != "" {
+		t.Error("a code from another browser set a session cookie")
+	}
+	// The nonce is used up by any redeem: the answer clears it.
+	ok := r.do(http.MethodPost, "/api/login/luci", lan, codeBody(r.mint(luci, "viewer")), withNonce(testNonce))
+	cleared := false
+	for _, c := range ok.Result().Cookies() {
+		if c.Name == HandoffCookie && c.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if ok.Code != http.StatusOK || !cleared {
+		t.Fatalf("the right browser: %d, nonce cleared %v", ok.Code, cleared)
+	}
 }

@@ -42,6 +42,9 @@ const (
 	// the router, so a cookie the browser sends to another port of the same
 	// host (LuCI, other services) carries nothing they could use.
 	CookieName = "netryx_sid"
+	// HandoffCookie is the nonce LuCI's page puts in the browser before it
+	// asks for a code; the code opens only together with it.
+	HandoffCookie = "netryx_handoff"
 	// CSRFHeader carries hex(HMAC-SHA256(Secret, handle)) on every change.
 	CSRFHeader = "X-Netryx-CSRF"
 	// Scope is the ACL scope netryx's grants live in
@@ -656,7 +659,13 @@ func (s *gate) luci(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "login")
 		return
 	}
-	c, err := handoff.Redeem(s.g.Handoff, in.Code, s.now())
+	// The nonce LuCI's page left in this browser; it is used up either way.
+	nonce := ""
+	if ck, err := r.Cookie(HandoffCookie); err == nil {
+		nonce = ck.Value
+	}
+	http.SetCookie(w, &http.Cookie{Name: HandoffCookie, Value: "", Path: "/", MaxAge: -1, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil})
+	c, err := handoff.Redeem(s.g.Handoff, in.Code, nonce, s.now())
 	if err != nil {
 		s.logf("a LuCI handoff from %s was refused: the code is unknown, used or expired", src)
 		writeErr(w, http.StatusUnauthorized, "login")

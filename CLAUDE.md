@@ -411,7 +411,10 @@ enforced, and that is a debt rather than a decision.
   `luci-app-netryx` grants that one call), whose only method `handoff` mints
   a 128-bit code for the caller's own rpcd session (put in by uhttpd; a
   session sent in the arguments is refused by rpcd, measured) and the user
-  rpcd says it is. Only the code's SHA-256 is kept, as a 0600 file in
+  rpcd says it is, and to the nonce the page put in the browser's
+  `netryx_handoff` cookie (Max-Age 60), so the code opens only in that browser;
+  a wrong or missing nonce spends the code, and every redeem clears the
+  cookie. Only the SHA-256 of the code and of the nonce are kept, as a 0600 file in
   `/tmp/netryx/luci` (0700), at most 32 pending; it is good for 30 s after it
   was made and not before, for one redeem (the rename takes it), never
   logged, and taken only as JSON by `POST /api/login/luci`, limited as logins
@@ -424,7 +427,8 @@ enforced, and that is a debt rather than a decision.
   `TestAnExpiredCodeOpensNothing`, `TestACodeForADeadOrForeignSessionOpensNothing`,
   `TestACodeForAUserWithoutTheViewGrantOpensNothing`, `TestAHandedOffViewerCannotWrite`,
   `TestLeavingTheConsoleKeepsTheLuCISession`, `TestTheCodeIsNeverLoggedAndOnlyTakenAsJSON`,
-  `TestHandoffRedeemsAreRateLimited`, `TestALentSessionStaysLentAcrossARestart`, the
+  `TestHandoffRedeemsAreRateLimited`, `TestALentSessionStaysLentAcrossARestart`,
+  `TestACodeSentToAnotherBrowserOpensNothing`, the
   `internal/handoff` tests, `TestAHandoffIsMintedForTheCallersOwnSession`,
   `TestAHandoffWithoutAGoodSessionMintsNothing`, `TestAHandoffSaysWhenTheConsoleIsNotReachable`;
   the page: "a code from LuCI is read from the address fragment only" in `web/src/api.test.ts`;
@@ -439,11 +443,12 @@ enforced, and that is a debt rather than a decision.
   console; plain http from loopback (the SSH tunnel) is served as it is; plain
   http from the house gets a 308 to https on the same port, for the router's
   own names only (`http_redirect '0'`: a 400 saying to use https); a
-  connection silent for 5 s is let go. No HSTS. Serve writes how it listens to
+  connection silent for 5 s is let go; an accept error short of the listener
+  closing (out of descriptors) is a pause, never the end of the port. No HSTS. Serve writes how it listens to
   `/tmp/netryx/console.json` for LuCI's page.
   (test: `TestWithoutUhttpdsPairTheConsoleMakesItsOwn`, `TestUhttpdsPairIsPreferred`,
   `TestTheLoopbackTunnelStaysPlain`, `TestPlainHTTPOnTheHTTPSPortIsSentToHTTPS`,
-  `TestASilentConnectionIsLetGo`; @measured netryx-lab 2026-11-22: own certificate
+  `TestASilentConnectionIsLetGo`, `TestRunningOutOfDescriptorsDoesNotCloseThePort`; @measured netryx-lab 2026-11-22: own certificate
   made, https on :8788, plain http from the router 200, to the LAN address 308, a
   foreign Host 421)
 - **A session lasts as long as LuCI's**: the login asks rpcd for

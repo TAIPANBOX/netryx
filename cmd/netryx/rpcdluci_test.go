@@ -15,6 +15,9 @@ import (
 
 const luciSID = "0123456789abcdef0123456789abcdef"
 
+// luciNonce is what LuCI's page put in the browser's cookie and sends along.
+const luciNonce = "fedcba9876543210fedcba9876543210"
+
 type luciRig struct {
 	dir, state string
 	users      map[string]string
@@ -65,8 +68,9 @@ func (r *luciRig) listening(t *testing.T, listen string, https bool) {
 func TestTheLuCIObjectOffersTheHandoffOnly(t *testing.T) {
 	r := newLuciRig(t)
 	got := r.call(t, []string{"list"}, "")
-	if len(got) != 1 || got["handoff"] == nil {
-		t.Fatalf("list %v, want the method handoff alone", got)
+	sig, _ := got["handoff"].(map[string]any)
+	if len(got) != 1 || len(sig) != 1 || sig["nonce"] != "str" {
+		t.Fatalf("list %v, want the method handoff alone, taking the browser's nonce", got)
 	}
 	for _, m := range []string{"status", "devices", "login", "../x"} {
 		if v := r.call(t, []string{"call", m}, "{}"); v["error"] == nil || v["code"] != nil {
@@ -78,7 +82,7 @@ func TestTheLuCIObjectOffersTheHandoffOnly(t *testing.T) {
 func TestAHandoffIsMintedForTheCallersOwnSession(t *testing.T) {
 	r := newLuciRig(t)
 	r.listening(t, "192.168.1.1:8788", true)
-	v := r.call(t, []string{"call", "handoff"}, `{"ubus_rpc_session":"`+luciSID+`"}`)
+	v := r.call(t, []string{"call", "handoff"}, `{"ubus_rpc_session":"`+luciSID+`","nonce":"`+luciNonce+`"}`)
 	code, _ := v["code"].(string)
 	if len(code) != 32 {
 		t.Fatalf("answer %v, want a 32-hex code", v)
@@ -89,7 +93,12 @@ func TestAHandoffIsMintedForTheCallersOwnSession(t *testing.T) {
 	if len(r.asked) != 1 || r.asked[0] != luciSID {
 		t.Fatalf("asked rpcd about %v, want the caller's session", r.asked)
 	}
-	c, err := handoff.Redeem(r.dir, code, r.now)
+	if _, err := handoff.Redeem(r.dir, code, "0000000000000000000000000000000f", r.now); err == nil {
+		t.Fatal("the code opened for another browser's nonce")
+	}
+	v = r.call(t, []string{"call", "handoff"}, `{"ubus_rpc_session":"`+luciSID+`","nonce":"`+luciNonce+`"}`)
+	code, _ = v["code"].(string)
+	c, err := handoff.Redeem(r.dir, code, luciNonce, r.now)
 	if err != nil || c.SID != luciSID || c.User != "root" {
 		t.Fatalf("the code redeems as %+v (%v), want the caller's session and user", c, err)
 	}
@@ -97,7 +106,7 @@ func TestAHandoffIsMintedForTheCallersOwnSession(t *testing.T) {
 
 func TestAHandoffSaysWhenTheConsoleIsNotReachable(t *testing.T) {
 	r := newLuciRig(t)
-	in := `{"ubus_rpc_session":"` + luciSID + `"}`
+	in := `{"ubus_rpc_session":"` + luciSID + `","nonce":"` + luciNonce + `"}`
 	// Not running: no code at all.
 	if v := r.call(t, []string{"call", "handoff"}, in); v["code"] != nil || !strings.Contains(v["error"].(string), "not running") {
 		t.Fatalf("no console: %v", v)
@@ -120,9 +129,10 @@ func TestAHandoffWithoutAGoodSessionMintsNothing(t *testing.T) {
 	for _, in := range []string{
 		``,
 		`{}`,
-		`{"ubus_rpc_session":"00000000000000000000000000000000"}`, // rpcd knows no such session
+		`{"ubus_rpc_session":"00000000000000000000000000000000","nonce":"` + luciNonce + `"}`, // rpcd knows no such session
 		`{"ubus_rpc_session":"../../etc"}`,
-		`{"ubus_rpc_session":"` + luciSID + `","user":"root"}`, // nothing else is taken
+		`{"ubus_rpc_session":"` + luciSID + `","nonce":"` + luciNonce + `","user":"root"}`, // nothing else is taken
+		`{"ubus_rpc_session":"` + luciSID + `"}`,                                           // no nonce: the browser cannot be bound
 		`{"ubus_rpc_session":7}`,
 		`not json`,
 	} {

@@ -85,12 +85,14 @@ function App() {
     const code = handoffCode(location.hash);
     if (code) {
       history.replaceState(null, "", location.pathname + location.search + "#/");
-      loginWithLuCI(code).then((r) => {
-        if (r.ok) setAuth({ state: "in", info: { user: r.user, canWrite: r.canWrite, noRPC: false } });
-        else {
-          setNote(r.text);
-          setAuth({ state: "login" });
-        }
+      loginWithLuCI(code).then(async (r) => {
+        if (r.ok) return setAuth({ state: "in", info: { user: r.user, canWrite: r.canWrite, noRPC: false } });
+        // A code that does not open (another browser's, or spent) leaves a
+        // session this browser already has as it is.
+        const s = await getSession().catch(() => null);
+        if (s) return setAuth({ state: "in", info: { user: s.user, canWrite: !!s.canWrite && !s.noRPC, noRPC: !!s.noRPC } });
+        setNote(r.text);
+        setAuth({ state: "login" });
       });
       return off;
     }

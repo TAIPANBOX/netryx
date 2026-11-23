@@ -149,7 +149,9 @@ The console signs you in with your LuCI account; there is no password of its own
 
 - **From LuCI.** Network → Network console opens it signed in, with no second login. The LuCI
   page asks the router for a one-time code (128 bits, good for 30 seconds and one use, bound to
-  your LuCI session and user name), and the console exchanges it for a session of its own. The
+  your LuCI session, your user name and a random value the page leaves in your browser's cookie),
+  and the console exchanges it for a session of its own. A link with a code opens nothing in
+  anyone else's browser. The
   code travels in the address fragment, which the browser never sends to a server, and the console
   takes it out of the address and the history at once. Leaving the console does not sign you out
   of LuCI. This needs the console on a house-side address (below).
