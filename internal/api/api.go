@@ -40,6 +40,7 @@ type History interface {
 	Holders(string, string, time.Time, time.Time) rollup.HoldersOf
 	Sparks(rollup.Filter, string, time.Duration, time.Duration) rollup.SparksOf
 	NewKeys(mac, dim string, split, from, now time.Time) []rollup.NewRow
+	FirstSeen(mac string, from time.Time) time.Time
 }
 
 // Apps names an app id from the catalog of rules, so a name does not depend

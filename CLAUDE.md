@@ -871,9 +871,12 @@ enforced, and that is a debt rather than a decision.
   for that device, each with the hour it was first seen and its bytes since;
   the catch-alls (`other`, Unknown, `--`) and the house's own traffic (`LAN`)
   are not news, and nothing new is written to flash. A device the router has
-  known for less than seven days is too new to tell, and says so.
+  known for less than seven days is too new to tell, and says so; how long it
+  has known it is the earlier of the inventory's first sight, which restarts
+  with the service, and the history's (`FirstSeen`), which does not.
   (test: `TestNewKeysAreWhatADeviceUsedSinceTheSplitAndNeverBefore`,
-  `TestADeviceSaysWhatIsNewForIt`, `TestADeviceSeenForLessThanAWeekIsTooNewToTell`;
+  `TestADeviceSaysWhatIsNewForIt`, `TestADeviceSeenForLessThanAWeekIsTooNewToTell`,
+  `TestFirstSeenIsTheFirstHourTheHistoryHoldsForTheDevice`, `TestWhatIsNewSurvivesARestartThatResetTheInventory`;
   the page: "what is new for a device says when it cannot tell" in `web/src/client360.test.ts`)
 
 ## The promise about a device's usual week
