@@ -15,14 +15,15 @@ import { blockedTile, type Rule } from "../rules";
 import { BlockCountry } from "./controls";
 import { bytes, ratePair, duration, num, share, plural, appName, category, countryName, newDevices, clientName } from "../format";
 import { alertText, alertsTile, telegramText, type AlertsState } from "../security";
-import { LAYER_COLORS, OTHER_COLOR, UP_COLOR, countryList, lineQuality } from "../view";
+import { LAYER_COLORS, OTHER_COLOR, UP_COLOR, countryList, lineQuality, speedTile } from "../view";
+import type { Win } from "../query";
 
 type SplitKind = "mac" | "app" | "none";
 
-export function Overview({ range, onRange }: { range: Range; onRange: (r: Range) => void }) {
+export function Overview({ range, onRange, win, onWin }: { range: Range; onRange: (r: Range) => void; win: Win; onWin: (w: Win) => void }) {
   const [split, setSplit] = useState<SplitKind>("mac");
   const per = usePeriod(range);
-  const polled = usePoll((s) => getJSON<OverviewData>(`/api/overview?${per.q}&split=${split}`, s), 10_000, [per.q, split]);
+  const polled = usePoll((s) => getJSON<OverviewData>(`/api/overview?${per.q}&split=${split}&window=${win}`, s), 10_000, [per.q, split, win]);
   const d = polled.data;
   // The Blocked tile reads the rules' own counters; without them (a read
   // that failed) it says there is no data rather than 0.
@@ -31,14 +32,14 @@ export function Overview({ range, onRange }: { range: Range; onRange: (r: Range)
 
   return (
     <div class="page">
-      <Header section="overview" range={range} onRange={onRange} />
+      <Header section="overview" range={range} onRange={onRange} win={win} onWin={onWin} />
       <main class="main">
         <Status polled={polled} />
         {!d ? (
           <Loading />
         ) : (
           <div class="stack">
-            <Tiles d={d} rules={rules.data} alerts={alerts.data} />
+            <Tiles d={d} rules={rules.data} alerts={alerts.data} win={win} />
             <Traffic d={d} step={per.step} range={per.range} span={!!per.span} split={split} onSplit={setSplit} alerts={alerts.data} />
             <div class="grid-3">
               <TopClients d={d} />
@@ -56,9 +57,8 @@ export function Overview({ range, onRange }: { range: Range; onRange: (r: Range)
   );
 }
 
-function Tiles({ d, rules, alerts }: { d: OverviewData; rules?: Rule[]; alerts?: AlertsState }) {
+function Tiles({ d, rules, alerts, win }: { d: OverviewData; rules?: Rule[]; alerts?: AlertsState; win: Win }) {
   const w = d.wan;
-  const r = ratePair(w.rxRate, w.txRate);
   const addr = w.ipv4 || w.ipv6 || w.device || "no address";
   const q = lineQuality(w);
   const blocked = blockedTile(rules);
@@ -68,7 +68,7 @@ function Tiles({ d, rules, alerts }: { d: OverviewData; rules?: Rule[]; alerts?:
   const line = (e: Element) => open("wan", { title: "Internet line", body: () => <LineCard /> }, e);
   const tiles: { label: string; value: string; sub: string; bad?: boolean; later?: boolean; href?: string; card?: boolean }[] = [
     { label: "WAN", value: w.up ? "Online" : "No connection", sub: `${addr} · uptime ${duration(w.uptimeSec)}`, bad: !w.up, card: true },
-    { label: "Speed now", value: `↓ ${r.down} · ↑ ${r.up}`, sub: r.unit + (w.device ? ` · ${w.device}` : ""), card: true },
+    { label: "Speed now", ...speedTile(w, win), card: true },
     { label: "Line quality", value: q.value, sub: q.sub, bad: q.bad, card: true },
     { label: "Clients", value: `${num(d.clients.online)} online`, sub: newDevices(d.clients.new24h), href: "#/clients" },
     { label: "Alerts", value: al.value, sub: al.sub, href: "#/security" },
@@ -333,7 +333,7 @@ function LineCard() {
     ["IPv4", w.ipv4 || "-"],
     ["IPv6", w.ipv6 || "-"],
     ["Up for", duration(w.uptimeSec)],
-    ["Speed now", `↓ ${r.down} · ↑ ${r.up} ${r.unit}`],
+    ["Last 10 s", `↓ ${r.down} · ↑ ${r.up} ${r.unit}`],
     ["Latency", w.latencyMs === null ? "no answer yet" : `${w.latencyMs.toFixed(1)} ms`],
     ["Jitter", w.jitterMs === null ? "no answer yet" : `${w.jitterMs.toFixed(1)} ms`],
     ["Loss", `${w.lossPct.toFixed(1)}%`],

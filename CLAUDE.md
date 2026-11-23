@@ -942,6 +942,14 @@ enforced, and that is a debt rather than a decision.
   (test: `TestTheMemoryLimitReachesTheServiceAsGOMEMLIMIT`;
   measured on the Flint 2, docs/flint2-measured.md sections 6 and 8: the
   all-countries apply peaked at 241.9 MB without the limit and 158.0 MB with it)
+- **Speed now is the line's average over the window** (1, 3 or 10 minutes),
+  from every 10 s reading of the WAN counters (at most 64 kept, a clock set
+  back or another device starting afresh), each weighted by the seconds it
+  covers; the last reading is shown small beside it, and before any reading
+  the tile says it is the last 10 s. (test: `TestTheWindowAveragesTheLineOverItsSpan`,
+  `TestTheWindowKeepsTenMinutesAtMost`, `TestAClockSetBackStartsTheWindowAgain`,
+  `TestTheSpeedTileIsTheWindowsAverage`, `TestTheWANTileAveragesTheLineOverTheWindow`;
+  the page: "Speed now is the line's average over the window" in `web/src/view.test.ts`)
 - **One answer to "whose is this address"**, shared by the flow table, the
   finished totals and the client list: the router's own addresses are the
   device `router`, else the hardware address the capture saw, else the

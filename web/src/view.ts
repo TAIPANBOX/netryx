@@ -4,7 +4,8 @@
 
 import type { AppUsage, FlowRow, Wan } from "./types";
 import type { SankeyLink, SankeyNode } from "./geometry";
-import { appName, countryName, ms, pct, share } from "./format";
+import { appName, countryName, ms, pct, ratePair, ratesIn, share } from "./format";
+import { windowLabel, type Win } from "./query";
 
 export const LAYER_COLORS = ["#4C9AFF", "#2F6FD6", "#9BD0FF", "#7FB2F0"];
 export const OTHER_COLOR = "#3A4658";
@@ -118,3 +119,20 @@ export function selectFlow(rows: FlowRow[], key: string, last: FlowRow | null): 
   if (found) return { row: found, ended: false };
   return last ? { row: last, ended: true } : { row: rows[0] ?? null, ended: false };
 }
+
+/** The Speed now tile: the line's average over the window, the last reading beside it. */
+export function speedTile(w: Wan, win: Win): { value: string; sub: string } {
+  const dev = w.device ? ` · ${w.device}` : "";
+  if (!w.avg) {
+    const r = ratePair(w.rxRate, w.txRate);
+    return { value: `↓ ${r.down} · ↑ ${r.up}`, sub: `${r.unit} · last 10 s${dev}` };
+  }
+  const r = ratePair(w.avg.rx, w.avg.tx);
+  const [nd, nu] = ratesIn(Math.max(w.avg.rx, w.avg.tx), w.rxRate, w.txRate);
+  // Fewer seconds read than the window (just started): say how many.
+  const full = w.avg.sec >= WIN_SEC[win] - 5;
+  const over = full ? windowLabel(win) : `${Math.round(w.avg.sec)} s`;
+  return { value: `↓ ${r.down} · ↑ ${r.up}`, sub: `${r.unit} · ${over} avg · now ↓ ${nd} ↑ ${nu}${dev}` };
+}
+
+const WIN_SEC: Record<Win, number> = { "1m": 60, "3m": 180, "10m": 600 };

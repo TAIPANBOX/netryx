@@ -249,7 +249,7 @@ function Route({ hash, nav, range, pick, win, pickWin }: { hash: string; nav: nu
     case "destination":
       return <Destination key={route.cc} cc={route.cc} range={range} onRange={pick} />;
     default:
-      return <Overview range={range} onRange={pick} />;
+      return <Overview range={range} onRange={pick} win={win} onWin={pickWin} />;
   }
 }
 
