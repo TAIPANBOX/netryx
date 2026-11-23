@@ -363,7 +363,10 @@ func (s *gate) awake(w http.ResponseWriter, r *http.Request) bool {
 	}
 	at := time.Time{}
 	if r.Method != http.MethodGet {
-		at = now
+		// A change is use only with the session's token; the gate refuses it otherwise.
+		if s.csrfOK(r, c.Value) {
+			at = now
+		}
 	} else if v, err := strconv.Atoi(r.Header.Get(ActivityHeader)); err == nil && v >= 0 && time.Duration(v)*time.Second <= maxActivity {
 		at = now.Add(-time.Duration(v) * time.Second)
 	}

@@ -453,14 +453,14 @@ enforced, and that is a debt rather than a decision.
   foreign Host 421)
 - **A session nobody uses ends**: the page sends the seconds since a person
   last used it (`X-Netryx-Activity`: mouse, key, focus, the tab shown) with
-  every request, a change counts as use, and a session with no use for
+  every request, a change counts as use only with the session's token, and a session with no use for
   LuCI's session time (`IdleLimit`) is ended before rpcd is asked anything,
   answering 401 `idle`: netryx's own rpcd session is destroyed, a lent one
   only let go, so LuCI's timeout ends it once nothing touches it. Polling
   alone moves nothing, the last use is kept across a restart, and use reported
   after the limit revives nothing. (test: `TestPollingAloneDoesNotKeepASessionAlive`,
   `TestActivityKeepsTheSessionAlive`, `TestActivityAfterTheLimitDoesNotReviveTheSession`,
-  `TestAWriteIsActivity`, `TestAnIdleLentSessionIsLetGoNotEnded`, `TestIdleTimeSurvivesARestart`;
+  `TestAWriteIsActivity`, `TestAChangeWithoutTheTokenIsNotActivity`, `TestAnIdleLentSessionIsLetGoNotEnded`, `TestIdleTimeSurvivesARestart`;
   the page: "each request says how long ago a person last used the page" in `web/src/api.test.ts`)
 - **A session lasts as long as LuCI's**: the login asks rpcd for
   `luci.sauth.sessiontime` (an hour when unset or not between five minutes and

@@ -112,3 +112,14 @@ func TestIdleTimeSurvivesARestart(t *testing.T) {
 		t.Fatalf("61 idle minutes across a restart: %d %s", rec.Code, rec.Body)
 	}
 }
+
+// Only a change that carries the session's token is use: a request without
+// it is refused, and refreshes nothing.
+func TestAChangeWithoutTheTokenIsNotActivity(t *testing.T) {
+	r := idleRig(t)
+	sid, _ := r.login("root", adminPW, lan)
+	r.clock.Add(50 * time.Minute)
+	wantError(t, r.do(http.MethodPost, "/api/rules", lan, `{"a":1}`, withCookie(sid)), http.StatusForbidden, "forbidden", "a change without the token")
+	r.clock.Add(11 * time.Minute)
+	wantError(t, r.do(http.MethodGet, "/api/overview", lan, "", withCookie(sid)), http.StatusUnauthorized, "idle", "61 minutes after a change without the token")
+}

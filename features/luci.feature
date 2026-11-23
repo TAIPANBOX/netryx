@@ -77,6 +77,7 @@ Feature: the console is opened from LuCI without a second login, and over https
     # -> TestActivityKeepsTheSessionAlive
     # -> TestActivityAfterTheLimitDoesNotReviveTheSession
     # -> TestAWriteIsActivity
+    # -> TestAChangeWithoutTheTokenIsNotActivity
     # -> TestAnIdleLentSessionIsLetGoNotEnded
     # -> TestIdleTimeSurvivesARestart
     # (the page: "each request says how long ago a person last used the page, in whole seconds" in web/src/api.test.ts)
