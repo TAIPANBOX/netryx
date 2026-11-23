@@ -1,0 +1,7 @@
+#!/bin/sh
+# The rpcd exec plugin behind the ubus object luci.netryx, which LuCI's
+# "Network console" page calls: its one method, handoff, mints a one-time code
+# for the caller's own rpcd session (uhttpd puts that session in), so a user
+# signed in to LuCI opens the console without a second login. Named apart from
+# the object netryx, so a grant for netryx.* never reaches it.
+exec /usr/sbin/netryx rpcd-luci "$@"

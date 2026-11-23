@@ -1,0 +1,8 @@
+{
+	"luci-app-netryx": {
+		"description": "Open the netryx network console from LuCI",
+		"read": {
+			"ubus": { "luci.netryx": [ "handoff" ] }
+		}
+	}
+}

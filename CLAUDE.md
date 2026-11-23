@@ -404,6 +404,53 @@ enforced, and that is a debt rather than a decision.
   `TestTheSessionsFileIsPrivateAndWrittenWhole`, `TestASessionsFileOthersCouldTouchIsNotLoaded`,
   `TestEndedSessionsLeaveTheFile`, `TestOnlyWellFormedSessionsAreLoaded`; @decided
   2026-11-22: sessions are kept across a restart of netryx)
+- **A LuCI user opens the console with a code, once, and LuCI stays the only
+  sign-in**: LuCI's Network console page calls the ubus object `luci.netryx`
+  (rpcd plugin `/usr/libexec/rpcd/luci.netryx`, running `netryx rpcd-luci`;
+  named apart from `netryx`, so a grant for `netryx.*` never reaches it; ACL
+  `luci-app-netryx` grants that one call), whose only method `handoff` mints
+  a 128-bit code for the caller's own rpcd session (put in by uhttpd; a
+  session sent in the arguments is refused by rpcd, measured) and the user
+  rpcd says it is, and to the nonce the page put in the browser's
+  `netryx_handoff` cookie (Max-Age 60), so the code opens only in that browser;
+  a wrong or missing nonce spends the code, and every redeem clears the
+  cookie. Only the SHA-256 of the code and of the nonce are kept, as a 0600 file in
+  `/tmp/netryx/luci` (0700), at most 32 pending; it is good for 30 s after it
+  was made and not before, for one redeem (the rename takes it), never
+  logged, and taken only as JSON by `POST /api/login/luci`, limited as logins
+  are. The console then asks rpcd that the session is alive and may view; a
+  session it opens this way is lent: signing out or being pushed out never
+  ends LuCI's session, and it stays lent across a restart. The page reads the
+  code from the fragment only (`#luci=<32 hex>`) and replaces the address and
+  its history entry before redeeming. A console on loopback only gets no code.
+  (test: `TestASignedInLuCIUserOpensTheConsoleWithACode`, `TestACodeOpensOneSessionOnly`,
+  `TestAnExpiredCodeOpensNothing`, `TestACodeForADeadOrForeignSessionOpensNothing`,
+  `TestACodeForAUserWithoutTheViewGrantOpensNothing`, `TestAHandedOffViewerCannotWrite`,
+  `TestLeavingTheConsoleKeepsTheLuCISession`, `TestTheCodeIsNeverLoggedAndOnlyTakenAsJSON`,
+  `TestHandoffRedeemsAreRateLimited`, `TestALentSessionStaysLentAcrossARestart`,
+  `TestACodeSentToAnotherBrowserOpensNothing`, the
+  `internal/handoff` tests, `TestAHandoffIsMintedForTheCallersOwnSession`,
+  `TestAHandoffWithoutAGoodSessionMintsNothing`, `TestAHandoffSaysWhenTheConsoleIsNotReachable`;
+  the page: "a code from LuCI is read from the address fragment only" in `web/src/api.test.ts`;
+  gate: `scripts/package-sane.sh` requires the plugin (0755), the ACL as shipped, the menu
+  entry and the page; @measured netryx-lab 2026-11-22: LuCI login, the menu, the code
+  redeemed, the address left at `#/`, the same code 401, LuCI's session alive after the
+  console's logout; @decided 2026-11-22: LuCI stays the only authorisation, no second login)
+- **On a house-side address the console speaks https**: with uhttpd's
+  certificate when both files exist, otherwise with its own self-signed
+  ECDSA P-256 certificate made once in `/etc/netryx` (key 0600, kept across
+  restarts and sysupgrades). One port answers both: a TLS handshake is the
+  console; plain http from loopback (the SSH tunnel) is served as it is; plain
+  http from the house gets a 308 to https on the same port, for the router's
+  own names only (`http_redirect '0'`: a 400 saying to use https); a
+  connection silent for 5 s is let go; an accept error short of the listener
+  closing (out of descriptors) is a pause, never the end of the port. No HSTS. Serve writes how it listens to
+  `/tmp/netryx/console.json` for LuCI's page.
+  (test: `TestWithoutUhttpdsPairTheConsoleMakesItsOwn`, `TestUhttpdsPairIsPreferred`,
+  `TestTheLoopbackTunnelStaysPlain`, `TestPlainHTTPOnTheHTTPSPortIsSentToHTTPS`,
+  `TestASilentConnectionIsLetGo`, `TestRunningOutOfDescriptorsDoesNotCloseThePort`; @measured netryx-lab 2026-11-22: own certificate
+  made, https on :8788, plain http from the router 200, to the LAN address 308, a
+  foreign Host 421)
 - **A session lasts as long as LuCI's**: the login asks rpcd for
   `luci.sauth.sessiontime` (an hour when unset or not between five minutes and
   a day), not rpcd's five minutes. (test: `TestASessionLastsTheSessionTimeAsked`,
@@ -872,6 +919,12 @@ enforced, and that is a debt rather than a decision.
   `TestTheRoutersOwnNameReachesTheConsole`; @decided 2026-11-22: the router's own
   host name and its local-domain form are admitted; a page elsewhere cannot send
   that Host without controlling the house's resolver)
+- **A request that arrived outside the house is refused**: on 0.0.0.0 or ::
+  the console listens on the WAN address too, and the Host header is the
+  client's to write, so the address the connection was made to must be
+  loopback, the listen address or one of the router's house-side addresses,
+  or the answer is 421; serve logs the warning at start. The default listen is
+  loopback. (test: `TestARequestArrivingOnTheWANAddressIsRefused`)
 - **A command cannot flood or hold the service**: what ubus or ping prints is
   kept up to 1 MiB and the rest drained, and a child left holding the output
   pipe is cut off 2 s after the command exits or its deadline passes, with

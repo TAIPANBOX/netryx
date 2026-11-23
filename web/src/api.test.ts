@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendJSON, setCSRF, onUnauthorized, ApiError, login, getJSON, setBuild, onNewBuild, reloadFor } from "./api";
+import { sendJSON, setCSRF, onUnauthorized, ApiError, login, getJSON, setBuild, onNewBuild, reloadFor, handoffCode } from "./api";
 
 interface Call { url: string; init: RequestInit }
 
@@ -234,4 +234,15 @@ test("the login reloads itself onto a newer page once for each build the router 
   assert.equal(reloadFor("aaaaaaaaaaaa", "", null), "", "no build named");
   assert.equal(reloadFor("aaaaaaaaaaaa", "bbbbbbbbbbbb", null), "bbbbbbbbbbbb", "a newer build: reload, and remember it");
   assert.equal(reloadFor("aaaaaaaaaaaa", "bbbbbbbbbbbb", "bbbbbbbbbbbb"), "", "already reloaded for it: no loop");
+});
+
+test("a code from LuCI is read from the address fragment only, and only in its exact shape", () => {
+  const code = "0123456789abcdef0123456789abcdef";
+  assert.equal(handoffCode(`#luci=${code}`), code);
+  assert.equal(handoffCode(`#/luci=${code}`), null);
+  assert.equal(handoffCode(`#luci=${code.toUpperCase()}`), null);
+  assert.equal(handoffCode(`#luci=${code}0`), null);
+  assert.equal(handoffCode(`#luci=${code}&x=1`), null);
+  assert.equal(handoffCode("#/"), null);
+  assert.equal(handoffCode(""), null);
 });

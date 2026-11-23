@@ -1355,7 +1355,7 @@ func (c *console) guard(h http.Handler) http.Handler {
 		listen = normHost(host)
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !c.hostAllowed(normHost(hostOnly(r.Host)), listen) {
+		if !c.hostAllowed(normHost(hostOnly(r.Host)), listen) || !c.arrivedAtHome(r, listen) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Header().Set("Cache-Control", "no-store")
@@ -1365,6 +1365,31 @@ func (c *console) guard(h http.Handler) http.Handler {
 		}
 		h.ServeHTTP(w, r)
 	})
+}
+
+// arrivedAtHome reports whether the request came in on one of the router's
+// own house-side addresses, loopback or the listen address itself. On 0.0.0.0
+// or :: the console listens on the WAN address too, and the Host header is
+// the client's to write, so the address the connection was made to decides.
+// A request with no such address (not from a socket) passes.
+func (c *console) arrivedAtHome(r *http.Request, listen string) bool {
+	la, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+	if !ok || la == nil {
+		return true
+	}
+	ap, err := netip.ParseAddrPort(la.String())
+	if err != nil {
+		return false
+	}
+	a := ap.Addr().Unmap().WithZone("")
+	if a.IsLoopback() {
+		return true
+	}
+	if l, err := netip.ParseAddr(listen); err == nil && !l.IsUnspecified() && l.Unmap() == a {
+		return true
+	}
+	s := c.local.cur.Load()
+	return s != nil && s.lanOwn[a]
 }
 
 func hostOnly(h string) string {
@@ -1763,19 +1788,28 @@ func loadKeyPair(certFile, keyFile string) (tls.Certificate, error) {
 	return tls.X509KeyPair(cb, kb)
 }
 
-// tlsFor is the TLS the console is served with: on a house-side address,
-// with uhttpd's certificate and key when both files exist. Otherwise nil,
-// and the console is plain http, as LuCI over http is; the login form says
-// the password then crosses the house network unencrypted.
-func tlsFor(listen, certFile, keyFile string) *tls.Config {
+// tlsFor is the TLS the console is served with on a house-side address:
+// uhttpd's certificate and key when both files exist, otherwise, with ownDir
+// set, a certificate of its own made there once (ownPair). Nil on loopback
+// (the SSH tunnel stays plain http) and when neither can be had; the login
+// form then says the password crosses the house network unencrypted.
+func tlsFor(listen, certFile, keyFile, ownDir string) *tls.Config {
 	if loopbackListen(listen) {
 		return nil
 	}
-	if _, err := os.Stat(certFile); err != nil {
-		return nil
-	}
-	if _, err := os.Stat(keyFile); err != nil {
-		return nil
+	_, e1 := os.Stat(certFile)
+	_, e2 := os.Stat(keyFile)
+	if e1 != nil || e2 != nil {
+		if ownDir == "" {
+			return nil
+		}
+		crt, key, err := ownPair(ownDir, listen)
+		if err != nil {
+			log.Printf("no %s or %s, and no certificate of its own could be made in %s (%v): the console runs unencrypted", certFile, keyFile, ownDir, err)
+			return nil
+		}
+		log.Printf("no %s or %s: the console uses its own self-signed certificate %s", certFile, keyFile, crt)
+		certFile, keyFile = crt, key
 	}
 	c, err := loadKeyPair(certFile, keyFile)
 	if err != nil {

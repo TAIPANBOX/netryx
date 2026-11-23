@@ -38,9 +38,10 @@ start_service() {
 	config_get state main state '/etc/netryx'
 	config_get wan main wan 'wan'
 	config_get ping main ping_target ''
-	local cert key mtoken memlimit
+	local cert key mtoken memlimit redirect
 	config_get cert main cert '/etc/uhttpd.crt'
 	config_get key main key '/etc/uhttpd.key'
+	config_get_bool redirect main http_redirect 1
 	config_get mtoken main metrics_token ''
 	config_get memlimit main memory_limit '160MiB'
 	[ -n "$state" ] || state=/etc/netryx
@@ -119,7 +120,8 @@ start_service() {
 		-ping="$ping" \
 		-zone="$zone" \
 		-cert="$cert" \
-		-key="$key"
+		-key="$key" \
+		-http-redirect="$([ "$redirect" = 1 ] && echo true || echo false)"
 	# The scrape token goes in the service's environment, which only root can
 	# read; on the command line every user's ps would show it. procd keeps the
 	# last env given to an instance, so everything goes in one call.

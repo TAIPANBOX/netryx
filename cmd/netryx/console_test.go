@@ -1394,7 +1394,7 @@ func TestTheInitCommandLineIsParsedAsWritten(t *testing.T) {
 		"interface": "watch-iface", "mode": "mode", "listen": "addr", "log_group": "group",
 		"capture": "capture", "passive_dns": "dns", "geo": "geo", "apps": "apps", "oui": "oui",
 		"meta": "meta", "fetch_icons": "fetch-icons", "state": "state", "wan": "wan", "ping_target": "ping",
-		"cert": "cert", "key": "key",
+		"cert": "cert", "key": "key", "http_redirect": "http-redirect",
 	}
 	// Options that reach serve through procd's environment instead.
 	uciEnv := map[string]string{"metrics_token": "NETRYX_METRICS_TOKEN", "memory_limit": "GOMEMLIMIT"}
