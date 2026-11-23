@@ -916,3 +916,39 @@ three devices `ubus call netryx devices` keys on the router
 name, address and whether it was online.
 
 @measured `grep netryx /etc/openwrt-mcp/audit.jsonl`, `ubus call netryx devices | jsonfilter -e '@.devices.*.mac'`, the agent's answer in the test bot's chat as the owner read it, Flint 2, 2026-11-22 09:20 London
+
+## 11. Memory after the packed history and the mapped tables (r5)
+
+netryx 0.1.0-r5, built from main 2813ae0 (TAIPANBOX/netryx#20 packed hours
+and days, #21 the address table and the vendor list as mapped packs), against
+the r4 that ran before it. `memory_limit` left at its default, 160MiB. Root is
+an overlay on f2fs. CPU is the process's utime + stime from `/proc/<pid>/stat`
+over the stated interval, as a share of one core; memory from
+`/proc/<pid>/status`.
+
+| | CPU | VmRSS | RssAnon | RssFile |
+|---|---|---|---|---|
+| r4, idle, up a day | 0.2 % | 96.4 MB | 89.5 MB | 6.9 MB |
+| r5, 20 s after the upgrade | | 35.5 MB | 11.2 MB | 24.3 MB |
+| r5, idle, minutes 1 to 2 | 0.2 % | 44.2 MB | 19.9 MB | 24.3 MB |
+| r5 under the synthetic house load (section 6), 30 s samples over 5 min, 2 700 to 4 600 conntrack entries | 4 to 5 % | 64.8 to 84.3 MB (VmHWM 84.3) | 40.4 to 59.9 MB | 24.4 MB |
+| r4 under the same load, section 6, restarted under it | | 133 to 135 MB plateau | 125.5 MB | |
+
+- The packs are mapped on this file system: RssAnon stayed at 11 MB at start;
+  read into memory they would have added about 15 MB of it. RssFile is their
+  pages, which the kernel may reclaim.
+- The upgrade kept the existing config, whose `geo` and `oui` still named the
+  text files the package no longer ships; netryx read the packs beside them and
+  said so (`/usr/share/netryx/ip2asn-combined.tsv.gz is gone; reading
+  /usr/share/netryx/ip2asn.pack, which the package ships in its place`).
+- The way back was run: `apk add` of r4 brought the text files back and r4
+  started on them (89.9 MB resident 15 s after start), and `apk add` of r5 again
+  brought the packs back (53.4 MB, 29.1 MB anonymous, 15 s after start).
+- Temperature 38.2 to 39.4 C throughout; Hermes was not restarted.
+
+@measured on flint2 `apk add --allow-untrusted /tmp/netryx-0.1.0-r5.apk`,
+`/etc/init.d/netryx restart`, `grep -E 'VmRSS|RssAnon|RssFile|VmHWM'
+/proc/$(pidof netryx)/status`, the CPU from `cut -d' ' -f14,15
+/proc/$(pidof netryx)/stat` 60 s and 30 s apart, `sh scripts/lab/flint2-load.sh
+up|down` under `sh scripts/lab/flint2-arm.sh arm 1800`, then `apk add` of r4
+and of r5, 2026-11-23 01:26-01:37 London
