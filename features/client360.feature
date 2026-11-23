@@ -97,6 +97,22 @@ Feature: a client's name opens its card, and its card opens its full view
     # -> TestADeviceAnswersItsUsualWeekAndTheLastHour
     # -> TestADeviceWithLessThanAWeekOfDaysHasNoUsualYet
     # -> TestTheUsualWeekIsReadInTheRoutersZone
-    # (the page: "the usual says both sides: what the last hour moved and what that hour of the week usually moves" in web/src/client360.test.ts)
-    # (the page: "the usual says when a side is missing, never reading it as zero" in web/src/client360.test.ts)
-    # (the page: "the week grid runs Monday to Sunday, shades by the busiest slot, keeps unknown slots apart and marks the hour that closed" in web/src/client360.test.ts)
+    # (the page: "the usual says both sides: what the last hour moved and what that hour of the week usually moves" in web/src/rhythm.test.ts)
+    # (the page: "the usual says when a side is missing, never reading it as zero" in web/src/rhythm.test.ts)
+    # (the page: "the week grid runs Monday to Sunday, shades by the busiest slot, keeps unknown slots apart and marks the hour that closed" in web/src/rhythm.test.ts)
+
+  Scenario: a client's view sets yesterday against its own median day
+    Given a client the router has counted on seven whole days or more of the last 30
+    When the owner opens its full view
+    Then a sentence names its median day and what it moved yesterday, and how many times the one is the other
+    And it says whether the last 7 days moved more, less or about as much as the 7 before
+    And it names the hours of yesterday in which it moved data while it usually moves nothing then
+    And a day the router did not count whole is no sample, a day with no file is drawn apart from a quiet one, and a client too new is not compared
+    # -> TestRhythmComparesYesterdayWithTheMedianDay
+    # -> TestRhythmRefusesAComparisonItCannotMake
+    # -> TestRhythmTrendIsTheLastWeekAgainstTheOneBefore
+    # -> TestRhythmFindsActivityInHoursItUsuallySleeps
+    # -> TestADeviceAnswersItsRhythm
+    # (the page: "the rhythm sets yesterday against the device's own median day, both sides named" in web/src/rhythm.test.ts)
+    # (the page: "the rhythm refuses a comparison it cannot make, and says why" in web/src/rhythm.test.ts)
+    # (the page: "the rhythm's days are drawn oldest first, yesterday marked, a day with no file apart from a quiet one" in web/src/rhythm.test.ts)

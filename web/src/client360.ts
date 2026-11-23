@@ -5,7 +5,7 @@
 import type { Device, NetworkView } from "./types";
 import type { Rule } from "./rules";
 import { appliesTo } from "./rules";
-import { bytes, groupName } from "./format";
+import { groupName } from "./format";
 import { signalText, speedText } from "./network";
 
 /** Where a device is connected: its port and the port's link, or its Wi-Fi network, band, channel and signal. */
@@ -83,63 +83,4 @@ export function exposureOf(mac: string, net: ExposureNet | undefined, inbound: {
   }
   if (lines.length === 0) return { quiet: true, lines: ["Nothing from the internet reaches it: no forwarded port, no UPnP mapping, no connection from outside in the last 24 hours."] };
   return { quiet: false, lines };
-}
-
-export interface Usual {
-  tooNew: boolean; knownDays: number; zone: string;
-  median: (number | null)[][] | null; samples: number[][] | null;
-  now: { from: string; to: string; weekday: number; hour: number; bytes: number | null; usual: number | null; samples: number } | null;
-}
-
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const two = (h: number) => String(h % 24).padStart(2, "0");
-const hourSpan = (h: number) => `${two(h)}:00 to ${two(h + 1)}:00`;
-const moved = (n: number) => (n > 0 ? bytes(n) : "nothing");
-const days = (n: number, wd: number) => `${n} ${WEEKDAYS[wd]}${n === 1 ? "" : "s"}`;
-
-/** The line under a device's usual week: the hour that just closed beside the
- *  usual of its slot, each side said, a missing side said as missing. */
-export function usualSentence(u: Usual): string {
-  if (u.tooNew || !u.now) {
-    const on = u.knownDays < 1 ? "has not counted this device on any day yet" : `has counted this device on ${u.knownDays} day${u.knownDays === 1 ? "" : "s"}`;
-    return `The router ${on}: a usual week needs at least 7.`;
-  }
-  const n = u.now;
-  const day = WEEKDAYS[n.weekday];
-  const usual = n.usual === null ? null : `it usually moves ${moved(n.usual)} (the median of ${days(n.samples, n.weekday)})`;
-  if (n.bytes === null) {
-    if (usual === null) return `The router did not count the whole of the last hour, and has counted only ${days(n.samples, n.weekday)} at that hour, too few to say what is usual.`;
-    return `On ${day}s from ${hourSpan(n.hour)} ${usual}; the router did not count the whole of the last hour, so there is nothing to set beside it.`;
-  }
-  const last = `In the last hour, ${day} ${hourSpan(n.hour)}, it moved ${moved(n.bytes)}.`;
-  if (n.usual === null) return `${last} The router has counted only ${days(n.samples, n.weekday)} at that hour, too few to say what is usual.`;
-  let verdict = "";
-  if (n.usual === 0) {
-    verdict = n.bytes === 0 ? " As usual." : "";
-  } else {
-    const r = n.bytes / n.usual;
-    verdict = r >= 1.5 ? ` That is ${r.toFixed(r < 10 ? 1 : 0)} times as much.` : r <= 2 / 3 ? ` That is ${Math.round(r * 100)}% of it.` : " About as usual.";
-  }
-  return `${last} On ${day}s at that hour ${usual}.${verdict}`;
-}
-/** The week grid, Monday first: each slot's shade step (0 quiet to 5 the
- *  busiest slot, on a square-root scale; -1 too few days to say), whether it
- *  is the slot of the hour that just closed, and what it says on hover. */
-export function usualRows(u: Usual): { day: string; cells: { level: number; now: boolean; title: string }[] }[] {
-  const med = u.median ?? [];
-  let max = 0;
-  for (const row of med) for (const v of row) if (v !== null && v > max) max = v;
-  return [1, 2, 3, 4, 5, 6, 0].map((wd) => ({
-    day: WEEKDAYS[wd].slice(0, 3),
-    cells: Array.from({ length: 24 }, (_, h) => {
-      const v = med[wd]?.[h] ?? null;
-      const n = u.samples?.[wd]?.[h] ?? 0;
-      const at = `${WEEKDAYS[wd]} ${hourSpan(h)}`;
-      return {
-        level: v === null ? -1 : v === 0 || max === 0 ? 0 : Math.ceil(5 * Math.sqrt(v / max)),
-        now: !!u.now && u.now.weekday === wd && u.now.hour === h,
-        title: v === null ? `${at}: not enough days to say (${n} counted)` : `${at}: usually ${moved(v)}, the median of ${n} days`,
-      };
-    }),
-  }));
 }

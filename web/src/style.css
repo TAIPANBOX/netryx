@@ -459,3 +459,10 @@ a.chip:hover { color: var(--link-hover); border-color: var(--link); }
 .usual-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
 .usual-swatch.usual-unknown { margin-left: 10px; }
 .usual-swatch.usual-now { margin-left: 10px; }
+
+/* A device's rhythm: a bar a day, yesterday the light one. */
+.rhythm-bars { width: 100%; max-width: 520px; height: 48px; }
+.rhythm-bar { fill: var(--muted); }
+.rhythm-partial { fill: var(--muted); opacity: 0.4; }
+.rhythm-yesterday { fill: var(--text); }
+.rhythm-unknown { fill: none; stroke: var(--edge); stroke-dasharray: 2 2; }
