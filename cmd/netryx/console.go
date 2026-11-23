@@ -912,12 +912,23 @@ type wanMonitor struct {
 	counter *wan.Counter
 	dev     string
 	probed  string
+	// win keeps the line's readings for the Speed now tile's average,
+	// back from the newest reading at last.
+	win  wan.Window
+	last time.Time
 }
 
 func (w *wanMonitor) Status() wan.Status {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.st
+}
+
+// Average is the line's rates over the span back from the newest reading.
+func (w *wanMonitor) Average(span time.Duration) (rx, tx float64, covered time.Duration) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.win.Average(w.last, span)
 }
 
 // tick is called every 10 s by one goroutine.
@@ -960,17 +971,27 @@ func (w *wanMonitor) tick(ctx context.Context, now time.Time) {
 	if st.Device != "" && st.Device != w.dev {
 		w.counter = wan.NewCounter(w.fsys, st.Device)
 		w.dev = st.Device
+		// Another device is another line: its first reading only starts the clock.
+		w.mu.Lock()
+		w.win, w.last = wan.Window{}, time.Time{}
+		w.mu.Unlock()
 		if w.onDevice != nil {
 			w.onDevice(st.Device)
 		}
 	}
+	read := false
 	if w.counter != nil {
 		if rx, tx, err := w.counter.Sample(now); err == nil {
 			st.RxRate, st.TxRate = rx, tx
+			read = true
 		}
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if read {
+		w.win.Add(now, st.RxRate, st.TxRate)
+		w.last = now
+	}
 	if target != w.probed {
 		// A new target is a new line to measure; the old window says
 		// nothing about it.
