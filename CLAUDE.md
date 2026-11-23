@@ -960,6 +960,12 @@ enforced, and that is a debt rather than a decision.
   (test: `TestOpenGeoReadsAPackAndTheOldFile`, `TestOpenOUIReadsAPackAndTheOldFile`,
   `TestAnOldConfigsTextPathFindsThePack`)
 
+- **The service's resident memory in the lab**: @measured netryx-lab
+  2026-11-23 (6 devices, memory_limit 160MiB, `grep -E 'VmRSS|RssAnon|RssFile'
+  /proc/$(pidof netryx)/status` 25 s after a restart): with the text files
+  loaded 86.5 MB resident, 76.1 MB of it anonymous; with the packs mapped
+  50.7 MB, 25.6 MB anonymous and 25.1 MB file pages the kernel may reclaim.
+  The target is 64 MB resident under the heavy profile on a 256 MB router.
 ## The promise about the running console
 
 - **The console runs without its data files.** A missing or unreadable
