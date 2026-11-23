@@ -14,10 +14,10 @@ import { RANGES, windowLabel, type Win } from "../query";
 import { Header, Pills, Card, Status, Loading, Empty, IconContext, usePeriod } from "../ui";
 import { setSpan } from "../span";
 import { Sankey } from "../charts";
-import { date, time, groupName } from "../format";
+import { bytes, countryName, date, dayMonth, time, groupName } from "../format";
 import { alertText, type AlertsState } from "../security";
 import { connMap } from "../connmap";
-import { rulesOn, whereConnected } from "../client360";
+import { newForNote, rulesOn, whereConnected, type NewFor } from "../client360";
 import { allowText, liveAllows, manifestName, stateOf, usageLabel, usageText, type Usage } from "../rules";
 import { deviceName } from "./Clients";
 import { RuleTitle } from "./Rules";
@@ -208,6 +208,7 @@ function History({ mac, range, onRange, win }: { mac: string; range: Range; onRa
             <Traffic d={got} step={per.step} range={per.range} span={!!per.span} split={split} onSplit={setSplit} alerts={marks} />
             <Apps apps={got.apps} mac={mac} win={win} />
             <Where dest={got.dest} />
+            <NewForDevice mac={mac} />
           </div>
         )}
       </Section>
@@ -252,3 +253,32 @@ function RulesSection({ d }: { d: Device }) {
   );
 }
 
+
+/** What this device used since yesterday and in none of the 29 days before. */
+function NewForDevice({ mac }: { mac: string }) {
+  const polled = usePoll((s) => getJSON<NewFor>(`/api/devices/${enc(mac)}/new`, s), 300_000, [mac]);
+  const n = polled.data;
+  return (
+    <Card label="New for this device" title="New for this device">
+      {!n ? (
+        <Loading />
+      ) : (
+        <div class="col-tight">
+          <span class="muted small">{newForNote(n)}</span>
+          {n.apps.map((a) => (
+            <span key={a.app.id} class="row-between small">
+              <EntityLink e={{ kind: "app", id: a.app.id }}>{a.app.name}</EntityLink>
+              <span class="soft nowrap">first {dayMonth(a.first)} {time(a.first)} · ↓ {bytes(a.down)}</span>
+            </span>
+          ))}
+          {n.countries.map((c) => (
+            <span key={c.cc} class="row-between small">
+              <EntityLink e={{ kind: "country", cc: c.cc }}>{countryName(c.cc)}</EntityLink>
+              <span class="soft nowrap">first {dayMonth(c.first)} {time(c.first)} · ↓ {bytes(c.down)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}

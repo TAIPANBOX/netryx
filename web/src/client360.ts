@@ -48,3 +48,19 @@ export function editBody(was: { name: string; group: string }, now: { name: stri
   if (now.group !== was.group) out.group = now.group;
   return Object.keys(out).length ? out : null;
 }
+
+export interface NewFor {
+  tooNew: boolean; knownDays: number; since: string;
+  apps: { app: { id: string; name: string; category: string }; first: string; down: number; up: number }[];
+  countries: { cc: string; first: string; down: number; up: number }[];
+}
+
+/** The line above what is new for a device. */
+export function newForNote(n: NewFor): string {
+  if (n.tooNew) {
+    const known = n.knownDays < 1 ? "less than a day" : `${n.knownDays} day${n.knownDays === 1 ? "" : "s"}`;
+    return `The router has known this device for ${known}: too new to tell what is new for it.`;
+  }
+  if (n.apps.length === 0 && n.countries.length === 0) return "Nothing new: every app and country it used since yesterday it had used in the 29 days before.";
+  return "Used since yesterday and in none of the 29 days before:";
+}

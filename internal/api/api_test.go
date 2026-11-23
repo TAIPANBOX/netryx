@@ -77,6 +77,19 @@ type fakeHistory struct {
 	sparks map[string]rollup.SparksOf
 	// tops records every Top asked for.
 	tops []topCall
+	// newKeys answers NewKeys by dimension; newAsked records each call.
+	newKeys  map[string][]rollup.NewRow
+	newAsked []newCall
+}
+
+type newCall struct {
+	mac, dim         string
+	split, from, now time.Time
+}
+
+func (h *fakeHistory) NewKeys(mac, dim string, split, from, now time.Time) []rollup.NewRow {
+	h.newAsked = append(h.newAsked, newCall{mac, dim, split, from, now})
+	return h.newKeys[dim]
 }
 
 type topCall struct {

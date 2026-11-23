@@ -39,6 +39,7 @@ type History interface {
 	Recent(rollup.Filter, string, time.Duration) ([]rollup.Row, time.Duration)
 	Holders(string, string, time.Time, time.Time) rollup.HoldersOf
 	Sparks(rollup.Filter, string, time.Duration, time.Duration) rollup.SparksOf
+	NewKeys(mac, dim string, split, from, now time.Time) []rollup.NewRow
 }
 
 // Apps names an app id from the catalog of rules, so a name does not depend
@@ -169,6 +170,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/apps", s.route(s.apps))
 	mux.HandleFunc("/api/devices/{mac}/destinations", s.route(s.destinations))
 	mux.HandleFunc("/api/devices/{mac}/live", s.route(s.live))
+	mux.HandleFunc("/api/devices/{mac}/new", s.route(s.newFor))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
 	s.agentRoutes(mux)
 	s.houseRoutes(mux)
