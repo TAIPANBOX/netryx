@@ -381,8 +381,15 @@ enforced, and that is a debt rather than a decision.
 
 ## The promise about login
 
-- **Every view needs a session**; only the login form is open.
-  (test: `TestEveryViewNeedsALogin`, `TestOnlyTheLoginFormIsOpen`)
+- **Every view needs a session**; only the login form is open: `/`, `/app.js`,
+  `/style.css`, the icons, and exactly the chunks the page's script imports
+  statically, which `web/build.sh` lists in `first-screen.txt` beside the
+  page (a chunk loaded on demand stays closed), so the form loads before
+  anyone signs in. (test: `TestEveryViewNeedsALogin`, `TestOnlyTheLoginFormIsOpen`,
+  `TestTheLoginFormsOwnChunksAreOpen`, `TestTheFirstScreensChunksAreReadFromBesideThePage`,
+  `TestTheLoginFormLoadsWithoutASession`; gate: `scripts/login-assets.sh`, run by
+  `web/build.sh`, with its cases in `scripts/gates-have-teeth.sh`; the first open
+  in a browser: `scripts/lab/login-first-open.mjs`)
 - **Writes need the grant and the session's token**, and a write route is
   reachable only through that gate.
   (test: `TestAWriteNeedsTheGrantAndTheToken`, `TestAWriteRouteIsReachableOnlyThroughTheGate`)

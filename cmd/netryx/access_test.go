@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io/fs"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -541,5 +542,55 @@ func TestTheGateNamesAZoneABrowserKnows(t *testing.T) {
 		if got := con.newGate(&fakeRPC{}, "").Zone; got != c.want {
 			t.Errorf("Loc %v: the gate says %q, want %q", c.loc, got, c.want)
 		}
+	}
+}
+
+// The login form loads before anyone signs in: the page, its script and
+// every chunk the script imports statically answer without a session, and a
+// chunk loaded only after a login does not. Run where the page is built.
+func TestTheLoginFormLoadsWithoutASession(t *testing.T) {
+	if !web.Built() {
+		t.Skip("the page is not built here (web/build.sh)")
+	}
+	c, err := buildConsole(testOptions(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gate := c.newGate(&fakeRPC{}, "tok")
+	h := c.serveHandler(serveMux(c, func() export.Snapshot { return export.Snapshot{} }), gate)
+	get := func(p string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, p, nil)
+		r.RemoteAddr, r.Host = "192.168.50.10:40000", "192.168.50.1:8788"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec
+	}
+	first := web.FirstScreen()
+	if len(first) == 0 {
+		t.Fatal("the built page lists no chunk its script imports statically")
+	}
+	for _, p := range append([]string{"/", "/app.js", "/style.css"}, first...) {
+		if rec := get(p); rec.Code != http.StatusOK {
+			t.Errorf("%s without a session: %d", p, rec.Code)
+		}
+	}
+	listed := map[string]bool{}
+	for _, p := range first {
+		listed[p] = true
+	}
+	entries, _ := fs.ReadDir(web.Files(), "chunks")
+	closed := 0
+	for _, e := range entries {
+		p := "/chunks/" + e.Name()
+		if listed[p] {
+			continue
+		}
+		closed++
+		if rec := get(p); rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s, loaded only after a login, answered %d without a session", p, rec.Code)
+		}
+	}
+	if closed == 0 {
+		t.Error("every chunk is open: nothing is loaded only after a login")
 	}
 }

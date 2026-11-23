@@ -49,6 +49,9 @@ npx esbuild src/main.tsx --bundle --minify --format=esm --target=es2020 \
 	--jsx-factory=h --jsx-fragment=Fragment --legal-comments=none \
 	--log-level=warning --outdir="$out"
 cp src/index.html src/style.css "$out/"
+# The chunks the page's script imports statically load before a login: the
+# console opens exactly these without a session (scripts/login-assets.sh).
+sh ../scripts/first-screen.sh "$out" >"$out/first-screen.txt"
 
 rm -rf dist-test
 for t in src/*.test.ts; do
@@ -59,3 +62,4 @@ done
 # The page is served from a router over Wi-Fi: the budgets are on what crosses
 # the air, the gzipped bundle and its chunks (scripts/bundle-budget.sh).
 sh ../scripts/bundle-budget.sh "$out"
+sh ../scripts/login-assets.sh "$out"

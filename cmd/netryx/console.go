@@ -1946,8 +1946,10 @@ func (c *console) newGate(rpc auth.RPC, token string) *auth.Gate {
 		zone = c.o.Loc.String()
 	}
 	return &auth.Gate{
-		Zone: zone,
-		RPC:  rpc, Now: time.Now, Secret: auth.NewSecret(), MetricsToken: token,
+		// The chunks the login form's script imports load before a login.
+		LoginFiles: web.FirstScreen(),
+		Zone:       zone,
+		RPC:        rpc, Now: time.Now, Secret: auth.NewSecret(), MetricsToken: token,
 		Logf: log.Printf, IsLocal: c.local.IsLocal,
 	}
 }

@@ -171,3 +171,29 @@ func WithBuild(build string, h http.Handler) http.Handler {
 		h.ServeHTTP(w, r)
 	})
 }
+
+// Files is the embedded page, for checks that read what was built.
+func Files() fs.FS { return embedded() }
+
+// FirstScreen is the chunks the page's script imports statically, which the
+// login form needs before anyone signs in: build.sh lists them beside the
+// page in first-screen.txt.
+func FirstScreen() []string { return firstScreen(embedded()) }
+
+// chunkName is what a line of first-screen.txt may be: one file under chunks/.
+var chunkName = regexp.MustCompile(`^chunks/[A-Za-z0-9._-]+\.js$`)
+
+func firstScreen(files fs.FS) []string {
+	b, err := fs.ReadFile(files, "first-screen.txt")
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if chunkName.MatchString(line) && path.Clean(line) == line {
+			out = append(out, "/"+line)
+		}
+	}
+	return out
+}
