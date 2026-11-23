@@ -30,6 +30,20 @@ export function onUnauthorized(fn: () => void): () => void {
 }
 const sessionGone = () => unauthorized.forEach((fn) => fn());
 
+// When a person last used the page (a mouse, a key, the tab in focus). Every
+// request says how long ago, and only that keeps the session alive: a tab
+// left open polls, and polling alone lets the session end, as LuCI's does.
+let lastUse = Date.now();
+export function noteUse() {
+  lastUse = Date.now();
+}
+export function activitySeconds(now: number, last: number): string {
+  return String(Math.max(0, Math.floor((now - last) / 1000)));
+}
+const activity = () => activitySeconds(Date.now(), lastUse);
+/** Whether the last 401 was a session ended for want of use. */
+export let wentIdle = false;
+
 async function failure(r: Response): Promise<ApiError> {
   let msg = `HTTP ${r.status}`;
   try {
@@ -43,18 +57,22 @@ async function failure(r: Response): Promise<ApiError> {
 
 /** GET a same-origin JSON route. Nothing is ever fetched from anywhere else. */
 export async function getJSON<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const r = await fetch(path, { signal, cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json" } });
+  const r = await fetch(path, { signal, cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json", "X-Netryx-Activity": activity() } });
   noteBuild(r);
   if (!r.ok) {
-    if (r.status === 401) sessionGone();
-    throw await failure(r);
+    const e = await failure(r);
+    if (r.status === 401) {
+      wentIdle = e.message === "idle";
+      sessionGone();
+    }
+    throw e;
   }
   return (await r.json()) as T;
 }
 
 // The router's own sentences are shown as they are; a bare code from the
 // login layer ("forbidden", "json") is put into words.
-const CODES = new Set(["forbidden", "no-rpc", "login", "rpc", "rate", "json", "bad login", "method not allowed", "internal error", ""]);
+const CODES = new Set(["idle", "forbidden", "no-rpc", "login", "rpc", "rate", "json", "bad login", "method not allowed", "internal error", ""]);
 function inWords(status: number, msg: string): string {
   if (!CODES.has(msg)) return msg;
   if (status === 403) return "No right to make changes: write access is needed.";
@@ -70,7 +88,7 @@ function inWords(status: number, msg: string): string {
  * presses the button again once signed in.
  */
 export async function sendJSON<T>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json", "X-Netryx-CSRF": csrf };
+  const headers: Record<string, string> = { Accept: "application/json", "X-Netryx-CSRF": csrf, "X-Netryx-Activity": activity() };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const r = await fetch(path, {
     method,
@@ -107,9 +125,12 @@ export interface Session { user: string; csrf: string; canWrite: boolean; noRPC?
 
 /** The session behind the cookie, or null when there is none. Keeps its token for the writes. */
 export async function getSession(): Promise<Session | null> {
-  const r = await fetch("/api/session", { cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json" } });
+  const r = await fetch("/api/session", { cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json", "X-Netryx-Activity": activity() } });
   noteBuild(r);
-  if (r.status === 401) return null;
+  if (r.status === 401) {
+    wentIdle = (await failure(r)).message === "idle";
+    return null;
+  }
   if (!r.ok) throw await failure(r);
   const s = (await r.json()) as Session;
   setCSRF(s.csrf || "");

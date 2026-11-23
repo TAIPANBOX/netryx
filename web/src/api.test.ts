@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendJSON, setCSRF, onUnauthorized, ApiError, login, getJSON, setBuild, onNewBuild, reloadFor, handoffCode } from "./api";
+import { sendJSON, setCSRF, onUnauthorized, ApiError, login, getJSON, setBuild, onNewBuild, reloadFor, handoffCode, activitySeconds } from "./api";
 
 interface Call { url: string; init: RequestInit }
 
@@ -245,4 +245,11 @@ test("a code from LuCI is read from the address fragment only, and only in its e
   assert.equal(handoffCode(`#luci=${code}&x=1`), null);
   assert.equal(handoffCode("#/"), null);
   assert.equal(handoffCode(""), null);
+});
+
+test("each request says how long ago a person last used the page, in whole seconds", () => {
+  assert.equal(activitySeconds(10_000, 10_000), "0");
+  assert.equal(activitySeconds(75_900, 10_000), "65");
+  // A clock that went back is no use in the future.
+  assert.equal(activitySeconds(5_000, 10_000), "0");
 });

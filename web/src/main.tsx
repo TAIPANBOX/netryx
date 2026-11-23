@@ -7,7 +7,7 @@ import { h, render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Range } from "./types";
 import type { IconManifest } from "./icons";
-import { getJSON, getSession, handoffCode, loginWithLuCI, onUnauthorized } from "./api";
+import { getJSON, getSession, handoffCode, loginWithLuCI, noteUse, onUnauthorized, wentIdle } from "./api";
 import { IconContext, SessionContext, SpanContext, type SessionInfo } from "./ui";
 import { parseSpan } from "./span";
 import { parseRoute, RANGES, WINDOWS, type Win } from "./query";
@@ -78,8 +78,15 @@ function App() {
   useEffect(() => {
     const off = onUnauthorized(() => {
       back.current = nextLogin(location.hash);
+      if (wentIdle) setNote("You were signed out after a while without using the page.");
       setAuth({ state: "login" });
     });
+    // A person at the page: only this keeps the session alive.
+    const use = () => noteUse();
+    const seen = () => document.visibilityState === "visible" && noteUse();
+    const kinds = ["pointerdown", "pointermove", "keydown", "wheel", "focus"];
+    for (const k of kinds) window.addEventListener(k, use, { passive: true });
+    document.addEventListener("visibilitychange", seen);
     // Opened from LuCI: the one-time code leaves the address and the history
     // at once, before anything else runs, and is redeemed for a session.
     const code = handoffCode(location.hash);
@@ -101,6 +108,7 @@ function App() {
         if (s) setAuth({ state: "in", info: { user: s.user, canWrite: !!s.canWrite && !s.noRPC, noRPC: !!s.noRPC } });
         else {
           back.current = nextLogin(location.hash);
+          if (wentIdle) setNote("You were signed out after a while without using the page.");
           setAuth({ state: "login" });
         }
       },
@@ -119,6 +127,7 @@ function App() {
         (s) => {
           if (!s) {
             back.current = nextLogin(location.hash);
+            if (wentIdle) setNote("You were signed out after a while without using the page.");
             setAuth({ state: "login" });
           } else {
             const info = { user: s.user, canWrite: !!s.canWrite && !s.noRPC, noRPC: !!s.noRPC };

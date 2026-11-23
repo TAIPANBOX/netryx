@@ -154,7 +154,9 @@ The console signs you in with your LuCI account; there is no password of its own
   anyone else's browser. The
   code travels in the address fragment, which the browser never sends to a server, and the console
   takes it out of the address and the history at once. Leaving the console does not sign you out
-  of LuCI. This needs the console on a house-side address (below).
+  of LuCI. A console nobody uses (no mouse, key or focus on the page) for LuCI's session time,
+  an hour by default, signs itself out, as LuCI does: an open tab polling the router does not
+  keep it alive. This needs the console on a house-side address (below).
 - **Over HTTPS on the house network.** Set `netryx.main.listen` to the router's LAN address, for
   example `192.168.1.1:8788`, and restart netryx. `0.0.0.0:8788` also works and keeps the SSH
   tunnel on loopback, but it takes in the WAN address too: netryx then refuses every request that
@@ -192,6 +194,10 @@ config login
 `list read 'luci-app-netryx'` for LuCI's Network console entry. Written as
 `option read 'netryx'`, rpcd does not take it as a grant, and the console answers that this user
 has no access to netryx.
+
+Going back to an older netryx is not supported: an older binary reads a session that came from
+LuCI as one of its own, and its logout would then end the LuCI session too. Sign out of the
+console before downgrading.
 
 Architectures: `aarch64_cortex-a53`, `aarch64_generic`, `x86_64`, `arm_cortex-a7`/`a9` and `mips`
 build from the same script (`build.sh` maps the OpenWrt name to Go's).

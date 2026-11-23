@@ -8,6 +8,7 @@ package auth
 import (
 	"encoding/hex"
 	"encoding/json"
+	"time"
 
 	"netryx/internal/ramfile"
 )
@@ -21,6 +22,8 @@ type storedSession struct {
 	User   string `json:"user"`
 	// Lent marks LuCI's own session, handed over by a code: never ended by netryx.
 	Lent bool `json:"lent,omitempty"`
+	// Active is when a person last used the page, unix seconds.
+	Active int64 `json:"active,omitempty"`
 }
 
 type storedFile struct {
@@ -61,6 +64,9 @@ func sanitize(sf storedFile) []signedIn {
 			continue
 		}
 		si := signedIn{handle: s.Handle, sid: s.SID, user: s.User, lent: s.Lent}
+		if s.Active > 0 {
+			si.active = time.Unix(s.Active, 0)
+		}
 		// A handle twice is one session, the later entry's: two would leave
 		// one in the order that the map no longer knows.
 		if i, seen := at[s.Handle]; seen {
@@ -85,7 +91,7 @@ func sanitize(sf storedFile) []signedIn {
 func saveStore(path string, secret []byte, sessions []signedIn) error {
 	sf := storedFile{Secret: hex.EncodeToString(secret), Sessions: []storedSession{}}
 	for _, s := range sessions {
-		sf.Sessions = append(sf.Sessions, storedSession{Handle: s.handle, SID: s.sid, User: s.user, Lent: s.lent})
+		sf.Sessions = append(sf.Sessions, storedSession{Handle: s.handle, SID: s.sid, User: s.user, Lent: s.lent, Active: unixOrZero(s.active)})
 	}
 	b, err := json.Marshal(sf)
 	if err != nil {
@@ -98,3 +104,10 @@ func saveStore(path string, secret []byte, sessions []signedIn) error {
 // a directory that is a link, or not this process's alone, is left as it
 // is, so the fail-closed removal never deletes a file elsewhere as root.
 func removeStore(path string) error { return ramfile.Remove(path) }
+
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
+}
