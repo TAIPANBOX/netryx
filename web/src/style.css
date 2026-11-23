@@ -319,7 +319,10 @@ select.input { padding-right: 8px; }
 
 /* the Network screen */
 .card-pad { padding: 16px 18px 0; }
-.net-table { min-width: 980px; }
+/* The networks fit their card from 720 px up: a long IPv6 address wraps
+   anywhere, and the short columns never wrap, so no column is cut off. */
+.net-table td.addr { overflow-wrap: anywhere; }
+.net-table td.nowrap-cell { white-space: nowrap; }
 .port-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .port { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); }
 .port-up { border-color: var(--edge); }
