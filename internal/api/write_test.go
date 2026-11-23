@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -333,7 +334,7 @@ func TestAnAllowanceEndsOnItsOwn(t *testing.T) {
 	}
 
 	// DELETE ends one by hand; one that is not there is a 404.
-	fr.secs = append(fr.secs, sec("allow", "a_1", "rule", "", "member", phone, "until", until))
+	fr.secs = append(fr.secs, sec("allow", "a_1", "rule", "*", "member", phone, "until", until))
 	rec = send(t, h, http.MethodDelete, "/api/allow/a_1", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("DELETE: %d %s", rec.Code, rec.Body)
@@ -347,7 +348,7 @@ func TestAnAllowanceEndsOnItsOwn(t *testing.T) {
 	// The bound: the 513th live allowance is refused.
 	big := house()
 	for i := 0; i < rules.MaxAllows; i++ {
-		big.secs = append(big.secs, sec("allow", "a_"+strconv.Itoa(i), "rule", "", "member", phone, "until", strconv.FormatInt(now0.Add(time.Hour).Unix(), 10)))
+		big.secs = append(big.secs, sec("allow", "a_"+strconv.Itoa(i), "rule", "*", "member", phone, "until", strconv.FormatInt(now0.Add(time.Hour).Unix(), 10)))
 	}
 	h2, _ := writable(t, big)
 	if rec := send(t, h2, http.MethodPost, "/api/allow", `{"mac":"`+phone+`","minutes":5}`); rec.Code != http.StatusBadRequest || len(big.writes) != 0 {
@@ -359,7 +360,7 @@ func TestDeletingARuleTakesItsAllowancesWithIt(t *testing.T) {
 	fr := house()
 	fr.secs = append(fr.secs,
 		sec("allow", "a_mine", "rule", "r_night", "member", phone, "until", "9999999999"),
-		sec("allow", "a_all", "rule", "", "member", phone, "until", "9999999999"))
+		sec("allow", "a_all", "rule", "*", "member", phone, "until", "9999999999"))
 	h, _ := writable(t, fr)
 	if rec := send(t, h, http.MethodDelete, "/api/rules/r_night", ""); rec.Code != http.StatusOK {
 		t.Fatalf("DELETE: %d %s", rec.Code, rec.Body)
@@ -631,7 +632,7 @@ func TestMethodsAreListedPerRouteAndWritesNeedTheRules(t *testing.T) {
 	for _, c := range []struct{ method, path, allow string }{
 		{http.MethodDelete, "/api/rules", "GET, POST"},
 		{http.MethodPatch, "/api/rules/r_night", "DELETE, PUT"},
-		{http.MethodGet, "/api/allow", "POST"},
+		{http.MethodDelete, "/api/allow", "GET, POST"},
 		{http.MethodGet, "/api/allow/a_1", "DELETE"},
 		{http.MethodPost, "/api/groups", "GET"},
 		{http.MethodPost, "/api/devices/" + phone, "GET, PUT"},
@@ -744,9 +745,9 @@ func TestAnEndedAllowanceIsRemovedWithTheNextWrite(t *testing.T) {
 	at := strconv.FormatInt(now0.Unix(), 10)
 	live := strconv.FormatInt(now0.Add(time.Hour).Unix(), 10)
 	fr.secs = append(fr.secs,
-		sec("allow", "a_old", "rule", "", "member", phone, "until", past),
-		sec("allow", "a_now", "rule", "", "member", phone, "until", at),
-		sec("allow", "a_live", "rule", "", "member", phone, "until", live))
+		sec("allow", "a_old", "rule", "*", "member", phone, "until", past),
+		sec("allow", "a_now", "rule", "*", "member", phone, "until", at),
+		sec("allow", "a_live", "rule", "*", "member", phone, "until", live))
 	h, _ := writable(t, fr)
 	if rec := send(t, h, http.MethodPost, "/api/allow", `{"mac":"`+phone+`","minutes":5}`); rec.Code != http.StatusOK {
 		t.Fatalf("POST: %d %s", rec.Code, rec.Body)
@@ -756,7 +757,7 @@ func TestAnEndedAllowanceIsRemovedWithTheNextWrite(t *testing.T) {
 		t.Errorf("batch:\n%s", b)
 	}
 	// Any write cleans, and a delete of the same section is not doubled.
-	fr.secs = append(fr.secs, sec("allow", "a_old2", "rule", "", "member", phone, "until", past))
+	fr.secs = append(fr.secs, sec("allow", "a_old2", "rule", "*", "member", phone, "until", past))
 	if rec := send(t, h, http.MethodDelete, "/api/allow/a_old2", ""); rec.Code != http.StatusOK {
 		t.Fatalf("DELETE: %d", rec.Code)
 	}
@@ -1251,5 +1252,32 @@ func TestTheDeviceInUseCannotIsolateItself(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("from another device: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// An allowance section that opens nothing (no rule or an empty one, a member
+// that is no device, a time that cannot be) is listed with why, so the owner
+// sees it does not work; one in force and one that has ended are not.
+func TestAllowancesThatOpenNothingAreListed(t *testing.T) {
+	fr := house()
+	live := strconv.FormatInt(now0.Add(time.Hour).Unix(), 10)
+	fr.secs = append(fr.secs,
+		sec("allow", "a_empty", "rule", "", "member", phone, "until", live),
+		sec("allow", "a_ok", "rule", "*", "member", phone, "until", live),
+		sec("allow", "a_old", "rule", "*", "member", phone, "until", strconv.FormatInt(now0.Add(-time.Hour).Unix(), 10)),
+	)
+	h, _ := writable(t, fr)
+	rec := send(t, h, http.MethodGet, "/api/allow", "")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var v struct {
+		Invalid []struct{ ID, Member, Why string } `json:"invalid"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &v); err != nil {
+		t.Fatal(err)
+	}
+	if len(v.Invalid) != 1 || v.Invalid[0].ID != "a_empty" || v.Invalid[0].Member != phone || !strings.Contains(v.Invalid[0].Why, "'*'") {
+		t.Errorf("%s", rec.Body)
 	}
 }

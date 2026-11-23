@@ -1243,13 +1243,16 @@ enforced, and that is a debt rather than a decision.
   left out is gone) through `uci -q batch` with the text on stdin, after the
   model has read the would-be config and found the rule valid; an invalid rule
   is a 400 and nothing is written. An allowance always carries a `rule` option,
-  written `'*'` for every rule (uci deletes an option set to an empty value,
-  and the model drops an allowance without it; an empty value written by
-  hand reads as every rule too), and a cut names a live flow of that MAC and no
+  written `'*'` for every rule: only an explicit `'*'` is every rule, so a
+  section with an empty rule or none (an empty uci set deletes the option, a
+  hand edit, a cut-short config) opens nothing, is never migrated, and is
+  listed with why by `GET /api/allow` and on the Rules screen, as is one
+  whose member, time or length cannot be, and a cut names a live flow of that MAC and no
   other. (test: `TestARuleWrittenThroughTheAPIIsTheBatchTheAgentWouldWrite`,
   `TestPUTWritesTheWholeSectionSoAnOmittedOptionIsGone`,
   `TestAnInvalidRuleIsRefusedBeforeItIsWritten`, `TestAnAllowanceEndsOnItsOwn`,
-  `TestAnAllowanceForEveryRuleIsWrittenAsAStar`,
+  `TestAnAllowanceForEveryRuleIsWrittenAsAStar`, `TestAnAllowanceWithoutAnExplicitRuleIsNotInForce`,
+  `TestAnAllowNeedsAnExplicitRule`, `TestAllowancesThatOpenNothingAreListed`,
   `TestCutIsOnlyForTheDevicesOwnFlows`, `TestTheConsoleWritesTheBatchOnStdinThenReloads`,
   `TestAWriteRouteIsReachableOnlyThroughTheGate`)
 - **A device's group is shown by its name**, on the clients list and the

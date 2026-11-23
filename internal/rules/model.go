@@ -46,6 +46,11 @@ type Allow struct {
 	Until            time.Time
 }
 
+// BadAllow is an allowance section that opens nothing, and why.
+type BadAllow struct {
+	ID, Member, Why string
+}
+
 // Group is a named set of devices. FilteredDNS sends its members to the
 // safe-search resolver (spec 6.5).
 type Group struct {
@@ -97,8 +102,10 @@ type Quarantine struct{ Enabled bool }
 
 // Config is everything FromSections read.
 type Config struct {
-	Rules      []Rule
-	Allows     []Allow
+	Rules  []Rule
+	Allows []Allow
+	// BadAllows are the allowance sections that open nothing, with why.
+	BadAllows  []BadAllow
 	Groups     []Group
 	People     []Person
 	Devices    []Device
@@ -191,16 +198,33 @@ func FromSections(secs []uciconf.Section, k Known, now time.Time) Config {
 			if len(c.Allows) >= MaxAllows {
 				continue
 			}
-			// The rule option must be present; present and empty means every rule.
-			if _, has := s.Options["rule"]; !has {
-				continue
-			}
-			mac, ok := normMAC(first(s, "member"))
-			until, uok := parseUntil(first(s, "until"))
-			if !ok || !uok || !until.After(now) || until.After(now.Add(MaxAllowFor)) {
-				continue
-			}
+			member := first(s, "member")
+			bad := func(why string) { c.BadAllows = append(c.BadAllows, BadAllow{ID: s.Name, Member: member, Why: why}) }
+			// Every rule only as an explicit '*': an empty value or none (an
+			// empty uci set deletes the option, a hand edit, a cut-short
+			// config) must never open everything.
 			rule := first(s, "rule")
+			if _, has := s.Options["rule"]; !has || rule == "" {
+				bad("it names no rule: write rule '*' for every rule, or a rule's name")
+				continue
+			}
+			mac, ok := normMAC(member)
+			if !ok {
+				bad("its member is not a hardware address")
+				continue
+			}
+			until, uok := parseUntil(first(s, "until"))
+			if !uok {
+				bad("its until is not a time")
+				continue
+			}
+			if !until.After(now) {
+				continue // ended: removed with the next write
+			}
+			if until.After(now.Add(MaxAllowFor)) {
+				bad("it runs longer than four hours")
+				continue
+			}
 			if rule == EveryRule {
 				rule = ""
 			}

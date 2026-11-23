@@ -7,6 +7,7 @@ import { h, Fragment, type ComponentChildren } from "preact";
 import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import type { Device, Overview, Group } from "../types";
 import { getJSON, sendJSON, usePoll } from "../api";
+import { invalidAllowsNote, type BadAllow } from "../allows";
 import { Header, Status, Loading, Empty, Pills, useSession, IconContext } from "../ui";
 import { time, BLOCKABLE_CATEGORIES, category, countryName } from "../format";
 import {
@@ -25,6 +26,7 @@ export function Rules({ focus = "" }: { focus?: string }) {
   const rules = usePoll((s) => getJSON<Rule[]>("/api/rules", s), 10_000, [n]);
   const devices = usePoll((s) => getJSON<Device[]>("/api/devices", s), 30_000, []);
   const groups = usePoll((s) => getJSON<Group[]>("/api/groups", s), 0, [n]);
+  const bad = usePoll((s) => getJSON<{ invalid: BadAllow[] }>("/api/allow", s), 30_000, [n]);
   const manifest = useContext(IconContext);
   // Apps the console has seen, so the picker works even without icon names.
   const seen = usePoll((s) => getJSON<Overview>("/api/overview?range=30d&split=app", s), 0, []);
@@ -57,6 +59,14 @@ export function Rules({ focus = "" }: { focus?: string }) {
           )}
         </div>
         <Status polled={rules} />
+        {(() => {
+          const lines = invalidAllowsNote(bad.data?.invalid ?? [], (m) => (names.device ? names.device(m) : m.toUpperCase()));
+          return lines.length ? (
+            <div class="banner banner-top" role="alert">
+              {lines.map((l, i) => <p key={i} class={i === 0 ? "" : "small"}>{l}</p>)}
+            </div>
+          ) : null;
+        })()}
         {editing === "new" && (
           <RuleEditor
             title="New rule"

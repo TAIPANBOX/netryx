@@ -55,7 +55,6 @@ Feature: the household decides what a device may reach, and the router enforces 
     When the time passes
     Then the device is blocked again and the finished allowance is removed with the next write
     # -> TestAnAllowanceEndsOnItsOwn
-    # -> TestAnAllowanceForEveryRuleIsWrittenAsAStar
     # -> TestAnEndedAllowanceIsRemovedWithTheNextWrite
 
   Scenario: an allowance lifts only the rule it names
@@ -213,3 +212,15 @@ Feature: the household decides what a device may reach, and the router enforces 
     When netryx reads the config
     Then it reads the value as uci does and every rule applies
     # -> TestParseReadsBackslashesAsLibuciDoes
+
+  Scenario: an allowance lifts only what it names, and one that names nothing opens nothing
+    Given allowances in the config for every rule, for one rule, and with no rule or an empty one
+    When the rules are applied
+    Then the one for every rule, written as '*', lifts every rule but a country's, and the one for a rule lifts that rule alone
+    And the one with no rule or an empty one opens nothing and the Rules screen lists it with why
+    # -> TestAnAllowanceForEveryRuleIsWrittenAsAStar
+    # -> TestAnAllowanceWithoutAnExplicitRuleIsNotInForce
+    # -> TestAnAllowNeedsAnExplicitRule
+    # -> TestAnAllowanceLiftsOnlyTheRuleItNames
+    # -> TestAllowancesThatOpenNothingAreListed
+    # (the page: "allowances that open nothing are named with why, never trusted" in web/src/allows.test.ts)
