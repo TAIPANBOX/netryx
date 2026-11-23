@@ -140,6 +140,8 @@ type server struct {
 	wmu sync.Mutex
 	// net reads the router's wiring for the Network screen; nil answers 503.
 	net Network
+	// agent is the router's agent for the ask button; nil says it is not enabled.
+	agent Agent
 }
 
 // Option configures the API beyond what every caller passes.
@@ -168,6 +170,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/devices/{mac}/destinations", s.route(s.destinations))
 	mux.HandleFunc("/api/devices/{mac}/live", s.route(s.live))
 	mux.HandleFunc("/api/flows", s.route(s.flows))
+	s.agentRoutes(mux)
 	s.houseRoutes(mux)
 	mux.HandleFunc("/api/networks/{asn}", s.route(s.network1))
 	mux.HandleFunc("/api/domains/{name}", s.route(s.domain1))

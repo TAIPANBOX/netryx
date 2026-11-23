@@ -254,3 +254,13 @@ func TestACodeSentToAnotherBrowserOpensNothing(t *testing.T) {
 		t.Fatalf("the right browser: %d, nonce cleared %v", ok.Code, cleared)
 	}
 }
+
+// Asking the router's agent is a change: a viewer, token and all, may not.
+func TestAViewerCannotAskTheAgent(t *testing.T) {
+	r := newRig(t)
+	sid, csrf := r.login("viewer", viewerPW, lan)
+	wantError(t, r.do(http.MethodPost, "/api/agent/ask", lan, `{"question":"q"}`, withCookie(sid), withCSRF(csrf)), http.StatusForbidden, "forbidden", "a viewer asking the agent")
+	if r.didReach() {
+		t.Fatal("a viewer's question reached the console")
+	}
+}

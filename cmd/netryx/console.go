@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"netryx/internal/api"
+	"netryx/internal/askagent"
 	"netryx/internal/auth"
 	"netryx/internal/collect"
 	"netryx/internal/ct"
@@ -150,6 +151,9 @@ type Options struct {
 	// Minutes is the file in RAM the last hour of minutes is kept in across
 	// a restart of netryx; empty keeps none.
 	Minutes string
+	// AgentConfig is Hermes's UCI file, read for the agent's question API;
+	// empty wires no agent in.
+	AgentConfig string
 	// WAN is the ubus name of the internet interface; its IPv6 twin is
 	// WAN+"6" (or WAN+"_6", the name netifd gives a dynamic one).
 	WAN        string
@@ -421,6 +425,11 @@ func buildConsole(o Options) (*console, error) {
 			run: o.NFT, inv: c.inv, agentPending: o.AgentPending,
 			alerts: c.alerts, triesSeen: o.LogGroup != 0, fsys: o.FS,
 		}))
+	}
+	if o.AgentConfig != "" {
+		// "Ask the router's agent": Hermes's own API on loopback, with the key
+		// read from its root-only file for every question.
+		apiOpts = append(apiOpts, api.WithAgent(&askagent.Client{Config: o.AgentConfig}))
 	}
 	c.api = api.New(c.table, c.store, c.inv, c.wan, c.apps, o.Now, c, apiOpts...)
 	return c, nil

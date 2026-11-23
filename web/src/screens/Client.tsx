@@ -3,6 +3,7 @@
 // it went.
 
 import { EntityLink } from "./entity";
+import { AskButton } from "./Ask";
 import { h, type ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { SortHead, useFlip, useSteadyRows } from "./table";
@@ -72,7 +73,7 @@ export function Traffic({ d, step, range, span, split, onSplit, alerts = [] }: {
         <TimeChart
           layers={layers} up={s.up} t={s.t} stepSec={step} viewH={220} axis={160} downH={150} upH={55}
           label="Client traffic chart for the period; drag across a stretch to look at it"
-          brush spike markers={marks} legend={legend} ticks={timeTicks(s.t, range, !span)}
+          brush spike actions={<AskButton />} markers={marks} legend={legend} ticks={timeTicks(s.t, range, !span)}
         />
       )}
     </Card>

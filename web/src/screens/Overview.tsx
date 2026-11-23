@@ -4,6 +4,7 @@
 import { useCards } from "./windows";
 import { stretchHref } from "../entity";
 import { ClientLink, EntityLink } from "./entity";
+import { AskButton } from "./Ask";
 import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { Overview as OverviewData, Range } from "../types";
@@ -153,7 +154,7 @@ function Traffic({ d, step, range, span, split, onSplit, alerts }: { d: Overview
         <TimeChart
           layers={layers} up={s.up} t={s.t} stepSec={step} viewH={260} axis={170} downH={160} upH={80}
           label="WAN traffic chart for the period; click a moment for its flows, drag across a stretch to look at it"
-          onPick={pick} brush spike markers={marks} legend={legend} ticks={timeTicks(s.t, range, !span)}
+          onPick={pick} brush spike actions={<AskButton />} markers={marks} legend={legend} ticks={timeTicks(s.t, range, !span)}
         />
       )}
     </Card>

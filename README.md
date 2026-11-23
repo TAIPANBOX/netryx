@@ -39,7 +39,13 @@ camera and a game console, on the real internet. The names, addresses and MACs a
   app moved at that moment, and every chart on the screen marks the same moment. Dragging across
   a stretch shows the whole screen for that stretch, and Back returns to the full period. The
   legend hides a layer or shows it alone, alerts sit on the time axis where they happened, and
-  "What made this spike?" opens the busiest moment.
+  "What made this spike?" opens the busiest moment. With a stretch picked and the right to change
+  things, "Ask the router's agent" puts a question about it to
+  [Hermes](https://github.com/TAIPANBOX/hermes-openwrt) on the same router, with a short summary
+  the router computes (the busiest clients, apps, countries and connections); the answer says a
+  model wrote it, what it cost and what is left of the hour's questions and the day's budget. It
+  needs Hermes's question API turned on (`hermes.api.enabled`); otherwise the chart says the
+  agent is not enabled on this router.
 - **Apps, not ports.** A connection is named by the name the device asked for: the TLS handshake,
   QUIC, and the router's own resolver when the handshake hides it. About 260 apps (TikTok,
   YouTube, Netflix, Steam, WhatsApp...) are told apart, each with its icon.

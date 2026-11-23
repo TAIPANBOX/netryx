@@ -437,3 +437,8 @@ a.chip:hover { color: var(--link-hover); border-color: var(--link); }
 .swatch-btn:focus-visible { outline: 2px solid var(--accent, #4C9AFF); }
 .span-chip { display: inline-flex; align-items: center; gap: 6px; }
 .btn-x { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 2px; font-size: 14px; line-height: 1; }
+
+/* the router's agent */
+.ask-card { min-width: 280px; max-width: 460px; }
+.ask-q { width: 100%; font: inherit; color: var(--text); background: var(--bg, #0f141b); border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: vertical; }
+.ask-answer { white-space: pre-wrap; line-height: 1.5; margin: 4px 0; }
