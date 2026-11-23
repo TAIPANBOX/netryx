@@ -402,3 +402,38 @@ func TestTheViewCarriesUPnPMappingsOrSaysThereAreNone(t *testing.T) {
 		t.Fatalf("no lease file: %+v, want an empty list", v.Forwards.UPnP)
 	}
 }
+
+// The house's lines: the configured WAN and every network on its device (its
+// IPv6 side) are the primary line; a backup line is any other network holding
+// a default route, except a tunnel, and a mobile modem's network even while
+// it holds none (idle until the primary fails). One network per device, so
+// two names of one device are never counted twice.
+func TestTheBackupLinesAreTheOtherUplinksAndAModemEvenWhenIdle(t *testing.T) {
+	dump := []byte(`{"interface":[
+	 {"interface":"wan","up":true,"proto":"dhcp","l3_device":"eth1","route":[{"target":"0.0.0.0","mask":0,"nexthop":"192.0.2.1"}]},
+	 {"interface":"wan6","up":true,"proto":"dhcpv6","l3_device":"eth1","route":[{"target":"::","mask":0,"nexthop":"fe80::1"}]},
+	 {"interface":"lan","up":true,"proto":"static","l3_device":"br-lan","route":[]},
+	 {"interface":"vpn","up":true,"proto":"wireguard","l3_device":"vpn","route":[{"target":"0.0.0.0","mask":0,"nexthop":"0.0.0.0"}]},
+	 {"interface":"wwan","up":true,"proto":"dhcp","l3_device":"wlan0","route":[{"target":"0.0.0.0","mask":0,"nexthop":"198.51.100.1"}]},
+	 {"interface":"wwan6","up":true,"proto":"dhcpv6","l3_device":"wlan0","route":[{"target":"::","mask":0,"nexthop":"fe80::2"}]},
+	 {"interface":"lte","up":false,"proto":"qmi","device":"/dev/cdc-wdm0","route":[]}]}`)
+	v := View{Interfaces: ParseInterfaces(dump, []string{"wan"})}
+	primary, backup := Lines(v)
+	names := func(l []Iface) (out []string) {
+		for _, i := range l {
+			out = append(out, i.Name)
+		}
+		return out
+	}
+	if got := names(primary); len(got) != 1 || got[0] != "wan" {
+		t.Errorf("primary %v, want wan alone (wan6 is the same device)", got)
+	}
+	if got := names(backup); len(got) != 2 || got[0] != "lte" || got[1] != "wwan" {
+		t.Errorf("backup %v, want lte (a modem, idle) and wwan (a second uplink), not the tunnel, the house or wwan6", got)
+	}
+	for _, i := range v.Interfaces {
+		if i.Primary != (i.Name == "wan" || i.Name == "wan6") {
+			t.Errorf("%s marked primary %v", i.Name, i.Primary)
+		}
+	}
+}

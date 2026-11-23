@@ -11,10 +11,13 @@ import (
 )
 
 type fakeDaily struct {
-	days  []daily.DayOf
-	asked [][6]byte
-	at    []time.Time
+	days     []daily.DayOf
+	counters []daily.DayCounters
+	asked    [][6]byte
+	at       []time.Time
 }
+
+func (f *fakeDaily) Counters(now time.Time) []daily.DayCounters { return f.counters }
 
 func (f *fakeDaily) Days(mac [6]byte, now time.Time) []daily.DayOf {
 	f.asked = append(f.asked, mac)

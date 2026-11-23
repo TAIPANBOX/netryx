@@ -8,6 +8,7 @@ import type { NetDevice, NetworkView } from "../types";
 import { getJSON, usePoll } from "../api";
 import { Header, Card, Status, Loading, Empty } from "../ui";
 import { bytes, duration, plural } from "../format";
+import { lineBars, linesSentences, type Lines } from "../lines";
 import { apName, forwardTarget, handshakeText, idleNetworks, peerConnected, shortKey, signalText, speedText, wgState } from "../network";
 
 export function Network() {
@@ -26,6 +27,7 @@ export function Network() {
         ) : (
           <div class="stack">
             <Interfaces d={d} />
+            <BackupLine />
             <Ports d={d} />
             <WiFi d={d} />
             <div class="grid-2">
@@ -261,6 +263,40 @@ function Forwards({ d }: { d: NetworkView }) {
             <span class="muted small nowrap">{r.enabled ? `from ${r.from || "wan"}` : "turned off"}</span>
           </div>
         ))
+      )}
+    </Card>
+  );
+}
+
+/** What the backup line carried over the last 30 days, from the counters each
+ *  daily file read at its close. */
+function BackupLine() {
+  const polled = usePoll((s) => getJSON<Lines>("/api/lines", s), 300_000, []);
+  const l = polled.data;
+  const W = 10, G = 3, H = 40;
+  return (
+    <Card label="Backup line" title="Backup line" aside={<span class="muted small">last 30 days, UTC days</span>}>
+      {!l ? (
+        polled.error ? <Empty>{polled.error}</Empty> : <Loading />
+      ) : (
+        <div class="col-tight">
+          {linesSentences(l).map((t, i) => <span key={i} class={i === 0 ? "small" : "small muted"}>{t}</span>)}
+          {l.backup.length > 0 && (
+            <Fragment>
+              <svg class="rhythm-bars" viewBox={`0 0 ${l.days.length * (W + G)} ${H}`} preserveAspectRatio="xMinYMax meet" role="img" aria-label="What the backup line carried each day, oldest first">
+                {lineBars(l).map((b, i) =>
+                  b.height === null ? (
+                    <rect key={b.date} x={i * (W + G)} y={H - 6} width={W} height={6} rx={2} class="rhythm-unknown"><title>{b.title}</title></rect>
+                  ) : (
+                    <rect key={b.date} x={i * (W + G)} y={H - Math.max(1, b.height * H)} width={W} height={Math.max(1, b.height * H)} rx={2}
+                      class={b.used ? "line-used" : "rhythm-bar"}><title>{b.title}</title></rect>
+                  ),
+                )}
+              </svg>
+              <span class="muted small">A light bar is a day the backup carried traffic; a short grey one a day of its checks only; an outline a day not known.</span>
+            </Fragment>
+          )}
+        </div>
       )}
     </Card>
   );

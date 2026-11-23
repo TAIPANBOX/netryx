@@ -466,3 +466,4 @@ a.chip:hover { color: var(--link-hover); border-color: var(--link); }
 .rhythm-partial { fill: var(--muted); opacity: 0.4; }
 .rhythm-yesterday { fill: var(--text); }
 .rhythm-unknown { fill: none; stroke: var(--edge); stroke-dasharray: 2 2; }
+.line-used { fill: var(--text); }

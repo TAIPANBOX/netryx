@@ -728,3 +728,32 @@ func (s *Store) Days(mac [6]byte, now time.Time) []DayOf {
 	}
 	return out
 }
+
+// DayCounters is one day of the window with what its close read.
+type DayCounters struct {
+	Date   time.Time
+	Known  bool
+	Mask   uint32
+	At     time.Time
+	Ifaces map[string][2]uint64
+}
+
+// Counters answers each day of the Window at now, oldest first, with the
+// counters its close read: a day with no file is unknown, and one written
+// after the router missed its close has a zero At and no counters.
+func (s *Store) Counters(now time.Time) []DayCounters {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []DayCounters
+	for _, date := range Window(now) {
+		o := DayCounters{Date: date, Ifaces: map[string][2]uint64{}}
+		if d := s.days[dayNumber(date)]; d != nil {
+			o.Known, o.Mask, o.At = true, d.Mask, d.CountersAt
+			for _, f := range d.Ifaces {
+				o.Ifaces[f.Name] = [2]uint64{f.Rx, f.Tx}
+			}
+		}
+		out = append(out, o)
+	}
+	return out
+}

@@ -1055,6 +1055,20 @@ enforced, and that is a debt rather than a decision.
   network with a default route; a tunnel's default route is not.
   (test: `TestTheWANIsTheConfiguredLineAndNotATunnel`)
 
+- **The backup line's month is read from the daily files' closes**: the
+  primary line is the configured WAN and every network on its device; a
+  backup line is any other network holding a default route (never a tunnel)
+  or a mobile modem's (qmi, mbim, ncm, modemmanager, 3g, directip, wwan) even
+  while idle, one network per device. `GET /api/lines` gives each day what
+  each carried, the close's counters less the close before, unknown when a
+  close is missing or was not read at the close, the router was off for part
+  of the day, or a counter fell; the days the backup carried at least 32 MiB
+  (more than its checks move), all it carried, its share of what the lines
+  carried on those days and its busiest day. Nothing new is written.
+  (test: `TestTheBackupLinesAreTheOtherUplinksAndAModemEvenWhenIdle`, `TestCountersAreEachDaysCloseOverTheWindow`,
+  `TestALineCarriesTheDifferenceOfTwoCloses`, `TestTheBackupLineSaysTheDaysItCarriedAndItsShare`,
+  `TestTheLinesAreServedWithTheBackupFoundInTheView`; the page: `web/src/lines.test.ts`)
+
 ## The promise about the fixed tables
 
 - **The address table and the vendor list cost the heap nothing**: the
