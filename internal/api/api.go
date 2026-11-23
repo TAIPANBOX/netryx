@@ -185,6 +185,7 @@ func New(f Flows, h History, inv Inventory, w WAN, apps Apps, now func() time.Ti
 	mux.HandleFunc("/api/networks/{asn}", s.route(s.network1))
 	mux.HandleFunc("/api/domains/{name}", s.route(s.domain1))
 	mux.HandleFunc("/api/network", s.route(s.network))
+	mux.HandleFunc("/api/lines", s.route(s.lines))
 	mux.HandleFunc("/api/wan", s.route(func(*http.Request) (any, error) { return wanView(s.w.Status()), nil }))
 	// Without this the mux would answer an unknown path in plain text.
 	mux.HandleFunc("/api/", s.route(func(*http.Request) (any, error) {

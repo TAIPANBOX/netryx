@@ -52,11 +52,13 @@ const (
 
 // Iface is one network netifd runs: lan, wan, wan6, guest.
 type Iface struct {
-	Name      string   `json:"name"`
-	Proto     string   `json:"proto"`
-	Device    string   `json:"device"`
-	Up        bool     `json:"up"`
-	WAN       bool     `json:"wan"`
+	Name   string `json:"name"`
+	Proto  string `json:"proto"`
+	Device string `json:"device"`
+	Up     bool   `json:"up"`
+	WAN    bool   `json:"wan"`
+	// Primary is the configured internet line, or a network on its device.
+	Primary   bool     `json:"primary"`
 	UptimeSec int64    `json:"uptimeSec"`
 	IPv4      []string `json:"ipv4"`
 	IPv6      []string `json:"ipv6"`
@@ -551,6 +553,17 @@ func ParseInterfaces(js []byte, wan []string) []Iface {
 		}
 		out = append(out, f)
 	}
+	// The primary line is the configured one and whatever shares its device
+	// (its IPv6 side).
+	dev := map[string]bool{}
+	for _, f := range out {
+		if slices.Contains(wan, f.Name) && f.Device != "" {
+			dev[f.Device] = true
+		}
+	}
+	for i := range out {
+		out[i].Primary = slices.Contains(wan, out[i].Name) || dev[out[i].Device]
+	}
 	return out
 }
 
@@ -705,3 +718,32 @@ var ifaceName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._@-]{0,14}$`)
 // validIface is a Linux interface name, so it cannot walk out of sysfs or
 // read as an option to a program.
 func validIface(s string) bool { return ifaceName.MatchString(s) && s != "." && s != ".." }
+
+// modem are the protocols of a mobile modem's network, which is a backup line
+// even while it holds no default route (idle until the primary fails).
+var modem = map[string]bool{"qmi": true, "mbim": true, "ncm": true, "modemmanager": true, "3g": true, "directip": true, "wwan": true}
+
+// Lines splits the house's internet lines: the primary is the configured WAN
+// and the networks on its device; a backup is any other network that holds a
+// default route (never a tunnel) or is a mobile modem's. One network per
+// device, the first by name, so two names of one device are counted once;
+// each list is in name order.
+func Lines(v View) (primary, backup []Iface) {
+	ifs := slices.Clone(v.Interfaces)
+	slices.SortFunc(ifs, func(a, b Iface) int { return strings.Compare(a.Name, b.Name) })
+	seen := map[string]bool{}
+	for _, i := range ifs {
+		if i.Primary && !seen[i.Device] {
+			seen[i.Device] = true
+			primary = append(primary, i)
+		}
+	}
+	for _, i := range ifs {
+		if i.Primary || tunnel[i.Proto] || !(i.WAN || modem[i.Proto]) || seen[i.Device] {
+			continue
+		}
+		seen[i.Device] = true
+		backup = append(backup, i)
+	}
+	return primary, backup
+}

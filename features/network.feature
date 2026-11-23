@@ -64,3 +64,18 @@ Feature: the console shows how the router is wired
     # -> TestViewersShareOneRead
     # -> TestAReadIsNotCutShortByTheViewerLeaving
     # -> TestAWaitingViewerCanLeave
+
+  Scenario: the Network screen says what the backup line carried this month
+    Given a router with a second uplink or a mobile modem beside its configured internet line
+    When the owner opens the Network screen
+    Then it says on how many of the last 30 days the backup line carried traffic, how much, and its share of what the lines carried on those days
+    And each day is the difference of two closes of the daily files, unknown when a close is missing, the router was off for part of the day, or a counter restarted
+    And a router with no backup line says so and names its line
+    # -> TestTheBackupLinesAreTheOtherUplinksAndAModemEvenWhenIdle
+    # -> TestCountersAreEachDaysCloseOverTheWindow
+    # -> TestALineCarriesTheDifferenceOfTwoCloses
+    # -> TestTheBackupLineSaysTheDaysItCarriedAndItsShare
+    # -> TestTheLinesAreServedWithTheBackupFoundInTheView
+    # (the page: "the backup line says on how many days it carried traffic, how much, and its share of the lines on those days" in web/src/lines.test.ts)
+    # (the page: "without a backup line it says so, and names the line there is" in web/src/lines.test.ts)
+    # (the page: "the backup line's days are drawn oldest first, a used day apart from a day of checks, an unknown day as no bar" in web/src/lines.test.ts)

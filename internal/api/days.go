@@ -14,6 +14,7 @@ import (
 // Daily is the store of daily files the API reads; daily.Store satisfies it.
 type Daily interface {
 	Days(mac [6]byte, now time.Time) []daily.DayOf
+	Counters(now time.Time) []daily.DayCounters
 }
 
 // WithDaily serves a device's days from d. Without it every day is unknown.
