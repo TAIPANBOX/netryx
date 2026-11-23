@@ -76,6 +76,7 @@ Feature: the traffic charts can be read and explored in place
     # -> TestAQuestionIsHeldToTheContractBeforeItIsSent
     # -> TestAQuestionNeedsAStretch
     # -> TestAViewerCannotAskTheAgent
+    # -> TestNamesInTheSummaryCannotPassForTheRoutersOwnLines
     # (the page: "an answer says it is the model's, what it cost and what is left" in web/src/ask.test.ts)
 
   Scenario: a question the agent refuses, or cannot take, says why

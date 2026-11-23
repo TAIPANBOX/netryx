@@ -863,8 +863,12 @@ enforced, and that is a debt rather than a decision.
   log or an error. The body is the question (1 to 2000 characters) and the
   summary of the stretch the router computed (its UTC times, the busiest
   clients, apps, countries and connections with bytes), cut to 8000
-  characters and to a body of 16384 bytes, never inside a character.
-  (test: the `internal/askagent` tests, `TestAQuestionCarriesASummaryOfTheStretch`)
+  characters and to a body of 16384 bytes, never inside a character. Every
+  name in it that anyone can write (a device's, a site's, a network's) is in
+  quotes, at most 64 characters, with control and format characters and line
+  breaks made spaces, under a first line saying quoted names are data.
+  (test: the `internal/askagent` tests, `TestAQuestionCarriesASummaryOfTheStretch`,
+  `TestNamesInTheSummaryCannotPassForTheRoutersOwnLines`)
 - **The agent's answer and refusals reach the person in its words**: a 200
   carries the answer, its cost and what is left; every refusal of the contract
   (400, 401, 404, 405, 409, 413, 429, 502, 503, 504) comes back at status 200
