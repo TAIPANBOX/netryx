@@ -80,6 +80,8 @@ type fakeHistory struct {
 	// newKeys answers NewKeys by dimension; newAsked records each call.
 	newKeys  map[string][]rollup.NewRow
 	newAsked []newCall
+	// firstSeen answers FirstSeen by MAC.
+	firstSeen map[string]time.Time
 }
 
 type newCall struct {
@@ -121,6 +123,8 @@ func (h *fakeHistory) Series(f rollup.Filter, from, to time.Time, step time.Dura
 	h.series = append(h.series, seriesCall{f: f, from: from, to: to, step: step, split: split})
 	return h.points
 }
+
+func (h *fakeHistory) FirstSeen(mac string, from time.Time) time.Time { return h.firstSeen[mac] }
 
 func (h *fakeHistory) Top(f rollup.Filter, dim string, from, to time.Time, n int) []rollup.Row {
 	h.tops = append(h.tops, topCall{dim: dim, from: from, to: to})

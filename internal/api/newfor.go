@@ -52,10 +52,16 @@ func (s *server) newFor(r *http.Request) (any, error) {
 	now := s.now().UTC()
 	split := now.Truncate(24 * time.Hour).Add(-24 * time.Hour)
 	out := newForJSON{Since: split.Format(time.RFC3339), Apps: []newAppJSON{}, Countries: []newCountryJSON{}}
-	if !d.First.IsZero() {
-		out.KnownDays = int(now.Sub(d.First) / (24 * time.Hour))
+	// The inventory's first sight restarts with the service; the history
+	// remembers further back.
+	first := d.First
+	if f := s.h.FirstSeen(d.MAC, now.Add(-30*24*time.Hour)); !f.IsZero() && (first.IsZero() || f.Before(first)) {
+		first = f
 	}
-	if d.First.IsZero() || now.Sub(d.First) < newMinKnown {
+	if !first.IsZero() {
+		out.KnownDays = int(now.Sub(first) / (24 * time.Hour))
+	}
+	if first.IsZero() || now.Sub(first) < newMinKnown {
 		out.TooNew = true
 		return out, nil
 	}

@@ -75,3 +75,23 @@ func TestADeviceSeenForLessThanAWeekIsTooNewToTell(t *testing.T) {
 		t.Errorf("an unknown device: %d", rec.Code)
 	}
 }
+
+// The inventory's first sight restarts with the service; the history's does
+// not, so a device the router has counted for weeks is not too new to tell
+// just because the service restarted.
+func TestWhatIsNewSurvivesARestartThatResetTheInventory(t *testing.T) {
+	fl, h, inv, w, ap := fixture()
+	inv.devs[0].First = now0.Add(-10 * time.Minute)
+	h.firstSeen = map[string]time.Time{laptop: now0.Add(-20 * 24 * time.Hour)}
+	h.newKeys = map[string][]rollup.NewRow{"app": {{Key: "netflix", First: now0}}}
+	rec := get(t, New(fl, h, inv, w, ap, clock, nil), http.MethodGet, "/api/devices/"+laptop+"/new")
+	var v struct {
+		TooNew    bool              `json:"tooNew"`
+		KnownDays int               `json:"knownDays"`
+		Apps      []json.RawMessage `json:"apps"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &v)
+	if rec.Code != 200 || v.TooNew || v.KnownDays != 20 || len(v.Apps) != 1 {
+		t.Errorf("after a restart: %d %s", rec.Code, rec.Body)
+	}
+}

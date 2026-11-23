@@ -66,9 +66,12 @@ Feature: a client's name opens its card, and its card opens its full view
     When the owner opens its full view
     Then it lists the apps and countries the client used since yesterday and in none of the 29 days before, each with when it was first seen
     And a client known for less than a week says it is too new to tell
+    And a restart of the service does not make a client known for weeks too new again
     # -> TestNewKeysAreWhatADeviceUsedSinceTheSplitAndNeverBefore
     # -> TestADeviceSaysWhatIsNewForIt
     # -> TestADeviceSeenForLessThanAWeekIsTooNewToTell
+    # -> TestFirstSeenIsTheFirstHourTheHistoryHoldsForTheDevice
+    # -> TestWhatIsNewSurvivesARestartThatResetTheInventory
     # (the page: "what is new for a device says when it cannot tell, when nothing is new, and since when" in web/src/client360.test.ts)
 
   Scenario: a client's view says what reaches it from the internet
