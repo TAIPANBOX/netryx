@@ -35,7 +35,7 @@ function useReloadOntoNewerPage() {
   );
 }
 
-export function Login({ onDone }: { onDone: (user: string, canWrite: boolean) => void }) {
+export function Login({ onDone, note = "" }: { onDone: (user: string, canWrite: boolean) => void; note?: string }) {
   useReloadOntoNewerPage();
   const [user, setUser] = useState("root");
   const [password, setPassword] = useState("");
@@ -72,6 +72,7 @@ export function Login({ onDone }: { onDone: (user: string, canWrite: boolean) =>
           <span class="small muted">Password</span>
           <input class="input" name="password" type="password" autocomplete="current-password" value={password} onInput={(e) => setPassword((e.target as HTMLInputElement).value)} />
         </label>
+        {note && !err && <p class="banner" role="status">{note}</p>}
         {err && <p class="banner" role="alert">{err}</p>}
         <button type="submit" class="btn btn-primary" disabled={busy || !user.trim()}>{busy ? "Signing in…" : "Sign in"}</button>
       </form>

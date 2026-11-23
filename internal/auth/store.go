@@ -19,6 +19,8 @@ type storedSession struct {
 	Handle string `json:"handle"`
 	SID    string `json:"sid"`
 	User   string `json:"user"`
+	// Lent marks LuCI's own session, handed over by a code: never ended by netryx.
+	Lent bool `json:"lent,omitempty"`
 }
 
 type storedFile struct {
@@ -58,7 +60,7 @@ func sanitize(sf storedFile) []signedIn {
 		if !validHandle(s.Handle) || s.SID == "" || len(s.SID) > 128 || s.User == "" || len(s.User) > 64 {
 			continue
 		}
-		si := signedIn{handle: s.Handle, sid: s.SID, user: s.User}
+		si := signedIn{handle: s.Handle, sid: s.SID, user: s.User, lent: s.Lent}
 		// A handle twice is one session, the later entry's: two would leave
 		// one in the order that the map no longer knows.
 		if i, seen := at[s.Handle]; seen {
@@ -83,7 +85,7 @@ func sanitize(sf storedFile) []signedIn {
 func saveStore(path string, secret []byte, sessions []signedIn) error {
 	sf := storedFile{Secret: hex.EncodeToString(secret), Sessions: []storedSession{}}
 	for _, s := range sessions {
-		sf.Sessions = append(sf.Sessions, storedSession{Handle: s.handle, SID: s.sid, User: s.user})
+		sf.Sessions = append(sf.Sessions, storedSession{Handle: s.handle, SID: s.sid, User: s.user, Lent: s.lent})
 	}
 	b, err := json.Marshal(sf)
 	if err != nil {

@@ -32,6 +32,17 @@ grep -q '"control"' "$tree/usr/share/rpcd/acl.d/netryx.json" 2>/dev/null ||
 # plugin that runs the binary's read-only `rpcd` and nothing else.
 cmp -s "$(dirname "$0")/../package/netryx/files/netryx.rpcd" "$tree/usr/libexec/rpcd/netryx" ||
 	fail "the package does not ship the ubus object's rpcd plugin running netryx rpcd (usr/libexec/rpcd/netryx)"
+# LuCI's "Network console" entry: the page, its menu entry, the ubus object
+# luci.netryx that mints the one-time code (a plugin running netryx rpcd-luci
+# and nothing else), and an ACL that grants a LuCI user that one call only.
+cmp -s "$(dirname "$0")/../package/netryx/files/luci/luci.netryx.rpcd" "$tree/usr/libexec/rpcd/luci.netryx" ||
+	fail "the package does not ship the LuCI handoff plugin running netryx rpcd-luci (usr/libexec/rpcd/luci.netryx)"
+cmp -s "$(dirname "$0")/../package/netryx/files/luci/acl.json" "$tree/usr/share/rpcd/acl.d/luci-app-netryx.json" ||
+	fail "the package's LuCI ACL is not the one that grants the handoff alone (usr/share/rpcd/acl.d/luci-app-netryx.json)"
+grep -q '"netryx/console"' "$tree/usr/share/luci/menu.d/luci-app-netryx.json" 2>/dev/null ||
+	fail "the package does not ship LuCI's Network console menu entry (usr/share/luci/menu.d/luci-app-netryx.json)"
+grep -q "object: 'luci.netryx', method: 'handoff'" "$tree/www/luci-static/resources/view/netryx/console.js" 2>/dev/null ||
+	fail "the package does not ship LuCI's Network console page (www/luci-static/resources/view/netryx/console.js)"
 # The config names three data files; a router package carries all of them,
 # each what it claims to be. Without them the console shows no country, no
 # app or no maker, and nothing on the router says why.
@@ -49,7 +60,7 @@ gzip -t "$share/ip2asn-combined.tsv.gz" 2>/dev/null ||
 # binary on the router is one any member of its group can replace.
 writable=$(find "$tree" ! -type l \( -perm -020 -o -perm -002 \) ! -path "$tree/CONTROL" ! -path "$tree/CONTROL/*" | head -n 3)
 [ -z "$writable" ] || fail "group- or world-writable in the package tree: $(echo $writable)"
-for f in usr/sbin/netryx etc/init.d/netryx usr/libexec/rpcd/netryx; do
+for f in usr/sbin/netryx etc/init.d/netryx usr/libexec/rpcd/netryx usr/libexec/rpcd/luci.netryx; do
 	[ "$(ls -l "$tree/$f" | cut -c1-10)" = "-rwxr-xr-x" ] || fail "$f must be mode 0755, is $(ls -l "$tree/$f" | cut -c1-10)"
 done
 

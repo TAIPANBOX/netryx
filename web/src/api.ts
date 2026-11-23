@@ -122,16 +122,31 @@ export type LoginResult = { ok: true; user: string; canWrite: boolean } | { ok: 
 /** A 403 on a write: the token may simply be stale (the router restarted its secret, or the session was renewed). */
 const REFRESHED = "The session was refreshed, press again.";
 
+/** The one-time code LuCI's page put in the address fragment (#luci=<32 hex>), or null. */
+export function handoffCode(hash: string): string | null {
+  const m = /^#luci=([0-9a-f]{32})$/.exec(hash);
+  return m ? m[1] : null;
+}
+
 /** POST /api/login. A wrong password is an answer for the form, not a lost session. */
 export async function login(user: string, password: string): Promise<LoginResult> {
+  return postLogin("/api/login", { user, password }, "Wrong user name or password.");
+}
+
+/** POST /api/login/luci: the code LuCI's page minted for its signed-in user, redeemed once. */
+export async function loginWithLuCI(code: string): Promise<LoginResult> {
+  return postLogin("/api/login/luci", { code }, "The link from LuCI has expired or was already used: open the console from LuCI again, or sign in here.");
+}
+
+async function postLogin(path: string, payload: object, refused: string): Promise<LoginResult> {
   let r: Response;
   try {
-    r = await fetch("/api/login", {
+    r = await fetch(path, {
       method: "POST",
       cache: "no-store",
       credentials: "same-origin",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ user, password }),
+      body: JSON.stringify(payload),
     });
   } catch {
     return { ok: false, text: "The router is not answering." };
@@ -145,7 +160,7 @@ export async function login(user: string, password: string): Promise<LoginResult
   }
   switch (r.status) {
     case 401:
-      return { ok: false, text: "Wrong user name or password." };
+      return { ok: false, text: refused };
     case 403:
       return {
         ok: false,
