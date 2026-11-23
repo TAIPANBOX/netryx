@@ -46,15 +46,34 @@ grep -q "object: 'luci.netryx', method: 'handoff'" "$tree/www/luci-static/resour
 # The config names three data files; a router package carries all of them,
 # each what it claims to be. Without them the console shows no country, no
 # app or no maker, and nothing on the router says why.
-share=$tree/usr/share/netryx
-grep -q '(hex)' "$share/oui.txt" 2>/dev/null ||
-	fail "the package does not carry the vendor list the config names (usr/share/netryx/oui.txt)"
+share=$(cd "$tree" && pwd)/usr/share/netryx
+# The address table and the vendor list are packs the service maps
+# read-only. Each is checked here the way the service checks it before use
+# (magic, version, every count and offset, the order of its records, the
+# SHA-256 at its end) by tools/datapack, which is pure Go and runs on this
+# host whatever the router's architecture. NETRYX_DATAPACK names a built
+# copy of the tool; otherwise it is run from the source beside this script.
+root=$(cd "$(dirname "$0")/.." && pwd)
+verify() { # verify <kind> <file>
+	if [ -n "${NETRYX_DATAPACK:-}" ]; then
+		"$NETRYX_DATAPACK" -verify -kind "$1" "$2"
+	else
+		command -v go >/dev/null 2>&1 || fail "cannot check the data packs: no go on PATH and no NETRYX_DATAPACK"
+		GOOS= GOARCH= GOARM= go run -C "$root" ./tools/datapack -verify -kind "$1" "$2"
+	fi
+}
+for spec in "oui oui.pack vendor list" "geo ip2asn.pack address table"; do
+	set -- $spec
+	kind=$1 file=$2; shift 2
+	[ -f "$share/$file" ] ||
+		fail "the package does not carry the $* the config names (usr/share/netryx/$file)"
+	verify "$kind" "$share/$file" >/dev/null ||
+		fail "the $* in the package does not pass its check (usr/share/netryx/$file)"
+done
 [ -s "$share/appmap.tsv" ] ||
 	fail "the package does not carry the app map the config names (usr/share/netryx/appmap.tsv)"
 grep -q 'Permission is hereby granted, free of charge' "$share/NOTICE" 2>/dev/null ||
 	fail "the package ships appmap.tsv without the v2fly MIT licence text in usr/share/netryx/NOTICE"
-gzip -t "$share/ip2asn-combined.tsv.gz" 2>/dev/null ||
-	fail "the package does not carry a valid address table the config names (usr/share/netryx/ip2asn-combined.tsv.gz)"
 
 # Modes come from build.sh, never from the builder's umask: a group-writable
 # binary on the router is one any member of its group can replace.

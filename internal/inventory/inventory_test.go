@@ -92,7 +92,7 @@ func TestHostapdBandFollowsFrequency(t *testing.T) {
 // and finally the address itself. A device that is only a random address has
 // no vendor to show, so it falls to the address.
 func TestNamePrecedence(t *testing.T) {
-	oui := map[string]string{"8C79F5": "Samsung Electronics Co.,Ltd"}
+	oui := OUIMap{"8C79F5": "Samsung Electronics Co.,Ltd"}
 	leases := device.NewTable(device.ParseLeases(strings.NewReader(
 		"1700000000 8c:79:f5:dd:ee:ff 192.168.1.20 laptop *\n")))
 	samsung := "8c:79:f5:dd:ee:ff"

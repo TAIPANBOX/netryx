@@ -98,11 +98,24 @@ install -m 0644 "$ROOT/package/netryx/files/netryx-safe.nft" "$TREE/usr/share/nf
 DATA=${NETRYX_DATA:-$ROOT/data}
 SHARE=$TREE/usr/share/netryx
 shipped=""
-for f in ip2asn-combined.tsv.gz appmap.tsv apps-meta.json oui.txt; do
+for f in appmap.tsv apps-meta.json; do
 	if [ -f "$DATA/$f" ]; then
 		mkdir -p "$SHARE"
 		install -m 0644 "$DATA/$f" "$SHARE/$f"
 		shipped="$shipped $f"
+	fi
+done
+# The address table and the vendor list go as packs, which the service maps
+# read-only instead of loading into its heap (about 21 MB and 5 MB loaded).
+# tools/datapack runs on this host, whatever the router's architecture, reads
+# each pack back and compares it with its source before it is written; the
+# text sources stay on the build host.
+for spec in "ip2asn ip2asn-combined.tsv.gz ip2asn.pack" "oui oui.txt oui.pack"; do
+	set -- $spec
+	if [ -f "$DATA/$2" ]; then
+		mkdir -p "$SHARE"
+		GOOS= GOARCH= GOARM= go run -C "$ROOT" ./tools/datapack "-$1" "$DATA/$2" -out "$SHARE"
+		shipped="$shipped $3"
 	fi
 done
 # The icon pack is embedded in the binary rather than shipped as a file, but
@@ -113,19 +126,21 @@ if [ -n "$shipped" ] || [ -n "$icons" ]; then
 	mkdir -p "$SHARE"
 	{
 		echo "Data files shipped with netryx, and their licences."
-		case "$shipped" in *ip2asn-combined.tsv.gz*)
+		case "$shipped" in *ip2asn.pack*)
 			echo
-			echo "ip2asn-combined.tsv.gz"
-			echo "  From iptoasn.com (https://iptoasn.com/). Public domain, under the Open"
-			echo "  Data Commons Public Domain Dedication and License (PDDL) v1.0:"
+			echo "ip2asn.pack"
+			echo "  Built by tools/datapack from ip2asn-combined.tsv.gz, from iptoasn.com"
+			echo "  (https://iptoasn.com/). Public domain, under the Open Data Commons"
+			echo "  Public Domain Dedication and License (PDDL) v1.0:"
 			echo "  https://opendatacommons.org/licenses/pddl/1-0/"
 			;;
 		esac
-		case "$shipped" in *oui.txt*)
+		case "$shipped" in *oui.pack*)
 			echo
-			echo "oui.txt"
-			echo "  The IEEE Registration Authority's public listing of MA-L assignments"
-			echo "  (https://standards-oui.ieee.org/oui/oui.txt), as IEEE publishes it."
+			echo "oui.pack"
+			echo "  Built by tools/datapack from oui.txt, the IEEE Registration Authority's"
+			echo "  public listing of MA-L assignments"
+			echo "  (https://standards-oui.ieee.org/oui/oui.txt)."
 			;;
 		esac
 		case "$shipped" in *apps-meta.json*)

@@ -247,6 +247,34 @@ func (c *console) logLost() {
 	}
 }
 
+// The data files the package ships. Packages before the packs shipped the
+// address table and the vendor list as text, and an install's config may still
+// name those files.
+const (
+	defaultGeoPath = "/usr/share/netryx/ip2asn.pack"
+	legacyGeoPath  = "/usr/share/netryx/ip2asn-combined.tsv.gz"
+	defaultOUIPath = "/usr/share/netryx/oui.pack"
+	legacyOUIPath  = "/usr/share/netryx/oui.txt"
+)
+
+// dataPath is the file to read for a configured path. A config written before
+// the packs names the text file the package used to ship; when that file is
+// gone and the pack is there, the pack is read instead, and that is logged.
+// A text file that is still there is read the old way.
+func dataPath(configured, legacy, current string) string {
+	if configured != legacy {
+		return configured
+	}
+	if _, err := os.Stat(configured); !errors.Is(err, fs.ErrNotExist) {
+		return configured
+	}
+	if _, err := os.Stat(current); err != nil {
+		return configured
+	}
+	log.Printf("%s is gone; reading %s, which the package ships in its place", configured, current)
+	return current
+}
+
 // buildConsole loads the data files, builds the flow table, the history and
 // the sources of the inventory and the WAN tile, and starts nothing: start
 // runs the loops that need netlink.
@@ -283,16 +311,17 @@ func buildConsole(o Options) (*console, error) {
 		c.col = collect.New()
 	}
 
-	var geo *enrich.GeoDB
-	if f, err := os.Open(o.Geo); err != nil {
+	geoPath := dataPath(o.Geo, legacyGeoPath, defaultGeoPath)
+	geo, err := enrich.OpenGeo(geoPath)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
 		log.Printf("no address table (%v): countries and organisations will be unknown", err)
-	} else {
-		geo, err = enrich.LoadIP2ASN(f)
-		f.Close()
-		if err != nil {
-			log.Printf("address table %s cannot be read (%v): countries and organisations will be unknown", o.Geo, err)
-			geo = nil
-		}
+		geo = nil
+	case err != nil:
+		log.Printf("address table %s cannot be read (%v): countries and organisations will be unknown", geoPath, err)
+		geo = nil
+	case strings.HasSuffix(geoPath, ".pack") && !geo.Mapped():
+		log.Printf("address table %s could not be mapped and was read into memory", geoPath)
 	}
 	if f, err := os.Open(o.Apps); err != nil {
 		log.Printf("no app map (%v): apps will be Unknown", err)
@@ -304,15 +333,16 @@ func buildConsole(o Options) (*console, error) {
 			c.apps = nil
 		}
 	}
-	var oui map[string]string
-	if f, err := os.Open(o.OUI); err != nil {
+	ouiPath := dataPath(o.OUI, legacyOUIPath, defaultOUIPath)
+	oui, err := inventory.OpenOUI(ouiPath)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
 		log.Printf("no vendor list (%v)", err)
-	} else {
-		oui, err = inventory.LoadOUI(f)
-		f.Close()
-		if err != nil {
-			log.Printf("vendor list %s cannot be read (%v)", o.OUI, err)
-		}
+	case err != nil:
+		log.Printf("vendor list %s cannot be read (%v): no vendor names", ouiPath, err)
+	}
+	if p, ok := oui.(*inventory.OUIPack); ok && !p.Mapped() {
+		log.Printf("vendor list %s could not be mapped and was read into memory", ouiPath)
 	}
 
 	c.local = &localNet{addrs: o.Addrs, fsys: o.FS, run: o.Run}
@@ -1093,7 +1123,7 @@ type inventorySource struct {
 	// labels.json. "" reads none.
 	conf    string
 	bridges []string
-	oui     map[string]string
+	oui     inventory.Vendors
 	every   time.Duration
 
 	mu     sync.Mutex
