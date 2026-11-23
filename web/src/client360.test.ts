@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { whereConnected, rulesOn, editBody, newForNote } from "./client360";
+import { whereConnected, rulesOn, editBody, newForNote, exposureOf } from "./client360";
 import type { Device, NetworkView } from "./types";
 import type { Rule } from "./rules";
 
@@ -52,4 +52,25 @@ test("what is new for a device says when it cannot tell, when nothing is new, an
     "Nothing new: every app and country it used since yesterday it had used in the 29 days before.");
   assert.equal(newForNote({ tooNew: false, knownDays: 20, since: "2026-11-22T00:00:00Z", apps: [{ app: { id: "tiktok", name: "TikTok", category: "social" }, first: "x", down: 1, up: 0 }], countries: [] }),
     "Used since yesterday and in none of the 29 days before:");
+});
+
+test("what reaches a device from the internet: forwards, UPnP mappings and connections from outside", () => {
+  const mac = "aa:bb:cc:dd:ee:01";
+  const dev = { mac, name: "NAS", online: true };
+  const net = { forwards: { why: "", rules: [
+    { name: "NAS web", from: "wan", proto: "tcp", port: "8443", destIp: "192.168.1.5", destPort: "443", enabled: true, device: dev },
+    { name: "old", from: "wan", proto: "tcp", port: "22", destIp: "192.168.1.5", destPort: "22", enabled: false, device: dev },
+    { name: "game", from: "wan", proto: "udp", port: "3074", destIp: "192.168.1.9", destPort: "3074", enabled: true, device: { mac: "other", name: "Xbox", online: true } },
+  ], upnp: [{ proto: "udp", port: "51413", destIp: "192.168.1.5", destPort: "51413", desc: "Transmission", device: dev }] } };
+  const inbound = [{ cc: "US" }, { cc: "US" }, { cc: "DE" }, { cc: "LAN" }];
+  const e = exposureOf(mac, net, inbound);
+  assert.equal(e.quiet, false);
+  assert.deepEqual(e.lines, [
+    "Port 8443/tcp from the internet leads to it, port 443 (forward \"NAS web\")",
+    "It opened port 51413/udp for itself through UPnP (\"Transmission\")",
+    "3 connections from the internet in the last 24 hours, from US, DE",
+  ]);
+  const none = exposureOf(mac, { forwards: { why: "", rules: [], upnp: [] } }, [{ cc: "LAN" }]);
+  assert.equal(none.quiet, true);
+  assert.deepEqual(none.lines, ["Nothing from the internet reaches it: no forwarded port, no UPnP mapping, no connection from outside in the last 24 hours."]);
 });

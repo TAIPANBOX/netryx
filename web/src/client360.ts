@@ -64,3 +64,23 @@ export function newForNote(n: NewFor): string {
   if (n.apps.length === 0 && n.countries.length === 0) return "Nothing new: every app and country it used since yesterday it had used in the 29 days before.";
   return "Used since yesterday and in none of the 29 days before:";
 }
+
+type ExposureNet = { forwards: { why: string; rules: { name: string; proto: string; port: string; destPort: string; enabled: boolean; device: { mac: string } | null }[]; upnp?: { proto: string; port: string; destPort: string; desc: string; device: { mac: string } | null }[] } };
+
+/** What reaches a device from the internet. */
+export function exposureOf(mac: string, net: ExposureNet | undefined, inbound: { cc: string }[]): { quiet: boolean; lines: string[] } {
+  const lines: string[] = [];
+  for (const f of net?.forwards.rules ?? []) {
+    if (f.enabled && f.device?.mac === mac) lines.push(`Port ${f.port}/${f.proto} from the internet leads to it, port ${f.destPort} (forward "${f.name}")`);
+  }
+  for (const u of net?.forwards.upnp ?? []) {
+    if (u.device?.mac === mac) lines.push(`It opened port ${u.port}/${u.proto} for itself through UPnP ("${u.desc}")`);
+  }
+  const outside = inbound.filter((f) => f.cc !== "LAN");
+  if (outside.length > 0) {
+    const ccs = [...new Set(outside.map((f) => f.cc).filter((c) => c && c !== "--"))].slice(0, 3);
+    lines.push(`${outside.length} connection${outside.length === 1 ? "" : "s"} from the internet in the last 24 hours${ccs.length ? ", from " + ccs.join(", ") : ""}`);
+  }
+  if (lines.length === 0) return { quiet: true, lines: ["Nothing from the internet reaches it: no forwarded port, no UPnP mapping, no connection from outside in the last 24 hours."] };
+  return { quiet: false, lines };
+}

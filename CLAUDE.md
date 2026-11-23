@@ -876,6 +876,19 @@ enforced, and that is a debt rather than a decision.
   `TestADeviceSaysWhatIsNewForIt`, `TestADeviceSeenForLessThanAWeekIsTooNewToTell`;
   the page: "what is new for a device says when it cannot tell" in `web/src/client360.test.ts`)
 
+## The promise about what reaches a device
+
+- **A client's view says what reaches it from the internet**: the enabled
+  port forwards of the firewall that lead to its address, the UPnP mappings it
+  opened for itself (miniupnpd's `/var/run/miniupnpd.leases`, read only, at
+  most as many as forwards, descriptions without control characters), and the
+  connections opened from outside to it in the last 24 hours with their
+  countries (the house's own traffic left out); with none of these it says
+  nothing from the internet reaches it. netryx changes no forward or mapping.
+  (test: `TestUPnPMappingsAreReadFromTheLeaseFile`, `TestTheViewCarriesUPnPMappingsOrSaysThereAreNone`,
+  `TestAUPnPMappingNamesItsDevice`; the page: "what reaches a device from the internet" in
+  `web/src/client360.test.ts`)
+
 ## The promise about the router's agent
 
 - **A question goes to the agent by its contract, with the router's own
