@@ -200,7 +200,11 @@ func FromSections(secs []uciconf.Section, k Known, now time.Time) Config {
 			if !ok || !uok || !until.After(now) || until.After(now.Add(MaxAllowFor)) {
 				continue
 			}
-			c.Allows = append(c.Allows, Allow{ID: s.Name, Rule: first(s, "rule"), Member: mac, Until: until})
+			rule := first(s, "rule")
+			if rule == EveryRule {
+				rule = ""
+			}
+			c.Allows = append(c.Allows, Allow{ID: s.Name, Rule: rule, Member: mac, Until: until})
 		}
 	}
 	return c
@@ -377,6 +381,12 @@ const MaxAllowFor = 240 * time.Minute
 // AgentOwned reports a section named agent_*: what the router agent writes.
 // The agent's grant matches section names, so a device or group section it
 // wrote must not rename a device or regroup one; the model ignores them.
+// EveryRule is how an allowance for every rule is written: uci deletes an
+// option set to an empty value, and an allowance without its rule option is
+// dropped, so the empty value cannot be written through uci. No rule can be
+// named "*".
+const EveryRule = "*"
+
 func AgentOwned(name string) bool { return strings.HasPrefix(name, "agent_") }
 
 // words is every value of a list option, each split on whitespace: the router
