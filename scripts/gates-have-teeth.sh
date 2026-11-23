@@ -280,6 +280,9 @@ red   "flash-budget, nothing to measure" sh "$work/noflash/scripts/flash-budget.
 # ---- gate: the interventions journal fits the flash --------------------------
 green "journal-budget, real tree" sh scripts/journal-budget.sh
 red   "journal-budget, a budget of 1 KB" env NETRYX_JOURNAL_BUDGET_KB=1 sh scripts/journal-budget.sh
+# Just under what the measured cost gives (500.7 KB a day): the model
+# must count 10 KiB an append, not the 4 KiB page it once assumed.
+red   "journal-budget, a budget just under the measured cost" env NETRYX_JOURNAL_BUDGET_KB=480 sh scripts/journal-budget.sh
 mkdir -p "$work/nojournal/scripts"
 cp scripts/journal-budget.sh "$work/nojournal/scripts/"
 red   "journal-budget, nothing to measure" sh "$work/nojournal/scripts/journal-budget.sh"
