@@ -11,13 +11,19 @@ import (
 	"time"
 )
 
+// appendCost is what one append costs the flash when it reaches the disk on
+// its own (interventions spread out, as a day's are): measured on f2fs with
+// OpenWrt's mount options, 200 KiB for 21 appends, about 10 KiB each
+// (docs/journal-measured.md).
+const appendCost = 10 << 10
+
 // The journal's cost to flash under a busy house: 50 interventions a day for
 // 30 days (blocks, allowances, spent limits, approvals, isolations and cuts),
-// each append counted as one 4 KiB page written (the worst case, when no two
-// appends share a writeback) and each rewrite as its whole size plus a page.
+// each append counted at appendCost (the worst case, when no two appends
+// share a writeback) and each rewrite as its whole size plus one append.
 // NETRYX_JOURNAL_BUDGET_KB is the budget a day.
 func TestJournalProfile(t *testing.T) {
-	budget := 256
+	budget := 640
 	if v := os.Getenv("NETRYX_JOURNAL_BUDGET_KB"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
@@ -66,8 +72,7 @@ func TestJournalProfile(t *testing.T) {
 		t.Fatalf("%d interventions written, want %d", written, days*perDay)
 	}
 	st := s.Stats()
-	page := 4096
-	flash := (st.Appends+1)*page + st.RewriteBytes + st.Rewrites*page
+	flash := (st.Appends+1)*appendCost + st.RewriteBytes + st.Rewrites*appendCost
 	perDayKB := float64(flash) / days / 1024
 	fi, _ := os.Stat(path)
 	t.Logf("journal written a day: %.1f KB (budget %d KB); appended %d lines, %d bytes; rewrites %d, %d bytes; file %d bytes",

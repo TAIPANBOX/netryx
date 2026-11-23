@@ -951,10 +951,17 @@ enforced, and that is a debt rather than a decision.
   the page: `web/src/interventions.test.ts`; @decided 2026-11-23: an append-only
   file on flash, 1000 entries or 30 days)
 - **The journal fits the flash**: under 50 interventions a day for 30 days,
-  each append counted as a 4 KiB page and each rewrite at its size, it writes
-  at most `NETRYX_JOURNAL_BUDGET_KB` (256) a day. (gate: `scripts/journal-budget.sh`,
-  run as `scripts/forge.sh sh scripts/journal-budget.sh`; @measured that command
-  2026-11-23 on forge: 200.3 KB a day)
+  each append counted at 10 KiB (what one costs f2fs when it reaches the disk
+  alone) and each rewrite at its size, it writes at most
+  `NETRYX_JOURNAL_BUDGET_KB` (640) a day; it stays appended with no fsync and
+  no buffer (@decided 2026-11-23). (gate: `scripts/journal-budget.sh`, run as
+  `scripts/forge.sh sh scripts/journal-budget.sh`, with a case just under the
+  measured cost in `scripts/gates-have-teeth.sh`; @measured that command
+  2026-11-23 on forge: 500.7 KB a day; @measured
+  `scripts/lab/journal-load -n 20 -every 35s -f2fs loop0` 2026-11-23 in
+  netryx-lab on an f2fs image with OpenWrt's options, `lifetime_write_kbytes`:
+  200 KiB for 21 appends, 220 with fsync, 40 when 5 s apart; on ext4 about
+  23.6 KiB an append; docs/journal-measured.md)
 
 ## The promise about the daily file
 
