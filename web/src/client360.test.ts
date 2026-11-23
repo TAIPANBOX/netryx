@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { whereConnected, rulesOn, editBody } from "./client360";
+import { whereConnected, rulesOn, editBody, newForNote } from "./client360";
 import type { Device, NetworkView } from "./types";
 import type { Rule } from "./rules";
 
@@ -39,4 +39,17 @@ test("a rename or a new group sends only what changed, a blank name is refused",
   assert.deepEqual(editBody({ name: "TV", group: "" }, { name: "TV", group: "kids" }), { group: "kids" });
   assert.deepEqual(editBody({ name: "TV", group: "kids" }, { name: " TV ", group: "kids" }), null, "nothing changed");
   assert.deepEqual(editBody({ name: "TV", group: "" }, { name: "   ", group: "" }), null, "a blank name is no rename");
+});
+
+test("what is new for a device says when it cannot tell, when nothing is new, and since when", () => {
+  assert.equal(newForNote({ tooNew: true, knownDays: 3, since: "2026-11-22T00:00:00Z", apps: [], countries: [] }),
+    "The router has known this device for 3 days: too new to tell what is new for it.");
+  assert.equal(newForNote({ tooNew: true, knownDays: 0, since: "2026-11-22T00:00:00Z", apps: [], countries: [] }),
+    "The router has known this device for less than a day: too new to tell what is new for it.");
+  assert.equal(newForNote({ tooNew: true, knownDays: 1, since: "2026-11-22T00:00:00Z", apps: [], countries: [] }),
+    "The router has known this device for 1 day: too new to tell what is new for it.");
+  assert.equal(newForNote({ tooNew: false, knownDays: 20, since: "2026-11-22T00:00:00Z", apps: [], countries: [] }),
+    "Nothing new: every app and country it used since yesterday it had used in the 29 days before.");
+  assert.equal(newForNote({ tooNew: false, knownDays: 20, since: "2026-11-22T00:00:00Z", apps: [{ app: { id: "tiktok", name: "TikTok", category: "social" }, first: "x", down: 1, up: 0 }], countries: [] }),
+    "Used since yesterday and in none of the 29 days before:");
 });

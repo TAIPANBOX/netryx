@@ -863,6 +863,19 @@ enforced, and that is a debt rather than a decision.
   (the page: `web/src/cursor.test.ts`; the drawing itself is not enforced by a
   test, seen in the lab)
 
+## The promise about what is new for a device
+
+- **New is used since the start of yesterday and in none of the 29 days
+  before**: the apps and countries a device used since 00:00 UTC yesterday
+  (read from the hour ring) that no day bucket from the 29 days before holds
+  for that device, each with the hour it was first seen and its bytes since;
+  the catch-alls (`other`, Unknown, `--`) and the house's own traffic (`LAN`)
+  are not news, and nothing new is written to flash. A device the router has
+  known for less than seven days is too new to tell, and says so.
+  (test: `TestNewKeysAreWhatADeviceUsedSinceTheSplitAndNeverBefore`,
+  `TestADeviceSaysWhatIsNewForIt`, `TestADeviceSeenForLessThanAWeekIsTooNewToTell`;
+  the page: "what is new for a device says when it cannot tell" in `web/src/client360.test.ts`)
+
 ## The promise about the router's agent
 
 - **A question goes to the agent by its contract, with the router's own

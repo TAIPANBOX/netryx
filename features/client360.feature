@@ -60,3 +60,13 @@ Feature: a client's name opens its card, and its card opens its full view
     When the pointer is over it
     Then nothing moves under it, so a click lands on the row that was there
     # (the order: "while the pointer is over the table the order holds" in web/src/steady.test.ts)
+
+  Scenario: a client's view says what is new for it
+    Given a client the router has known for a week or more
+    When the owner opens its full view
+    Then it lists the apps and countries the client used since yesterday and in none of the 29 days before, each with when it was first seen
+    And a client known for less than a week says it is too new to tell
+    # -> TestNewKeysAreWhatADeviceUsedSinceTheSplitAndNeverBefore
+    # -> TestADeviceSaysWhatIsNewForIt
+    # -> TestADeviceSeenForLessThanAWeekIsTooNewToTell
+    # (the page: "what is new for a device says when it cannot tell, when nothing is new, and since when" in web/src/client360.test.ts)
