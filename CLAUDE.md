@@ -667,8 +667,11 @@ enforced, and that is a debt rather than a decision.
   every ring full, its live heap stays under 24 MB (`NETRYX_HEAP_BUDGET_MB`).
   (gate: `scripts/memory-budget.sh`, run on forge as
   `scripts/forge.sh sh scripts/memory-budget.sh`; @measured that command
-  2026-11-23 on forge: 17.9 MB with closed hours and days packed, 3406 KB
-  written a day, unchanged)
+  2026-11-23 on forge: 17.9 MB with closed hours and days packed, against
+  100.9 MB when they were maps, 3406 KB written a day, unchanged; the budget
+  is 24 MB, under the 64 MB of resident memory set for a 256 MB router. The
+  price is on reads: on forge the heaviest, the top networks over 7 days,
+  takes 69 ms against 57 ms, the top domains over 7 days 26 ms against 20)
 - **History survives a restart, and one bad file never empties the store.** A
   damaged, misnamed, other-version or later-than-the-clock file is skipped and
   named, and every other file loads; a day is read from its own file only if
