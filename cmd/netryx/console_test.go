@@ -1951,6 +1951,41 @@ func TestTheMinutesAreKeptInRAMAcrossARestart(t *testing.T) {
 // The day's file is written by the first tick after the day has closed, the
 // tick that writes the closed day of the history, into <state>/daily; a tick
 // before midnight writes none.
+// A day is taken only once every history file has been read: while a file
+// set aside as later than the clock waits, it may still hold that day's
+// hours, so no daily file is written; once the clock passes it and it loads,
+// the day is written whole.
+func TestTheDailyFileWaitsForHistorySetAsideAsLaterThanTheClock(t *testing.T) {
+	o := testOptions(t)
+	later := time.Date(2026, 11, 21, 5, 0, 0, 0, time.UTC)
+	prev := rollup.NewStore(rollup.Options{Now: (&clock{t: later}).Now})
+	addDelta(prev, later)
+	if err := rollup.SaveOpen(prev, filepath.Join(o.State, "history")); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 11, 20, 10, 30, 0, 0, time.UTC)
+	clk := &clock{t: start}
+	o.Now = clk.Now
+	c, err := buildConsole(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addDelta(c.store, start)
+	file := filepath.Join(o.State, "daily", "2026-11-20.day")
+	at := time.Date(2026, 11, 21, 0, 2, 30, 0, time.UTC)
+	clk.Set(at)
+	c.hist.tick(at)
+	if _, err := os.Stat(file); err == nil {
+		t.Fatal("the day was written while a history file later than the clock still waited")
+	}
+	at = later.Add(2*time.Minute + 30*time.Second)
+	clk.Set(at)
+	c.hist.tick(at)
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("once the waiting file loaded, the day was not written: %v", err)
+	}
+}
+
 func TestTheDailyFileIsWrittenByTheFirstTickAfterTheDayCloses(t *testing.T) {
 	o := testOptions(t)
 	start := time.Date(2026, 11, 20, 10, 30, 0, 0, time.UTC)

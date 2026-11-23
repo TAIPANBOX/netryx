@@ -11,6 +11,7 @@ Feature: every closed day is kept for a month in one small file
     Then that day's file is written beside the history, and a later tick or a changed ring never writes it again
     # -> TestADayIsWrittenOnceWhenItClosesAndNeverRewritten
     # -> TestTheDailyFileIsWrittenByTheFirstTickAfterTheDayCloses
+    # -> TestTheDailyFileWaitsForHistorySetAsideAsLaterThanTheClock
 
   Scenario: a restart in the middle of the day loses none of its hours
     Given the service was stopped mid-morning and started again a few minutes later
