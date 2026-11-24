@@ -8,6 +8,9 @@
 # builds, the UI build) runs there, not on the laptop: its build cache once grew
 # to 84 GB. The tree is copied without .git, build output, node_modules or the
 # downloaded data, and the remote copies of those are kept between runs.
+#
+# On forge every command runs under forge-heavy when it is there: CPU held to
+# 2.5 of 4 cores, the lowest CPU and IO priority, one heavy job at a time.
 set -eu
 
 [ $# -gt 0 ] || { echo "usage: scripts/forge.sh <command...>" >&2; exit 2; }
@@ -28,4 +31,5 @@ for a in "$@"; do
 	q=$(printf "%s" "$a" | sed "s/'/'\\\\''/g")
 	cmd="$cmd '$q'"
 done
-exec ssh -n "$HOST" "cd ~/$DIR && export PATH=/usr/local/go/bin:\$HOME/tools/node/bin:\$PATH && $cmd"
+heavy='h=$HOME/.local/bin/forge-heavy; [ -x "$h" ] || h=""'
+exec ssh -n "$HOST" "cd ~/$DIR && export PATH=/usr/local/go/bin:\$HOME/tools/node/bin:\$PATH && $heavy && exec \$h $cmd"
