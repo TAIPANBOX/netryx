@@ -952,3 +952,39 @@ over the stated interval, as a share of one core; memory from
 /proc/$(pidof netryx)/stat` 60 s and 30 s apart, `sh scripts/lab/flint2-load.sh
 up|down` under `sh scripts/lab/flint2-arm.sh arm 1800`, then `apk add` of r4
 and of r5, 2026-11-23 01:26-01:37 London
+
+## 12. A day of flash writes (r6)
+
+netryx 0.1.0-r6, pid 15911, the router up 2 days 12 hours without a reboot,
+`memory_limit` 96MiB. The overlay is f2fs, mounted with `background_gc=on` and
+`mode=adaptive`, 5 % full. The day is read from a start point taken at
+2026-11-23 06:37:54 UTC to 2026-11-24 11:33 UTC, 28 h 55 min.
+
+| | Written | A day |
+|---|---|---|
+| the whole f2fs overlay (`lifetime_write_kbytes` 2397568 to 3152968) | 755400 KB | about 627 MB |
+| netryx's history (`/etc/netryx/history`, 289 to 412 KB) | 123 KB | about 100 KB |
+| netryx's daily files (`/etc/netryx/daily`, 6 to 7 KB) | 1 KB | about 1 KB |
+
+- The file system's own background garbage collection writes almost all of
+  it. Over 10 minutes (11:33:37 to 11:43:37 UTC) 12508 KB were written, and
+  `moved_blocks_background` rose by 2960 blocks, 11840 KB of them: 94.7 %. It
+  runs in bursts; that window ran at about 1.8 GB a day. 1415 background GC
+  calls since the mount.
+- netryx's own share is about 100 KB a day, 0.02 % of the day: an hour file
+  of about 2.4 KB each hour and one day file (20261123.gob, 42 KB) once a day,
+  against the 3406 KB a day of the heavy profile of 30 busy devices
+  (`scripts/memory-budget.sh`). `alerts.json` and `rules.nft` were each written
+  once, on 2026-11-23 at 18:46 to 18:47 UTC. 38 files in `/overlay/upper`
+  changed over the day.
+- Memory: VmRSS 77560 KB, VmHWM 89056 KB, about 7 MiB under the 96MiB limit.
+- r6 predates the interventions journal (TAIPANBOX/netryx#31), so the router
+  has no `interventions.jsonl`; its writes are compared with the 10 KiB an
+  append of `docs/journal-measured.md` once the Flint 2 runs main.
+
+@measured on flint2 `cat /sys/fs/f2fs/*/lifetime_write_kbytes` against the
+start points `/root/netryx-io-start.txt` and `/root/netryx-io-start2.txt`,
+`moved_blocks_background` and `gc_background_calls` from the same directory
+10 minutes apart, `du -sk /etc/netryx/history /etc/netryx/daily`,
+`find /overlay/upper -mtime -1`, `grep -E 'VmRSS|VmHWM' /proc/15911/status`,
+2026-11-24 11:33-11:43 London
