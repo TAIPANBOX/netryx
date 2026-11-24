@@ -956,7 +956,8 @@ and of r5, 2026-11-23 01:26-01:37 London
 ## 12. A day of flash writes (r6)
 
 netryx 0.1.0-r6, pid 15911, the router up 2 days 12 hours without a reboot,
-`memory_limit` 96MiB. The overlay is f2fs, mounted with `background_gc=on` and
+`memory_limit` at its default, 160MiB (`/etc/config/netryx` sets none and is
+unchanged since 2026-11-22). The overlay is f2fs, mounted with `background_gc=on` and
 `mode=adaptive`, 5 % full. The day is read from a start point taken at
 2026-11-23 06:37:54 UTC to 2026-11-24 11:33 UTC, 28 h 55 min.
 
@@ -977,7 +978,7 @@ netryx 0.1.0-r6, pid 15911, the router up 2 days 12 hours without a reboot,
   (`scripts/memory-budget.sh`). `alerts.json` and `rules.nft` were each written
   once, on 2026-11-23 at 18:46 to 18:47 UTC. 38 files in `/overlay/upper`
   changed over the day.
-- Memory: VmRSS 77560 KB, VmHWM 89056 KB, about 7 MiB under the 96MiB limit.
+- Memory: VmRSS 77560 KB, VmHWM 89056 KB, under the default 160MiB limit.
 - r6 predates the interventions journal (TAIPANBOX/netryx#31), so the router
   has no `interventions.jsonl`; its writes are compared with the 10 KiB an
   append of `docs/journal-measured.md` once the Flint 2 runs main.
@@ -988,3 +989,35 @@ start points `/root/netryx-io-start.txt` and `/root/netryx-io-start2.txt`,
 10 minutes apart, `du -sk /etc/netryx/history /etc/netryx/daily`,
 `find /overlay/upper -mtime -1`, `grep -E 'VmRSS|VmHWM' /proc/15911/status`,
 2026-11-24 11:33-11:43 London
+
+## 13. r7 from main on the router, 2026-11-24
+
+netryx 0.1.0-r7, built from main 9653a39 on forge under forge-heavy:
+`scripts/forge.sh sh -c 'sh package/netryx/build.sh aarch64_cortex-a53 &&
+PKGREL=7 sh scripts/lab/forge-mkapk.sh aarch64_cortex-a53'`, then
+`scripts/package-sane.sh` and `scripts/elf-arch.sh`, both clean. The package
+is 10299859 bytes (sha256
+e84ebd78daebfc53f1fe25a33b379bedd8d523a76ea07458347da973ee8f9725), the binary
+11272352 bytes.
+
+- The upgrade ran under `flint2-arm.sh arm 900` (armed 11:47:42 London):
+  `apk add --allow-untrusted` took 4 s, said `Upgrading netryx (0.1.0-r6 ->
+  0.1.0-r7)`, and post-upgrade restarted the service (pid 17721) with the four
+  nft tables in place. The config stayed the owner's; `netryx.apk-new` was
+  removed. Disarmed after: no boot-guard line, no sleeper left.
+- The login's own files (TAIPANBOX/netryx#33): `/`, `/app.js`, `/style.css`
+  and the 8 static chunks `chunks/chunk-*.js` answer 200 without a session;
+  the 11 page chunks `chunks/<Page>-*.js`, `/api/devices` and `/api/session`
+  answer 401.
+- The interventions journal: `/etc/netryx/interventions.jsonl`, mode 0600,
+  54 bytes, its one entry `{"kind":"start"}` at 11:47:46 UTC.
+- Memory: VmRSS 37.9 MB at start, 46.8 MB (VmHWM) about 10 minutes later, 13
+  threads, `GOMEMLIMIT=160MiB` in the process's environment, the default.
+  Temperature 40.6 C, MemAvailable 484 MB.
+
+@measured on flint2 `apk add --allow-untrusted /tmp/netryx-0.1.0-r7.apk`,
+`nft list tables`, `curl -sk -o /dev/null -w '%{http_code}'` on each path
+without a cookie, `ls -l` and `cat /etc/netryx/interventions.jsonl`,
+`grep -E 'VmRSS|VmHWM|Threads' /proc/$(pidof netryx)/status`,
+`tr '\0' '\n' < /proc/$(pidof netryx)/environ | grep GOMEMLIMIT`,
+2026-11-24 11:47-11:58 London
