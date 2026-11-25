@@ -43,6 +43,16 @@ Feature: the installed service is the thing that was tested
       the rule and says so in the log
     # -> TestAMemberThatComesBackIsWatchedAgain
 
+  Scenario: a bridge with no port up does not stop the service
+    Given every port of the watched bridge is down when netryx starts
+    When the service installs the capture
+    Then the console and its API still run, the log says there is nothing to
+      listen on, and the router's own traffic is still watched
+    # -> TestABridgeWithNoPortsInstallsNoChainAndSaysSo
+    # -> TestAnEmptyBridgeDoesNotStopTheService
+    And once a port comes up the rule is attached to it
+    # -> TestAPortThatComesUpAfterAnEmptyStartIsWatched
+
   Scenario: the kernel is the authority on what is attached
     Given the rule was installed successfully a minute ago
     When netryx checks whether it is still attached

@@ -514,6 +514,13 @@ enforced, and that is a debt rather than a decision.
   once. (test: `TestLostCopiesAreCountedExactly`, `TestTheSequenceNumberIsReadFromTheAttributeTheKernelUses`)
 - **What is installed stays attached.** The kernel is asked what the chain is
   attached to, in both the forms it prints. (test: `TestAMemberThatComesBackIsWatchedAgain`, `TestTheKernelIsAskedWhatIsAttached`)
+- **A bridge with no port up never stops the service**: the netdev table goes
+  in without its chain (nft refuses an empty device list), the router's own
+  chain goes in, serve logs that there is nothing to listen on and runs, and
+  the supervisor attaches the chain once a port comes up.
+  (test: `TestABridgeWithNoPortsInstallsNoChainAndSaysSo`, `TestAnEmptyBridgeDoesNotStopTheService`,
+  `TestAPortThatComesUpAfterAnEmptyStartIsWatched`; found in netryx-lab
+  2026-11-25 with the fake house down)
 - **check asks the kernel, not itself**, dry-running the exact ruleset each
   mode would install, and its advice names the cause rather than a package.
   (test: `TestValidateChecksTheRulesetThatWillBeInstalled`, `TestTheRuleFailureSaysWhichFailureItWas`)

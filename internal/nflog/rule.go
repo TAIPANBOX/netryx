@@ -1,6 +1,7 @@
 package nflog
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -151,16 +152,27 @@ func Apply(o RuleOptions) (string, error) {
 			return "", err
 		}
 		out, err := nftRun(NetdevRuleSet(o, devices))
-		if err != nil || !o.Own {
-			return out, err
+		if err == nil && o.Own {
+			// The router's own traffic needs the output hook whichever mode
+			// the house is watched in, and whatever the bridge holds.
+			var own string
+			own, err = nftRun(OwnRuleSet(o))
+			out += own
 		}
-		// The router's own traffic needs the output hook whichever mode the
-		// house is watched in.
-		own, err := nftRun(OwnRuleSet(o))
-		return out + own, err
+		if err == nil && len(devices) == 0 {
+			err = ErrNoDevices
+		}
+		return out, err
 	}
 	return nftRun(RuleSet(o))
 }
+
+// ErrNoDevices is Apply's answer for an ingress rule whose interfaces hold no
+// device right now (a bridge with every port down). The netdev table goes in
+// without its chain and the router's own chain goes in as usual; the
+// supervisor attaches the chain once a port comes up. It is a state to say,
+// not a failure to stop on.
+var ErrNoDevices = errors.New("no device to listen on: the watched interfaces have no port up")
 
 // nftRun is the seam. Remove is the one function whose whole job is what it
 // asks the kernel for, and a test that cannot see the commands can only prove
@@ -249,6 +261,12 @@ func NetdevRuleSet(o RuleOptions, devices []string) string {
 	for _, f := range families {
 		fmt.Fprintf(&b, "\tset %s { type %s . inet_service . %s . inet_service; flags dynamic, timeout; timeout %s; size %d; }\n",
 			f.set, f.addrType, f.addrType, o.SetTimeout, o.SetSize)
+	}
+	if len(devices) == 0 {
+		// nft refuses `devices = { }`. The table stands without its chain,
+		// and the supervisor reads it back as attached to nothing.
+		b.WriteString("}\n")
+		return b.String()
 	}
 	b.WriteString("\tchain observe {\n")
 	fmt.Fprintf(&b, "\t\ttype filter hook ingress devices = { %s } priority -1; policy accept;\n", strings.Join(devices, ", "))
