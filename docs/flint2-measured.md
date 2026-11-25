@@ -1021,3 +1021,39 @@ without a cookie, `ls -l` and `cat /etc/netryx/interventions.jsonl`,
 `grep -E 'VmRSS|VmHWM|Threads' /proc/$(pidof netryx)/status`,
 `tr '\0' '\n' < /proc/$(pidof netryx)/environ | grep GOMEMLIMIT`,
 2026-11-24 11:47-11:58 London
+
+## 14. CPU and memory under load at 160, 96 and 64 MiB (r7)
+
+netryx 0.1.0-r7 under the synthetic house load of section 6
+(`scripts/lab/flint2-load.sh up`, two devices, 6 workers each, 3 900 to 4 900
+conntrack entries), with `memory_limit` set in turn to the default 160MiB,
+96MiB and 64MiB. Each value had its own restart and 5 minutes of 30 s samples.
+CPU is utime + stime from `/proc/<pid>/stat` over each 30 s, as a share of one
+of the router's four cores.
+
+| `GOMEMLIMIT` | CPU, mean of 10 samples | CPU, range | VmRSS at 30 s and at 5 min | RssAnon at 5 min | VmHWM |
+|---|---|---|---|---|---|
+| 160MiB (default) | 5.7 % | 5.1 to 6.5 % | 70.0, 85.7 MB | 60.8 MB | 86.1 MB |
+| 96MiB | 5.8 % | 5.3 to 6.1 % | 72.9, 87.4 MB | 62.5 MB | 88.7 MB |
+| 64MiB | 6.4 % | 5.9 to 7.0 % | 62.6, 70.9 MB | 45.9 MB | 72.4 MB |
+
+- Under traffic alone the heap stays under 96 MiB, so 96MiB changes nothing
+  measurable against the default.
+- 64MiB holds the process about 15 MB lower at 5 minutes and costs about 0.8
+  of a percentage point of one core, about 14 % more CPU, as the collector runs
+  more often. RSS was still rising slowly at 5 minutes in every phase.
+- The peak of section 6 is the apply of a big rule set (241.9 MB VmHWM without
+  a limit, 158.0 MB at 160MiB in section 8), not traffic; this run wrote no
+  rules.
+- Temperature 41.8 to 42.7 C throughout, under a 55 C guard that stops the run;
+  it never fired. Hermes was not restarted. Afterwards the config was put back
+  as it was (sha256 21fb33fa...e988, `memory_limit` unset), netryx restarted at
+  the default 160MiB, the load stopped and br-lan left with its own four ports.
+
+@measured on flint2 a sampler of `/proc/$(pidof netryx)/stat` fields 14 and
+15, `VmRSS`, `VmHWM`, `RssAnon` from `/proc/$(pidof netryx)/status`,
+`nf_conntrack_count` and `thermal_zone0/temp` every 30 s after
+`uci set netryx.main.memory_limit=<value>; uci commit netryx;
+/etc/init.d/netryx restart` under `flint2-arm.sh arm 2400` and
+`flint2-load.sh up`, the log kept as `/root/netryx-memrun-2026-11-25.log`,
+2026-11-25 15:16-15:32 London
