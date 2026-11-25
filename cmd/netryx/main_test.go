@@ -287,3 +287,24 @@ func TestTheBlindReasonNamesItsCause(t *testing.T) {
 		}
 	}
 }
+
+// A bridge with no port up must not end serve: procd would restart it for
+// ever and the console would never answer (netryx-lab, 2026-11-25). Every
+// other failure to install the capture still stops the start.
+func TestAnEmptyBridgeDoesNotStopTheService(t *testing.T) {
+	var said []string
+	logf := func(f string, a ...any) { said = append(said, fmt.Sprintf(f, a...)) }
+	if err := captureErr(fmt.Errorf("apply: %w", nflog.ErrNoDevices), logf); err != nil {
+		t.Fatalf("an empty bridge is a state, not a failure: %v", err)
+	}
+	if len(said) != 1 || !strings.Contains(said[0], "no device to listen on") {
+		t.Fatalf("the log must say there is nothing to listen on: %q", said)
+	}
+	other := errors.New("exit status 1: syntax error")
+	if err := captureErr(other, logf); !errors.Is(err, other) {
+		t.Fatalf("any other failure still stops the start: %v", err)
+	}
+	if err := captureErr(nil, logf); err != nil {
+		t.Fatal(err)
+	}
+}

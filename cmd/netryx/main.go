@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -371,7 +372,7 @@ func main() {
 				fatal(fmt.Errorf("opening the log group: %w", err))
 			}
 			out, err := nflog.Apply(rule)
-			if err != nil {
+			if err := captureErr(err, log.Printf); err != nil {
 				fatal(fmt.Errorf("installing the rule: %v: %s", err, out))
 			}
 			cleanup = func() {
@@ -801,4 +802,16 @@ func logGroupFor(capture bool, group uint16) uint16 {
 		return 0
 	}
 	return group
+}
+
+// captureErr decides whether a failed install of the capture ends serve. A
+// bridge with no port up is a state, not a failure: the console and its API
+// run, the router's own traffic is watched, and the supervisor attaches the
+// chain once a port comes up. Anything else stops the start.
+func captureErr(err error, logf func(string, ...any)) error {
+	if errors.Is(err, nflog.ErrNoDevices) {
+		logf("capture: %v; the console runs, and the capture attaches when a port comes up", err)
+		return nil
+	}
+	return err
 }

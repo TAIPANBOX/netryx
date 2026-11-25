@@ -2,6 +2,8 @@ package nflog
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -277,5 +279,81 @@ func TestTheResolverIsReadOnBothSides(t *testing.T) {
 	o.DNS = false
 	if strings.Contains(NetdevRuleSet(o, []string{"lan2"}), "dport 53") || strings.Contains(OwnRuleSet(o), "sport 53") {
 		t.Fatal("turning it off must remove both halves")
+	}
+}
+
+// A bridge with no port up (every cable out, the lab's fake house not raised)
+// gave nft `devices = {  }`, a syntax error, and serve ended on it, so procd
+// restarted it for ever and the console never answered. Found in netryx-lab,
+// 2026-11-25. With no device the netdev table carries no chain, the router's
+// own chain still goes in, and Apply says there is nothing to listen on.
+func TestABridgeWithNoPortsInstallsNoChainAndSaysSo(t *testing.T) {
+	var scripts []string
+	restore := nftRun
+	nftRun = func(s string) (string, error) { scripts = append(scripts, s); return "", nil }
+	t.Cleanup(func() { nftRun = restore })
+	sysfs := fakeSysfs(t, map[string][]string{"br-lan": nil})
+	restoreFS := sysfsNet
+	sysfsNet = sysfs
+	t.Cleanup(func() { sysfsNet = restoreFS })
+
+	o := DefaultRule("br-lan")
+	o.Mode = Ingress
+	_, err := Apply(o)
+	if !errors.Is(err, ErrNoDevices) {
+		t.Fatalf("an empty bridge must say there is nothing to listen on, got %v", err)
+	}
+	if len(scripts) != 2 {
+		t.Fatalf("the netdev table and the router's own chain go in, got %d: %v", len(scripts), scripts)
+	}
+	if !strings.Contains(scripts[0], "table netdev netryx {") {
+		t.Fatalf("the netdev table must exist, so the supervisor can read it back:\n%s", scripts[0])
+	}
+	if strings.Contains(scripts[0], "hook ingress") || strings.Contains(scripts[0], "devices = {") {
+		t.Fatalf("no chain may be written over an empty device list:\n%s", scripts[0])
+	}
+	if !strings.Contains(scripts[1], "hook output") {
+		t.Fatalf("the router's own traffic is watched whatever the bridge holds:\n%s", scripts[1])
+	}
+}
+
+// Once a port comes up, the supervisor reads the chain-less table back as
+// attached to nothing and installs the chain on the port.
+func TestAPortThatComesUpAfterAnEmptyStartIsWatched(t *testing.T) {
+	var scripts []string
+	restore := nftRun
+	nftRun = func(s string) (string, error) { scripts = append(scripts, s); return "", nil }
+	t.Cleanup(func() { nftRun = restore })
+	sysfs := fakeSysfs(t, map[string][]string{"br-lan": nil})
+	restoreFS := sysfsNet
+	sysfsNet = sysfs
+	t.Cleanup(func() { sysfsNet = restoreFS })
+
+	o := DefaultRule("br-lan")
+	o.Mode = Ingress
+	if _, err := Apply(o); !errors.Is(err, ErrNoDevices) {
+		t.Fatal(err)
+	}
+	restoreList := nftList
+	nftList = func(string) (string, error) { return "table netdev netryx {\n}\n", nil }
+	t.Cleanup(func() { nftList = restoreList })
+	s := &Supervisor{
+		Want:  func() ([]string, error) { return WatchedDevices([]string{"br-lan"}) },
+		Have:  func() ([]string, error) { return InstalledDevices("netryx") },
+		Apply: func() error { _, err := Apply(o); return err },
+	}
+	if _, err := s.Check(); err == nil {
+		t.Fatal("still no port: nothing to install")
+	}
+	if err := os.Mkdir(filepath.Join(sysfs, "br-lan", "brif", "lan2"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scripts = nil
+	did, err := s.Check()
+	if err != nil || !did {
+		t.Fatalf("a port that came up must be watched: %v %v", did, err)
+	}
+	if !strings.Contains(scripts[0], `devices = { lan2 }`) {
+		t.Fatalf("the chain must go on the port:\n%s", scripts[0])
 	}
 }
