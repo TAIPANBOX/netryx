@@ -1044,7 +1044,8 @@ of the router's four cores.
   more often. RSS was still rising slowly at 5 minutes in every phase.
 - The peak of section 6 is the apply of a big rule set (241.9 MB VmHWM without
   a limit, 158.0 MB at 160MiB in section 8), not traffic; this run wrote no
-  rules.
+  rules. The apply at five limits, in a forge clone of the lab template, is in
+  `docs/apply-memory-measured.md`.
 - Temperature 41.8 to 42.7 C throughout, under a 55 C guard that stops the run;
   it never fired. Hermes was not restarted. Afterwards the config was put back
   as it was (sha256 21fb33fa...e988, `memory_limit` unset), netryx restarted at
