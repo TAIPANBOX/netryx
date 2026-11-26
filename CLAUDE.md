@@ -1245,12 +1245,15 @@ enforced, and that is a debt rather than a decision.
   the service stops (`net.netfilter.nf_conntrack_acct=1`); the service logs
   when it finds it off. (not enforced by a test)
 - **The heap has a soft limit from the config**: the init passes
-  `memory_limit` (default 160MiB) as `GOMEMLIMIT` in procd's one env with
-  the scrape token; empty sets none. Accepted is a whole number above zero
+  `memory_limit` as `GOMEMLIMIT` in procd's one env with the scrape token;
+  empty sets none. Left out of the config, or 'auto', it follows the router's
+  RAM: 128MiB up to 768 MiB of MemTotal, 160MiB above it and whenever
+  MemTotal cannot be read; a value in the config always wins. Accepted is a whole number above zero
   with B or KiB (at most 15 digits), MiB (at most 12) or GiB (at most 9), so
   the runtime's int64 of bytes never overflows; anything else is logged and
   sets none.
-  (test: `TestTheMemoryLimitReachesTheServiceAsGOMEMLIMIT`;
+  (test: `TestTheMemoryLimitReachesTheServiceAsGOMEMLIMIT`, `TestTheMemoryLimitFollowsTheRoutersMemory`;
+  @decided 2026-11-26: the default follows the router's RAM;
   measured on the Flint 2, docs/flint2-measured.md sections 6 and 8: the
   all-countries apply peaked at 241.9 MB without the limit and 158.0 MB with it;
   at five limits in a forge clone, docs/apply-memory-measured.md: 226.0 MB

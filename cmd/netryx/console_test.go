@@ -1508,7 +1508,7 @@ func TestTheMemoryLimitReachesTheServiceAsGOMEMLIMIT(t *testing.T) {
 		env        []string
 		log        bool
 	}{
-		{"absent", "160MiB", nil, false},
+		{"absent, no meminfo", "160MiB", []string{"NETRYX_MEMINFO=/nonexistent/meminfo"}, false},
 		{"set", "96MiB", []string{"UCI_memory_limit=96MiB"}, false},
 		{"bytes", "123456789B", []string{"UCI_memory_limit=123456789B"}, false},
 		{"KiB", "200000KiB", []string{"UCI_memory_limit=200000KiB"}, false},
@@ -2047,6 +2047,61 @@ func TestTheUsualWeekIsReadInTheRoutersZone(t *testing.T) {
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), &v); rec.Code != 200 || err != nil || v.Zone != c.want {
 			t.Errorf("Loc %v: %d %s, want the zone %q", c.loc, rec.Code, rec.Body, c.want)
+		}
+	}
+}
+
+// Without a memory_limit in the config the limit follows the router's RAM:
+// 128MiB up to 768 MiB of MemTotal (a 512 MB router such as the Beryl AX),
+// 160MiB above, and 160MiB when MemTotal cannot be read. A limit in the
+// config always wins, an empty one included (docs/small-router-memory-measured.md).
+func TestTheMemoryLimitFollowsTheRoutersMemory(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "state")
+	dir := t.TempDir()
+	meminfo := func(body string) string {
+		f, err := os.CreateTemp(dir, "meminfo")
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.WriteString(body)
+		f.Close()
+		return f.Name()
+	}
+	total := func(kb string) string {
+		return meminfo("MemTotal:       " + kb + " kB\nMemFree:         100000 kB\nMemAvailable:    300000 kB\n")
+	}
+	limit := func(env []string) string {
+		for _, e := range env {
+			if s, ok := strings.CutPrefix(e, "GOMEMLIMIT="); ok {
+				return s
+			}
+		}
+		return ""
+	}
+	for _, c := range []struct {
+		name, want string
+		env        []string
+	}{
+		{"at 768 MiB", "128MiB", []string{"NETRYX_MEMINFO=" + total("786432")}},
+		{"a kB over 768 MiB", "160MiB", []string{"NETRYX_MEMINFO=" + total("786433")}},
+		{"the Beryl AX", "128MiB", []string{"NETRYX_MEMINFO=" + total("496724")}},
+		{"the Flint 2", "160MiB", []string{"NETRYX_MEMINFO=" + total("1010132")}},
+		{"no meminfo", "160MiB", []string{"NETRYX_MEMINFO=/nonexistent/meminfo"}},
+		{"no MemTotal", "160MiB", []string{"NETRYX_MEMINFO=" + meminfo("MemFree: 1 kB\n")}},
+		{"MemTotal not a number", "160MiB", []string{"NETRYX_MEMINFO=" + meminfo("MemTotal: lots kB\n")}},
+		{"auto written out", "128MiB", []string{"NETRYX_MEMINFO=" + total("496724"), "UCI_memory_limit=auto"}},
+		{"a limit in the config wins", "96MiB", []string{"NETRYX_MEMINFO=" + total("496724"), "UCI_memory_limit=96MiB"}},
+		{"a larger one too", "160MiB", []string{"NETRYX_MEMINFO=" + total("496724"), "UCI_memory_limit=160MiB"}},
+		{"an empty one is no limit", "", []string{"NETRYX_MEMINFO=" + total("496724"), "UCI_memory_limit="}},
+	} {
+		_, ev, env := runInit(t, state, append([]string{"UCI_state=" + state}, c.env...)...)
+		if got := limit(env); got != c.want {
+			t.Errorf("%s: GOMEMLIMIT %q, want %q (%q)", c.name, got, c.want, env)
+		}
+		for _, e := range ev {
+			if strings.HasPrefix(e, "logger ") && strings.Contains(e, "memory_limit") {
+				t.Errorf("%s: logged %q", c.name, e)
+			}
 		}
 	}
 }
