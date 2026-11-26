@@ -96,6 +96,13 @@ test("a rule's state says why it is not working", () => {
   assert.deepEqual(stateOf(rule({ problem: "nft refused" }), now), { kind: "failed", text: "not applied: nft refused" });
 });
 
+test("a rule enforced with ranges kept from before says so beside its state", () => {
+  const now = Date.parse("2026-11-21T12:00:00Z");
+  const note = "country ranges kept from the kernel: too little memory to load them again";
+  assert.deepEqual(stateOf(rule({ activeNow: true, applied: true, note }), now), { kind: "active", text: `active now · ${note}` });
+  assert.deepEqual(stateOf(rule({ applied: true, note }), now), { kind: "waiting", text: `waiting for its time · ${note}` });
+});
+
 test("a pause ends in an hour, at the next 07:00 of the router's zone, or never", () => {
   const t = (iso: string) => new Date(iso);
   const sec = (iso: string) => Date.parse(iso) / 1000;

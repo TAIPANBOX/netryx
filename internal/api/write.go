@@ -415,6 +415,7 @@ type ruleJSON struct {
 	Hits      uint64         `json:"hits"`
 	Applied   bool           `json:"applied"`
 	Problem   string         `json:"problem"`
+	Note      string         `json:"note,omitempty"`
 	Error     string         `json:"error"`
 	Allows    []allowJSON    `json:"allows"`
 	Action    string         `json:"action"`
@@ -452,7 +453,7 @@ func ruleView(st rules.RuleState) ruleJSON {
 	j := ruleJSON{
 		ID: r.ID, Enabled: r.Enabled, What: r.What, Targets: strs(r.Targets), Who: r.Who,
 		Members: strs(r.Members), Group: r.Group, Days: []string{}, From: clock5(r.From), To: clock5(r.To),
-		ActiveNow: st.ActiveNow, Hits: st.Hits, Applied: st.Applied, Problem: st.Problem, Error: r.Err,
+		ActiveNow: st.ActiveNow, Hits: st.Hits, Applied: st.Applied, Problem: st.Problem, Note: st.Note, Error: r.Err,
 		Allows: []allowJSON{}, Action: r.Action, Minutes: r.Minutes, Used: map[string]int{},
 	}
 	for mac, n := range st.Used {

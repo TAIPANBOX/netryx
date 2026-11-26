@@ -366,3 +366,88 @@ func TestARefusalIsLoggedOnceWhileItHolds(t *testing.T) {
 		t.Errorf("the refusal was logged %d times", n)
 	}
 }
+
+// A rule whose country sets were kept from the kernel is enforced, with the
+// ranges it had: it says so, and is still applied.
+func TestAKeptCountryRuleSaysItsRangesAreFromBefore(t *testing.T) {
+	r := newRig(t, ruRule, winter(t))
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	r.mu.Lock()
+	r.mem = 1
+	r.mu.Unlock()
+	e2 := NewEngine(r.e.o)
+	if err := e2.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range e2.State() {
+		if s.ID == "ru" && (!s.Applied || !strings.Contains(s.Note, "kept from the kernel")) {
+			t.Fatalf("the kept rule does not say so: %+v", s)
+		}
+	}
+}
+
+// Kept sets are loaded again once the memory is there, at the next retry,
+// without a change of the config, and the note goes.
+func TestKeptCountrySetsAreFilledOnceTheMemoryIsThere(t *testing.T) {
+	now := winter(t)
+	r := newRig(t, ruRule, now)
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	r.mu.Lock()
+	r.mem = 1
+	r.mu.Unlock()
+	e2 := NewEngine(r.e.o)
+	if err := e2.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	before := len(r.nft.applies())
+	r.mu.Lock()
+	r.mem = 0
+	r.mu.Unlock()
+	at := now.Add(6 * time.Minute)
+	r.set(at, 6*time.Minute)
+	e2.Tick(at)
+	a := r.nft.applies()
+	if len(a) == before || !strings.Contains(a[len(a)-1].stdin, "cc_ru_v4") || !strings.Contains(a[len(a)-1].stdin, "add element") {
+		t.Fatalf("the kept sets were not loaded again: %d applies", len(a)-before)
+	}
+	for _, s := range e2.State() {
+		if s.ID == "ru" && (s.Note != "" || !s.Applied) {
+			t.Fatalf("after the fill: %+v", s)
+		}
+	}
+}
+
+// A country kept from the kernel is tried again at each reload without
+// holding the rest back, even once other countries were loaded since.
+func TestAStaleCountryNeverHoldsTheRestBack(t *testing.T) {
+	r := newRig(t, ruRule, winter(t))
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	r.write(ruRule + gbRule)
+	// The restart: loading RU and GB does not fit, GB alone does.
+	r.mu.Lock()
+	r.mem, r.memSeq = 1, []uint64{1, 1 << 40}
+	r.mu.Unlock()
+	e2 := NewEngine(r.e.o)
+	if err := e2.Reload(); err != nil {
+		t.Fatalf("the restart: %v", err)
+	}
+	if !r.nft.objects["set cc_gb_v4"] {
+		t.Fatal("setup: GB was loaded")
+	}
+	// RU is still the kernel's, and there is no memory to load it: the
+	// reload keeps it again rather than refusing everything.
+	if err := e2.Reload(); err != nil {
+		t.Fatalf("a stale country held the rest back: %v", err)
+	}
+	for _, s := range e2.State() {
+		if s.ID == "ru" && !strings.Contains(s.Note, "kept from the kernel") {
+			t.Errorf("ru: %+v", s)
+		}
+	}
+}

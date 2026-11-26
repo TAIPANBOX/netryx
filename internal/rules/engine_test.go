@@ -187,6 +187,8 @@ type rig struct {
 	// mem is what MemAvailable answers (0: plenty), memErr its error.
 	mem    uint64
 	memErr error
+	// memSeq, when not empty, answers MemAvailable first, one value a call.
+	memSeq []uint64
 	// logs is what the engine logged.
 	logs    []string
 	mono    time.Duration
@@ -278,6 +280,11 @@ func newRig(t *testing.T, conf string, now time.Time) *rig {
 			defer r.mu.Unlock()
 			if r.memErr != nil {
 				return 0, r.memErr
+			}
+			if len(r.memSeq) > 0 {
+				v := r.memSeq[0]
+				r.memSeq = r.memSeq[1:]
+				return v, nil
 			}
 			if r.mem == 0 {
 				return 1 << 40, nil

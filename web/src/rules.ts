@@ -25,6 +25,8 @@ export interface Rule {
   problem: string;
   /** Why the model refused to read it ("" when it reads). */
   error: string;
+  /** A note on a rule that is applied: its country ranges were kept from before (absent when none). */
+  note?: string;
   /** The live allowances that lift it now (absent from an older router). */
   allows?: RuleAllow[];
   /** "block" or "limit" (absent from an older router: block). */
@@ -177,8 +179,9 @@ export function stateOf(r: Rule, nowMs: number): RuleState {
   if (!r.enabled) return { kind: "off", text: "off: turned off" };
   if (r.until && r.until * 1000 <= nowMs) return { kind: "off", text: "off: its time has ended" };
   if (r.problem) return { kind: "failed", text: r.problem.startsWith("not applied") ? r.problem : `not applied: ${r.problem}` };
-  if (r.activeNow) return { kind: "active", text: "active now" };
-  return { kind: "waiting", text: "waiting for its time" };
+  const note = r.note ? ` · ${r.note}` : "";
+  if (r.activeNow) return { kind: "active", text: `active now${note}` };
+  return { kind: "waiting", text: `waiting for its time${note}` };
 }
 
 /** The rules form for a rule that exists, for editing. */

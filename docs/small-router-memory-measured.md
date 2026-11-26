@@ -234,7 +234,9 @@ which that count fell short of the ten-country apply on the Beryl, and the
   older address table), which needs nft over the kernel's ruleset twice. When
   that does not fit, the country sets the kernel holds are kept as they are:
   the rules stay enforced with the ranges they had, the rest applies, and the
-  log names the countries kept.
+  log names the countries kept. Each such rule is shown applied with a note
+  that its country ranges were kept from the kernel. The sets are loaded again
+  at the next retry (5 minutes) once the memory is there, and the note goes.
 
 The same four every-country writes on a 512MiB clone, with r9 built from this
 tree, at no limit:
@@ -255,3 +257,15 @@ side of the router.
 `netryx-0.1.0-r9.apk` (`scripts/forge.sh sh -c 'sh package/netryx/build.sh x86_64 && PKGREL=9 sh scripts/lab/forge-mkapk.sh x86_64'`),
 2026-11-26 16:46-16:50 London. The figures in its answers were then printed in
 MB of 10^6 bytes; the console now prints MiB.
+
+**A restart on the clone with kept sets (r10):**
+- Two rules of 64 countries each were applied (264 sets, 230.9 MB available).
+- Then `/etc/init.d/netryx restart`.
+- The new process could not load the sets again within the memory, so it kept the kernel's. The kernel still held 264 sets.
+- `netryx ctl rules` showed both rules applied, with the note `country ranges kept from the kernel: too little memory to load them again`.
+- The log named the countries kept. No OOM kill.
+
+@measured on a 512MiB clone `nxkept` of `nxlab-golden` upgraded to
+`netryx-0.1.0-r10.apk` built from this tree, with the script inlined in the
+pull request that added the note, 2026-11-26 17:18-17:19 London.
+
