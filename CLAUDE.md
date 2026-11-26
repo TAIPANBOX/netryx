@@ -1224,7 +1224,10 @@ enforced, and that is a debt rather than a decision.
   sets none.
   (test: `TestTheMemoryLimitReachesTheServiceAsGOMEMLIMIT`;
   measured on the Flint 2, docs/flint2-measured.md sections 6 and 8: the
-  all-countries apply peaked at 241.9 MB without the limit and 158.0 MB with it)
+  all-countries apply peaked at 241.9 MB without the limit and 158.0 MB with it;
+  at five limits in a forge clone, docs/apply-memory-measured.md: 226.0 MB
+  without, 184.4 at 160MiB, 153.5 at 128MiB, 129.6 at 96MiB, 121.2 at 64MiB
+  with the collector running without pause)
 - **Speed now is the line's average over the window** (1, 3 or 10 minutes),
   from every 10 s reading of the WAN counters (at most 64 kept, a clock set
   back or another device starting afresh), each weighted by the seconds it
