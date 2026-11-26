@@ -178,12 +178,17 @@ const testGeo = "5.8.0.0\t5.8.255.255\t1\tRU\tSOME-RU\n" +
 // rig is an engine over a temporary config and state directory, a fake nft,
 // a fake clock and a recorded Delete.
 type rig struct {
-	t       *testing.T
-	nft     *fakeNFT
-	e       *Engine
-	conf    string
-	state   string
-	now     time.Time
+	t     *testing.T
+	nft   *fakeNFT
+	e     *Engine
+	conf  string
+	state string
+	now   time.Time
+	// mem is what MemAvailable answers (0: plenty), memErr its error.
+	mem    uint64
+	memErr error
+	// logs is what the engine logged.
+	logs    []string
 	mono    time.Duration
 	east    int
 	live    []flows.Flow
@@ -262,7 +267,23 @@ func newRig(t *testing.T, conf string, now time.Time) *rig {
 		},
 		KernelEast: func() (int, error) { r.mu.Lock(); defer r.mu.Unlock(); return r.east, nil },
 		Elapsed:    func() time.Duration { r.mu.Lock(); defer r.mu.Unlock(); return r.mono },
-		Logf:       t.Logf,
+		Logf: func(f string, a ...any) {
+			t.Logf(f, a...)
+			r.mu.Lock()
+			r.logs = append(r.logs, fmt.Sprintf(f, a...))
+			r.mu.Unlock()
+		},
+		MemAvailable: func() (uint64, error) {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			if r.memErr != nil {
+				return 0, r.memErr
+			}
+			if r.mem == 0 {
+				return 1 << 40, nil
+			}
+			return r.mem, nil
+		},
 		IsLocal: func(a netip.Addr) bool {
 			return netip.MustParsePrefix("192.168.50.0/24").Contains(a) || netip.MustParsePrefix("2a02:c7c::/32").Contains(a)
 		},

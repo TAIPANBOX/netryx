@@ -428,6 +428,7 @@ func buildConsole(o Options) (*console, error) {
 			ConfigPath: o.RulesConfig, StateDir: o.State, Run: o.NFT, Now: o.Now, Loc: o.Loc,
 			Geo: geo, Apps: c.apps, Live: c.table.Live,
 			Delete: ct.Delete, DeleteReply: ct.DeleteReply, Logf: log.Printf,
+			MemAvailable: rules.ReadMemAvailable,
 			// The house's networks and the router's addresses are never an
 			// app's destination.
 			IsLocal: c.local.IsLocal,

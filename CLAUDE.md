@@ -108,6 +108,29 @@ enforced, and that is a debt rather than a decision.
   (@measured US rule for the fakehouse tv, address table moved away and
   netryx restarted in netryx-lab, 2026-11-21: tv still 000, the 4 cc_us
   lines and the set kept, ctl `applied:false` with the reason)
+- **An apply the router cannot hold is refused before nft runs.** An apply
+  that loads new country sets is counted first: nft over the ruleset the
+  kernel holds and the script (22 bytes a byte, 16 on x86-64), the new sets at
+  7, against MemAvailable with 64 MiB kept free. If it would not fit, nft is
+  not run, the kernel keeps its ruleset, rules.nft is not rewritten, and the
+  rule says "too little memory" with the figures. A change that loads no
+  country set (a delete, an app rule) is never held back, so a starved router
+  can always shed rules, and a router whose memory cannot be read applies as
+  before. A restarted process loads every country set again; when that does
+  not fit, the sets the kernel holds are kept as they are, the rules apply,
+  and the log says so. A refusal clears once the memory is there, and the
+  tick logs a refusal that holds once. (test: `TestAnApplyThatWouldNotFitIsRefusedBeforeNft`,
+  `TestARestartWithoutTheMemoryKeepsTheKernelsCountrySets`, `TestARefusalClearsOnceTheMemoryIsThere`,
+  `TestARefusalIsLoggedOnceWhileItHolds`, `TestTheLineIsDrawnAtTheCountedNeed`,
+  `TestAnAppRuleIsNotHeldBackOnAStarvedRouter`, `TestTheRoutersMeminfoIsRead`,
+  `TestAnApplyThatFitsGoesAhead`, `TestAChangeThatAddsNoCountrySetIsNotHeldBack`,
+  `TestTheApplyNeedIsCountedFromTheKernelsRulesAndTheScript`,
+  `TestTheMarginIsKeptOnBothSidesOfTheLine`, `TestTheRulesHeldAtStartAreReadFromRulesNft`,
+  `TestUnreadableMemoryDoesNotHoldTheRulesBack`, `TestMemAvailableIsReadFromMeminfo`)
+  (@measured a 512MiB clone of nxlab-golden with r9 from this tree,
+  2026-11-26: of the four every-country writes the third and fourth were
+  refused with the figures and no OOM kill, where r7 had nft killed;
+  docs/small-router-memory-measured.md)
 - **A rule held only by names says when names cannot be seen**: with the
   capture or passive DNS off, or forward mode under flow offloading, an app
   or category rule whose apps have no organisation ranges is not applied and
