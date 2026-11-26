@@ -12,6 +12,8 @@ Feature: netryx on a router with 512 MB
     When the owner adds a rule that loads new country sets
     Then nft is not run, the kernel keeps the rules it had, and the rule says it was not applied for want of memory
     # -> TestAnApplyThatWouldNotFitIsRefusedBeforeNft
+    # -> TestARefusalClearsOnceTheMemoryIsThere
+    # -> TestARefusalIsLoggedOnceWhileItHolds
 
   Scenario: a rule set that fits is applied as before
     Given a router with the memory for the new sets and the margin
@@ -24,6 +26,7 @@ Feature: netryx on a router with 512 MB
     When the owner deletes a rule or adds one that loads no country set
     Then the change is applied, since it holds no more than the router already held
     # -> TestAChangeThatAddsNoCountrySetIsNotHeldBack
+    # -> TestAnAppRuleIsNotHeldBackOnAStarvedRouter
 
   Scenario: the need is counted from what nft holds
     Given the ruleset the kernel holds, the script and the processor
@@ -31,6 +34,7 @@ Feature: netryx on a router with 512 MB
     Then it counts nft over both, 22 bytes a byte on aarch64 and 16 on x86-64, the new sets at 7, and keeps 64 MiB free
     # -> TestTheApplyNeedIsCountedFromTheKernelsRulesAndTheScript
     # -> TestTheMarginIsKeptOnBothSidesOfTheLine
+    # -> TestTheLineIsDrawnAtTheCountedNeed
     # -> TestTheRulesHeldAtStartAreReadFromRulesNft
     # -> TestMemAvailableIsReadFromMeminfo
     # -> TestTheRoutersMeminfoIsRead
@@ -40,3 +44,9 @@ Feature: netryx on a router with 512 MB
     When the rules change
     Then they are applied, and the log says the apply was not checked
     # -> TestUnreadableMemoryDoesNotHoldTheRulesBack
+
+  Scenario: a restart without the memory keeps the kernel's country sets
+    Given a router enforcing country rules, too short of memory to load their sets again
+    When netryx restarts
+    Then the country sets stay as the kernel holds them, the rules apply, and the log says the sets were kept
+    # -> TestARestartWithoutTheMemoryKeepsTheKernelsCountrySets

@@ -297,8 +297,10 @@ type Engine struct {
 	dropped int
 	// held is the size of the ruleset netryx applied last, which the kernel
 	// holds (heldKnown: since this process applied one).
-	held      int
-	heldKnown bool
+	// lastRefusal is the reload error the tick logged last.
+	lastRefusal string
+	held        int
+	heldKnown   bool
 }
 
 // NewEngine builds an engine; Reload (or Run) applies the rules.
@@ -473,6 +475,10 @@ func (e *Engine) reload() error {
 	if e.ccDone == nil {
 		e.ccDone = map[string]bool{}
 	}
+	// A process that has filled no country set yet, over a table that is
+	// there, loads every country set again (they may come from an older
+	// address table): that needs nft over the kernel's ruleset twice.
+	firstFill := present && len(e.ccDone) == 0
 	reset := map[string]bool{}
 	fresh := map[string]bool{}
 	recut := map[string]bool{}
@@ -519,14 +525,33 @@ func (e *Engine) reload() error {
 	e.quarantineSig = qsig
 	e.mu.Unlock()
 	delta, meta := compile(cfg, e.cat, e.o.Loc, now, east, fresh, reset, recut, x)
+	var kept []string
 	if delta != last || !present {
-		if msg := e.tooBig(present, delta, len(fresh)); msg != "" {
+		msg := e.tooBig(present, delta, len(fresh))
+		if msg != "" && firstFill {
+			// Without the memory to load them again, the country sets the
+			// kernel holds are kept as they are: the rules stay enforced
+			// with the ranges they had, and the rest applies.
+			have := e.kernelCountries()
+			for cc := range fresh {
+				if have[cc] {
+					delete(fresh, cc)
+					kept = append(kept, cc)
+				}
+			}
+			if len(kept) > 0 {
+				delta, meta = compile(cfg, e.cat, e.o.Loc, now, east, fresh, reset, recut, x)
+				msg = e.tooBig(present, delta, len(fresh))
+			}
+		}
+		if msg != "" {
 			// Refused before nft runs: the kernel keeps its ruleset and
 			// rules.nft is not rewritten, as for a ruleset nft refuses.
 			e.mu.Lock()
 			e.shown, e.read = cfg, true
 			e.appliedOK = false
 			e.problem = msg
+			e.missing = nil
 			e.next = now.Add(retry)
 			e.mu.Unlock()
 			return fmt.Errorf("rules not applied: %s", msg)
@@ -590,6 +615,10 @@ func (e *Engine) reload() error {
 	e.east, e.eastSet = east, true
 	e.mu.Unlock()
 	e.tell(told)
+	if len(kept) > 0 {
+		sort.Strings(kept)
+		e.o.Logf("country sets kept as the kernel held them (%s): too little memory to load them again", strings.Join(kept, " "))
+	}
 
 	// The file the init loads at boot is the whole ruleset, every set
 	// written, since the kernel then holds nothing.
@@ -1254,7 +1283,16 @@ func (e *Engine) Tick(now time.Time) {
 	e.ticked, e.lastWall, e.lastMono = true, now, mono
 	e.mu.Unlock()
 	if need {
-		if err := e.reload(); err != nil {
+		// A refusal that holds is logged once, not at every retry.
+		err := e.reload()
+		e.mu.Lock()
+		said := e.lastRefusal
+		e.lastRefusal = ""
+		if err != nil {
+			e.lastRefusal = err.Error()
+		}
+		e.mu.Unlock()
+		if err != nil && err.Error() != said {
 			e.o.Logf("rules not applied: %v", err)
 		}
 	}

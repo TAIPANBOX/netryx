@@ -116,7 +116,13 @@ enforced, and that is a debt rather than a decision.
   rule says "too little memory" with the figures. A change that loads no
   country set (a delete, an app rule) is never held back, so a starved router
   can always shed rules, and a router whose memory cannot be read applies as
-  before. (test: `TestAnApplyThatWouldNotFitIsRefusedBeforeNft`,
+  before. A restarted process loads every country set again; when that does
+  not fit, the sets the kernel holds are kept as they are, the rules apply,
+  and the log says so. A refusal clears once the memory is there, and the
+  tick logs a refusal that holds once. (test: `TestAnApplyThatWouldNotFitIsRefusedBeforeNft`,
+  `TestARestartWithoutTheMemoryKeepsTheKernelsCountrySets`, `TestARefusalClearsOnceTheMemoryIsThere`,
+  `TestARefusalIsLoggedOnceWhileItHolds`, `TestTheLineIsDrawnAtTheCountedNeed`,
+  `TestAnAppRuleIsNotHeldBackOnAStarvedRouter`, `TestTheRoutersMeminfoIsRead`,
   `TestAnApplyThatFitsGoesAhead`, `TestAChangeThatAddsNoCountrySetIsNotHeldBack`,
   `TestTheApplyNeedIsCountedFromTheKernelsRulesAndTheScript`,
   `TestTheMarginIsKeptOnBothSidesOfTheLine`, `TestTheRulesHeldAtStartAreReadFromRulesNft`,

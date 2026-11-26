@@ -112,3 +112,35 @@ func (e *Engine) tooBig(present bool, script string, fresh int) string {
 	return fmt.Sprintf("too little memory to apply: nft and the new sets would need about %d MiB, %d MiB is available and %d MiB is kept free",
 		(need+1<<20-1)>>20, avail>>20, memMargin>>20)
 }
+
+// kernelCountries are the countries whose sets the kernel holds now, both
+// halves of each.
+func (e *Engine) kernelCountries() map[string]bool {
+	have := map[string]bool{}
+	b, err := e.run(nil, "", "-t", "-j", "list", "table", "inet", "netryx_rules")
+	if err != nil {
+		return have
+	}
+	objs, err := listing(b)
+	if err != nil {
+		return have
+	}
+	v4, v6 := map[string]bool{}, map[string]bool{}
+	for _, st := range objs["set"] {
+		n, ok := strings.CutPrefix(st.Name, "cc_")
+		if !ok {
+			continue
+		}
+		if c, ok := strings.CutSuffix(n, "_v4"); ok {
+			v4[c] = true
+		} else if c, ok := strings.CutSuffix(n, "_v6"); ok {
+			v6[c] = true
+		}
+	}
+	for c := range v4 {
+		if v6[c] {
+			have[strings.ToUpper(c)] = true
+		}
+	}
+	return have
+}

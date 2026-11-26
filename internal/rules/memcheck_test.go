@@ -4,8 +4,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 const ruRule = `
@@ -202,5 +204,165 @@ func TestTheRoutersMeminfoIsRead(t *testing.T) {
 	}
 	if err != nil || got == 0 {
 		t.Fatalf("%d %v", got, err)
+	}
+}
+
+// The line is drawn at the need counted from the ruleset the kernel holds and
+// the script, with the margin left: at it the apply goes ahead, a byte under
+// it is refused.
+func TestTheLineIsDrawnAtTheCountedNeed(t *testing.T) {
+	r := newRig(t, ruRule, winter(t))
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	held := r.e.heldBytes(true)
+	if held == 0 {
+		t.Fatal("setup: the kernel holds a ruleset")
+	}
+	script := strings.Repeat("x", 1000)
+	need := applyNeed(held, len(script), runtime.GOARCH)
+	r.mu.Lock()
+	r.mem = need + memMargin
+	r.mu.Unlock()
+	if msg := r.e.tooBig(true, script, 1); msg != "" {
+		t.Errorf("at the line: %s", msg)
+	}
+	r.mu.Lock()
+	r.mem = need + memMargin - 1
+	r.mu.Unlock()
+	if msg := r.e.tooBig(true, script, 1); msg == "" {
+		t.Error("a byte under the line is refused")
+	}
+	if msg := r.e.tooBig(true, script, 0); msg != "" {
+		t.Errorf("no new country set, no check: %s", msg)
+	}
+}
+
+// A refusal is not for ever: once the memory is there, the next reload
+// applies, and rules.nft follows.
+func TestARefusalClearsOnceTheMemoryIsThere(t *testing.T) {
+	r := newRig(t, ruRule, winter(t))
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	r.write(ruRule + gbRule)
+	r.mu.Lock()
+	r.mem = 1
+	r.mu.Unlock()
+	if err := r.e.Reload(); err == nil {
+		t.Fatal("setup: refused")
+	}
+	before, _ := os.ReadFile(filepath.Join(r.state, "rules.nft"))
+	r.mu.Lock()
+	r.mem = 0
+	r.mu.Unlock()
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.ReadFile(filepath.Join(r.state, "rules.nft"))
+	if !r.state1("gb").Applied || !r.nft.objects["set cc_gb_v4"] || string(after) == string(before) {
+		t.Fatalf("the apply did not follow the memory: %+v", r.state1("gb"))
+	}
+}
+
+// After a restart the new process would load every country set again,
+// which needs nft over the kernel's ruleset twice. When that does not fit,
+// the country sets the kernel holds are kept as they are, the rules apply,
+// and the log says so; nothing is opened.
+func TestARestartWithoutTheMemoryKeepsTheKernelsCountrySets(t *testing.T) {
+	r := newRig(t, ruRule+gbRule, winter(t))
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	before := len(r.nft.applies())
+	r.mu.Lock()
+	r.mem = 1
+	r.mu.Unlock()
+	e2 := NewEngine(r.e.o)
+	if err := e2.Reload(); err != nil {
+		t.Fatalf("the restart was refused: %v", err)
+	}
+	a := r.nft.applies()
+	if len(a) == before {
+		t.Fatal("the restart applied nothing")
+	}
+	if strings.Contains(a[len(a)-1].stdin, "add element inet netryx_rules cc_") {
+		t.Fatalf("the country sets were loaded again:\n%s", a[len(a)-1].stdin)
+	}
+	if !r.nft.objects["set cc_ru_v4"] || !r.nft.objects["set cc_gb_v4"] {
+		t.Fatalf("a country set went: %v", r.nft.objects)
+	}
+	for _, id := range []string{"ru", "gb"} {
+		for _, s := range e2.State() {
+			if s.ID == id && !s.Applied {
+				t.Errorf("%s not applied: %+v", id, s)
+			}
+		}
+	}
+	r.mu.Lock()
+	logs := strings.Join(r.logs, "\n")
+	r.mu.Unlock()
+	if !strings.Contains(logs, "country sets kept as the kernel held them") {
+		t.Errorf("the log does not say the sets were kept:\n%s", logs)
+	}
+	// The next reload of the same process takes them as loaded.
+	if err := e2.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	r.mu.Lock()
+	n := strings.Count(strings.Join(r.logs, "\n"), "country sets kept as the kernel held them")
+	r.mu.Unlock()
+	if n != 1 {
+		t.Errorf("the sets were kept %d times, want once", n)
+	}
+}
+
+// An app rule loads no country set: it is not held back on a starved router.
+func TestAnAppRuleIsNotHeldBackOnAStarvedRouter(t *testing.T) {
+	r := newRig(t, ruRule, winter(t))
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	r.mu.Lock()
+	r.mem = 1
+	r.mu.Unlock()
+	r.write(ruRule + ytForLaptop)
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	if !r.state1("yt").Applied {
+		t.Fatalf("an app rule was held back: %+v", r.state1("yt"))
+	}
+}
+
+// A refusal that does not change is logged once, not at every retry.
+func TestARefusalIsLoggedOnceWhileItHolds(t *testing.T) {
+	now := winter(t)
+	r := newRig(t, ruRule, now)
+	if err := r.e.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	r.write(ruRule + gbRule)
+	r.mu.Lock()
+	r.mem = 1
+	r.mu.Unlock()
+	if err := r.e.Reload(); err == nil {
+		t.Fatal("setup: refused")
+	}
+	for i := 1; i <= 3; i++ {
+		at := now.Add(time.Duration(i) * 6 * time.Minute)
+		r.set(at, time.Duration(i)*6*time.Minute)
+		r.e.Tick(at)
+	}
+	r.mu.Lock()
+	n := 0
+	for _, l := range r.logs {
+		if strings.Contains(l, "too little memory") {
+			n++
+		}
+	}
+	r.mu.Unlock()
+	if n != 1 {
+		t.Errorf("the refusal was logged %d times", n)
 	}
 }

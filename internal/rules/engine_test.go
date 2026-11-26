@@ -185,8 +185,10 @@ type rig struct {
 	state string
 	now   time.Time
 	// mem is what MemAvailable answers (0: plenty), memErr its error.
-	mem     uint64
-	memErr  error
+	mem    uint64
+	memErr error
+	// logs is what the engine logged.
+	logs    []string
 	mono    time.Duration
 	east    int
 	live    []flows.Flow
@@ -265,7 +267,12 @@ func newRig(t *testing.T, conf string, now time.Time) *rig {
 		},
 		KernelEast: func() (int, error) { r.mu.Lock(); defer r.mu.Unlock(); return r.east, nil },
 		Elapsed:    func() time.Duration { r.mu.Lock(); defer r.mu.Unlock(); return r.mono },
-		Logf:       t.Logf,
+		Logf: func(f string, a ...any) {
+			t.Logf(f, a...)
+			r.mu.Lock()
+			r.logs = append(r.logs, fmt.Sprintf(f, a...))
+			r.mu.Unlock()
+		},
 		MemAvailable: func() (uint64, error) {
 			r.mu.Lock()
 			defer r.mu.Unlock()

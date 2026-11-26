@@ -230,6 +230,11 @@ which that count fell short of the ten-country apply on the Beryl, and the
   router can always shed rules.
 - A router whose memory cannot be read applies as before, and says so in the
   log.
+- A restarted process loads every country set again (they may come from an
+  older address table), which needs nft over the kernel's ruleset twice. When
+  that does not fit, the country sets the kernel holds are kept as they are:
+  the rules stay enforced with the ranges they had, the rest applies, and the
+  log names the countries kept.
 
 The same four every-country writes on a 512MiB clone, with r9 built from this
 tree, at no limit:
