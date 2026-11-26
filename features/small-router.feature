@@ -61,3 +61,10 @@ Feature: netryx on a router with 512 MB
     # -> TestKeptCountrySetsAreFilledOnceTheMemoryIsThere
     # -> TestAStaleCountryNeverHoldsTheRestBack
     # -> TestARulesNoteReachesThePage
+
+  Scenario: the memory limit follows the router's RAM unless the config names one
+    Given a config without a memory limit
+    When netryx starts on a router with at most 768 MiB of memory, or more, or one whose memory cannot be read
+    Then the limit is 128MiB, 160MiB and 160MiB, and a limit written in the config, an empty one included, always wins
+    # -> TestTheMemoryLimitFollowsTheRoutersMemory
+    # -> TestTheMemoryLimitReachesTheServiceAsGOMEMLIMIT

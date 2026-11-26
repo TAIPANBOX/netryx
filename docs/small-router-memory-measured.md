@@ -196,8 +196,11 @@ in its VmHWM.
 
 - **A typical household's rules fit at any limit**, on the clone and on the
   Beryl: netryx at 70 to 126 MB, nft at 5 to 24 MB, over 190 MB left.
-- **Set `memory_limit` to 128MiB on a 512 MB router.** It costs the typical set
-  nothing, and on the clone it was what let every country apply.
+- **128MiB on a 512 MB router, by default.** It costs the typical set nothing,
+  and on the clone it was what let every country apply. The init now takes
+  128MiB when MemTotal is at most 768 MiB and 160MiB above, unless the config
+  names a limit. An install configured before keeps its `memory_limit '160MiB'`
+  until that line is removed or set to `auto`.
 - **Ten countries fit on the Beryl**, with 81 MB left at the lowest sample.
 - **Every country does not fit on a Beryl at any limit.** On aarch64, nft alone
   would need about 230 MB.
@@ -268,4 +271,14 @@ MB of 10^6 bytes; the console now prints MiB.
 @measured on a 512MiB clone `nxkept` of `nxlab-golden` upgraded to
 `netryx-0.1.0-r10.apk` built from this tree, with the script inlined in the
 pull request that added the note, 2026-11-26 17:18-17:19 London.
+
+**The limit by RAM on the clone (r11):**
+- r7 ran with its config's `memory_limit '160MiB'` (GOMEMLIMIT=160MiB).
+- `apk add` of r11 replaced the untouched config with the new one, which names no limit.
+- netryx came up with GOMEMLIMIT=128MiB on 474 248 kB of MemTotal.
+
+@measured on a 512MiB clone `nxram` of `nxlab-golden`,
+`tr '\0' '\n' < /proc/$(pidof netryx)/environ | grep GOMEMLIMIT` before and
+after `apk add --allow-untrusted netryx-0.1.0-r11.apk` built from this tree,
+2026-11-26 17:33 London.
 

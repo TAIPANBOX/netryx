@@ -43,7 +43,7 @@ start_service() {
 	config_get key main key '/etc/uhttpd.key'
 	config_get_bool redirect main http_redirect 1
 	config_get mtoken main metrics_token ''
-	config_get memlimit main memory_limit '160MiB'
+	config_get memlimit main memory_limit 'auto'
 	[ -n "$state" ] || state=/etc/netryx
 
 	# History and labels live here, readable by root only: it is a record of
@@ -75,6 +75,19 @@ start_service() {
 	# MiB (at most 12) or GiB (at most 9), all under 2^63 bytes; anything else
 	# is logged and the service runs without a limit (a zero would keep the
 	# collector running without pause). Empty means no limit.
+	# Unset (or 'auto') follows the router's RAM: 128MiB up to 768 MiB of
+	# MemTotal, where every country's nft run would not fit beside 160MiB
+	# (docs/small-router-memory-measured.md), 160MiB above it and whenever
+	# MemTotal cannot be read. A value in the config always wins.
+	if [ "$memlimit" = auto ]; then
+		local total
+		total=$(awk '$1 == "MemTotal:" && $2 ~ /^[0-9]+$/ { print $2; exit }' "${NETRYX_MEMINFO:-/proc/meminfo}" 2>/dev/null)
+		if [ -n "$total" ] && [ "$total" -le 786432 ]; then
+			memlimit=128MiB
+		else
+			memlimit=160MiB
+		fi
+	fi
 	if [ -n "$memlimit" ]; then
 		local n max
 		case "$memlimit" in
