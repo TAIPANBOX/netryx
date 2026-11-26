@@ -50,3 +50,14 @@ Feature: netryx on a router with 512 MB
     When netryx restarts
     Then the country sets stay as the kernel holds them, the rules apply, and the log says the sets were kept
     # -> TestARestartWithoutTheMemoryKeepsTheKernelsCountrySets
+
+  Scenario: country sets kept from the kernel are loaded again once the memory is there
+    Given a rule enforced with country sets kept as the kernel held them
+    When the console shows it
+    Then it is applied, with a note that its ranges were kept from the kernel
+    And once the memory is there the next retry loads the sets again and the note goes, without any change of the rules
+    And until then a kept country never holds the other rules back
+    # -> TestAKeptCountryRuleSaysItsRangesAreFromBefore
+    # -> TestKeptCountrySetsAreFilledOnceTheMemoryIsThere
+    # -> TestAStaleCountryNeverHoldsTheRestBack
+    # -> TestARulesNoteReachesThePage

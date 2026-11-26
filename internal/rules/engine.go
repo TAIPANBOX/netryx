@@ -123,6 +123,9 @@ type RuleState struct {
 	Hits      uint64
 	Applied   bool
 	Problem   string
+	// Note qualifies a rule that is applied: its country sets were kept as
+	// the kernel held them, so their ranges may be from before ("" when not).
+	Note string
 	// Allows are the live allowances that lift this rule now (R42).
 	Allows []LiveAllow
 	// Used is, for a limit rule, today's minutes per device.
@@ -297,6 +300,11 @@ type Engine struct {
 	dropped int
 	// held is the size of the ruleset netryx applied last, which the kernel
 	// holds (heldKnown: since this process applied one).
+	// stale are the countries whose sets were kept as the kernel held them
+	// (too little memory to load them again), tried again at each retry;
+	// lastKept is what the log said of them last.
+	stale    map[string]bool
+	lastKept string
 	// lastRefusal is the reload error the tick logged last.
 	lastRefusal string
 	held        int
@@ -479,6 +487,7 @@ func (e *Engine) reload() error {
 	// there, loads every country set again (they may come from an older
 	// address table): that needs nft over the kernel's ruleset twice.
 	firstFill := present && len(e.ccDone) == 0
+	stale := false
 	reset := map[string]bool{}
 	fresh := map[string]bool{}
 	recut := map[string]bool{}
@@ -505,6 +514,7 @@ func (e *Engine) reload() error {
 			for _, cc := range r.Targets {
 				if !e.ccDone[strings.ToUpper(cc)] {
 					fresh[strings.ToUpper(cc)] = true
+					stale = stale || e.stale[strings.ToUpper(cc)]
 				}
 			}
 		}
@@ -528,7 +538,7 @@ func (e *Engine) reload() error {
 	var kept []string
 	if delta != last || !present {
 		msg := e.tooBig(present, delta, len(fresh))
-		if msg != "" && firstFill {
+		if msg != "" && (firstFill || stale) {
 			// Without the memory to load them again, the country sets the
 			// kernel holds are kept as they are: the rules stay enforced
 			// with the ranges they had, and the rest applies.
@@ -615,9 +625,22 @@ func (e *Engine) reload() error {
 	e.east, e.eastSet = east, true
 	e.mu.Unlock()
 	e.tell(told)
-	if len(kept) > 0 {
-		sort.Strings(kept)
-		e.o.Logf("country sets kept as the kernel held them (%s): too little memory to load them again", strings.Join(kept, " "))
+	sort.Strings(kept)
+	e.mu.Lock()
+	// Kept sets are not taken as loaded: the next retry tries them again.
+	e.stale = map[string]bool{}
+	for _, cc := range kept {
+		delete(e.ccDone, cc)
+		e.stale[cc] = true
+	}
+	if len(kept) > 0 && e.next.After(now.Add(retry)) {
+		e.next = now.Add(retry)
+	}
+	said := e.lastKept
+	e.lastKept = strings.Join(kept, " ")
+	e.mu.Unlock()
+	if len(kept) > 0 && e.lastKept != said {
+		e.o.Logf("country sets kept as the kernel held them (%s): too little memory to load them again", e.lastKept)
 	}
 
 	// The file the init loads at boot is the whole ruleset, every set
@@ -891,6 +914,14 @@ func (e *Engine) State() []RuleState {
 				s.Problem = e.blind
 			case e.appliedOK:
 				s.Applied = e.applied[r.ID]
+				if s.Applied && r.What == "country" {
+					for _, cc := range r.Targets {
+						if e.stale[strings.ToUpper(cc)] {
+							s.Note = "country ranges kept from the kernel: too little memory to load them again"
+							break
+						}
+					}
+				}
 			case e.problem != "":
 				s.Problem = "not applied: " + e.problem
 			}

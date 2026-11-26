@@ -118,11 +118,16 @@ enforced, and that is a debt rather than a decision.
   can always shed rules, and a router whose memory cannot be read applies as
   before. A restarted process loads every country set again; when that does
   not fit, the sets the kernel holds are kept as they are, the rules apply,
-  and the log says so. A refusal clears once the memory is there, and the
+  and the log says so; such a rule is applied with a note that its ranges
+  were kept, the sets are loaded again at the next retry once the memory is
+  there, and a kept country never holds the other rules back. A refusal clears once the memory is there, and the
   tick logs a refusal that holds once. (test: `TestAnApplyThatWouldNotFitIsRefusedBeforeNft`,
   `TestARestartWithoutTheMemoryKeepsTheKernelsCountrySets`, `TestARefusalClearsOnceTheMemoryIsThere`,
   `TestARefusalIsLoggedOnceWhileItHolds`, `TestTheLineIsDrawnAtTheCountedNeed`,
   `TestAnAppRuleIsNotHeldBackOnAStarvedRouter`, `TestTheRoutersMeminfoIsRead`,
+  `TestAKeptCountryRuleSaysItsRangesAreFromBefore`, `TestKeptCountrySetsAreFilledOnceTheMemoryIsThere`,
+  `TestAStaleCountryNeverHoldsTheRestBack`, `TestARulesNoteReachesThePage`;
+  the page: "a rule enforced with ranges kept from before says so beside its state" in `web/src/rules.test.ts`,
   `TestAnApplyThatFitsGoesAhead`, `TestAChangeThatAddsNoCountrySetIsNotHeldBack`,
   `TestTheApplyNeedIsCountedFromTheKernelsRulesAndTheScript`,
   `TestTheMarginIsKeptOnBothSidesOfTheLine`, `TestTheRulesHeldAtStartAreReadFromRulesNft`,

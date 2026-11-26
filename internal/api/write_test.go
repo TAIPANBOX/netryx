@@ -1289,3 +1289,22 @@ func TestAllowancesThatOpenNothingAreListed(t *testing.T) {
 		t.Errorf("%s", rec.Body)
 	}
 }
+
+// A rule enforced with country sets kept from the kernel carries its note to
+// the page; a rule without one sends none.
+func TestARulesNoteReachesThePage(t *testing.T) {
+	fr := house()
+	fr.state = []rules.RuleState{
+		{Rule: rules.Rule{ID: "r_cc", Enabled: true, What: "country", Targets: []string{"RU"}, Who: "all", From: -1, To: -1},
+			Applied: true, Note: "country ranges kept from the kernel"},
+		{Rule: rules.Rule{ID: "r_all", Enabled: true, What: "all", Who: "all", From: -1, To: -1}, Applied: true},
+	}
+	h, _ := writable(t, fr)
+	list, _ := decode(t, get(t, h, http.MethodGet, "/api/rules")).([]any)
+	if len(list) != 2 || field(list[0], "note") != "country ranges kept from the kernel" || field(list[0], "applied") != true {
+		t.Fatalf("rules: %v", list)
+	}
+	if n, ok := list[1].(map[string]any)["note"]; ok {
+		t.Errorf("a rule without a note sends %v", n)
+	}
+}

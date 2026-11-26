@@ -234,7 +234,9 @@ which that count fell short of the ten-country apply on the Beryl, and the
   older address table), which needs nft over the kernel's ruleset twice. When
   that does not fit, the country sets the kernel holds are kept as they are:
   the rules stay enforced with the ranges they had, the rest applies, and the
-  log names the countries kept.
+  log names the countries kept. Each such rule is shown applied with a note
+  that its country ranges were kept from the kernel. The sets are loaded again
+  at the next retry (5 minutes) once the memory is there, and the note goes.
 
 The same four every-country writes on a 512MiB clone, with r9 built from this
 tree, at no limit:
