@@ -98,20 +98,6 @@ back at its six base sets.
   is larger than nft's 170 MB, that service would be taken instead. Hermes
   holds about 213 MB on the Flint 2 (`docs/flint2-measured.md` section 6).
 
-## Recommendation for 512 MB
-
-- Set `memory_limit` to 128MiB on a 512 MB router. The typical set then costs
-  nothing, and every country applies on a router with nothing else large on it.
-- Every country, or anything near it, is not safe on a 512 MB router that runs
-  another large service. The apply should not be started there at all.
-
-What would make that hold without the owner's care is a check before `nft`
-runs: if the ruleset's expected nft peak is more than the memory available
-less a margin, the apply is refused with that reason, and the OOM killer is
-never reached. This is a proposal, not built. Its factor, nft's peak per byte of
-ruleset, is to be measured on the Beryl itself (aarch64), since this clone is
-x86-64.
-
 @measured `scripts/forge.sh sh -c 'MEM=512MiB sh scripts/lab/forge-small-router-memory.sh'`
 (it runs `scripts/lab/small-router-memory.sh` on the clone), the log, samples,
 gctrace lines, nft peaks and OOM lines in `build/small/out` on forge; clone
@@ -122,3 +108,110 @@ stopped after the run, which deletes them. An earlier attempt at 15:37 was
 discarded: its nft wrapper passed nft no input (a background command's stdin is
 /dev/null under busybox), so nothing reached the kernel. The script now
 checks that a set made through the wrapper exists before it measures.
+
+## On the Beryl AX itself (beryl1)
+
+The same questions on the router: a GL-MT3000 (aarch64, OpenWrt 25.12.6
+r33311), 496.7 MB MemTotal.
+
+**The router beforehand:**
+- 334.5 MB available, two days up.
+- Resident processes: tailscaled (37 MB), rollcalld (16 MB) and two openwrt-mcp
+  processes (11 MB each). hermes-agent is installed and was not running.
+- 59.3 C idle. Its trip points are 60 C (fan), 85 C, 120 C (hot) and 125 C
+  (critical). The run's guard was the start plus 12 C.
+
+**The run:**
+- netryx 0.1.0-r7 for aarch64_cortex-a53 (sha256 7c828b4e...2c8), installed
+  with `apk add`, which brought three kernel modules with it.
+- `memory_limit '128MiB'`, the quarantine off.
+- Rules written as UCI sections and applied with a reload, the agent's path.
+  Every rule names devices that are not on the router, so no client's traffic
+  changed.
+- No synthetic load, only the router's own clients.
+- The typical set of the clone (a group, five countries, ads, apps, the night
+  window, the time limit, a pause), then ten countries (US CN DE GB RU JP FR NL
+  BR IN), as in `docs/flint2-measured.md` section 6.
+- Every country was not run on the router. The ten-country figure below shows
+  why.
+
+| | idle | typical set | ten countries |
+|---|---|---|---|
+| netryx VmRSS, or VmHWM over the apply | 48.4 MB | 70.1 MB | 117.2 MB |
+| netryx RssAnon, highest | 23.2 MB | 44.9 MB | 97.7 MB |
+| `rules.nft` | 3 267 bytes | 704 068 bytes | 5 699 956 bytes |
+| sets in the kernel | 13 | 133 | 34 |
+| nft, highest seen | | 23.7 MB | 125.7 MB |
+| SUnreclaim, before and highest | 23.8 MB | 41.1 MB | 63.1 MB |
+| MemAvailable, lowest | 290.4 MB | 222.7 MB | **81.0 MB** |
+| applied | | all 6 | yes |
+| OOM kills | 0 | 0 | 0 |
+
+The temperature stayed between 57.8 and 60.2 C, 24.8 C under the 85 C trip
+point, with a load average under 1.
+
+**nft costs more on aarch64.** Its peak per byte of ruleset was 22.0 for the
+ten countries (125.7 MB for 5.7 MB), against 16.1 on the x86-64 clone (169.8 MB
+for 10.5 MB). At 22 bytes a byte, every country's 10.5 MB ruleset would need
+about 230 MB for nft alone (an estimate, not run). Beside netryx's peak and the
+sets, that does not fit in the Beryl's 334 MB, whatever the limit. Ten
+countries fit, with 81 MB left at the lowest sample.
+
+**The router afterwards:**
+- The rules deleted, then `apk del netryx`, which purged the three modules.
+- `/etc/config/netryx`, `/etc/netryx` and `/tmp/netryx` removed.
+- The rollback timer disarmed.
+
+The router was then compared with a snapshot taken before the install, and was
+the same in:
+- the 222 installed packages;
+- the sha256 of the 18 files in `/etc/config`;
+- the stateless nft ruleset;
+- the pids of rollcalld, tailscaled, openwrt-mcp, hostapd and dnsmasq;
+- `/etc/rc.local`, `/etc/init.d`, the crontab and the mounts of the extroot;
+- the loaded modules.
+
+Two steps beyond the package's own were needed to get there:
+- **fw4 still held the package's DNS accept line** (`th dport 553 ct status
+  dnat accept`). The removal took the include file away but did not reload fw4,
+  so the line stayed until `fw4 -q reload`. This is a defect of the package's
+  removal scripts.
+- **The five modules the install loaded stayed loaded** (nf_conntrack_bridge,
+  nf_conntrack_netlink, nfnetlink_log, nft_meta_bridge, nft_reject_bridge),
+  with their files gone. They were unloaded with `rmmod`.
+
+@measured `sh scripts/lab/beryl-memory.sh 128MiB` on beryl1 under
+`HOST=beryl1 scripts/lab/flint2-arm.sh arm 900`, its log and samples kept
+from `/tmp/nxm`, the snapshot in `/root/netryx-pre.2026-11-26` on the router
+(`apk list --installed`, `sha256sum /etc/config/*`, `nft -s list ruleset`, the
+pids, `lsmod`); the package built on forge with
+`scripts/forge.sh sh -c 'sh package/netryx/build.sh aarch64_cortex-a53 && PKGREL=7 sh scripts/lab/forge-mkapk.sh aarch64_cortex-a53 && sh scripts/package-sane.sh build/aarch64_cortex-a53/tree build/aarch64_cortex-a53/netryx-0.1.0-r7.apk && sh scripts/elf-arch.sh build/aarch64_cortex-a53/tree/usr/sbin/netryx arm64'`,
+2026-11-26 16:20-16:33 London. In seven one-second samples during the
+ten-country apply `pidof netryx` gave no single pid, so the sampler wrote
+those lines without netryx's three fields. Their MemAvailable (106.8 MB at the
+lowest) was read from its shifted place, and netryx's peak in those seconds is
+in its VmHWM.
+
+## Recommendation for 512 MB
+
+- **A typical household's rules fit at any limit**, on the clone and on the
+  Beryl: netryx at 70 to 126 MB, nft at 5 to 24 MB, over 190 MB left.
+- **Set `memory_limit` to 128MiB on a 512 MB router.** It costs the typical set
+  nothing, and on the clone it was what let every country apply.
+- **Ten countries fit on the Beryl**, with 81 MB left at the lowest sample.
+- **Every country does not fit on a Beryl at any limit.** On aarch64, nft alone
+  would need about 230 MB.
+
+The console cannot know any of this unaided today. The OOM killer settles it,
+and it takes the largest process. That was nft here, but it could be another
+service on a router that runs one.
+
+The fix proposed is a check before `nft` runs: if the ruleset's expected nft
+peak is more than the memory available less a margin, the apply is refused with
+that reason, and the OOM killer is never reached. nft's peak per byte of
+ruleset is measured above:
+- 22 on the Beryl for ten countries;
+- 34 for the small typical set, where nft's own base weighs more;
+- 16 on the x86-64 clone.
+
+This is a proposal, not built.
