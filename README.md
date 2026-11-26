@@ -119,6 +119,8 @@ On real routers and a lab, each figure with the command that produced it in
 | Console bytes against the line's own counters | within -0.14% to -1.78% |
 | Memory on a Flint 2 (1 GB) | 133 to 135 MB under load; the heaviest apply, every country blocked at once, peaks at 158 MB with the default `memory_limit` of 160 MiB (242 MB without it) |
 | Every country blocked | 296 384 set elements, 44 MB of kernel memory |
+| A 512 MB router (Beryl AX) | idle 48 MB; a typical household's rules peak netryx at 70 MB with 223 MB left; ten countries fit with 81 MB left; every country does not fit, and an apply that would not fit is refused before nft runs, with the reason ([docs/small-router-memory-measured.md](docs/small-router-memory-measured.md)) |
+| The memory limit | follows the router's RAM unless the config names one: 128 MiB up to 768 MiB, 160 MiB above |
 | Flash written | about 3.4 MB a day for a profile of 30 busy devices: one file per closed hour and per closed day |
 
 ## Install
@@ -239,6 +241,8 @@ build from the same script (`build.sh` maps the OpenWrt name to Go's).
 - A device behind a second router or a 3-address repeater arrives as one MAC.
 - A Wi-Fi device is isolated from its SSID neighbours only when the SSID isolates clients itself;
   the console says so on the device.
+- On a 512 MB router not every country can be blocked at once: the router holds about ten.
+  A rule set that would not fit is refused with the reason, and what is in force stays in force.
 
 ## How it is tested
 
