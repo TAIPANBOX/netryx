@@ -1377,8 +1377,11 @@ enforced, and that is a debt rather than a decision.
 - **A filtered device in a zone whose input is REJECT still reaches the safe
   resolver**: the package ships the fw4 include
   `/usr/share/nftables.d/chain-pre/input/netryx.nft`, accepting exactly DNS
-  redirected to 553 (`ct status dnat`), and the install reloads fw4.
-  (gate: `scripts/package-sane.sh`; measured docs/stage2b-measured.md section 7)
+  redirected to 553 (`ct status dnat`), and the install reloads fw4; the
+  removal reloads it again once the files are gone, so the accept goes with
+  the package. (gate: `scripts/package-sane.sh`, with its cases in
+  `scripts/gates-have-teeth.sh`; measured docs/stage2b-measured.md section 7;
+  the line left behind found on beryl1, docs/small-router-memory-measured.md)
 - **The first screen stays small, whatever is added**: the page is split into
   chunks by esbuild, every screen past the overview and the clients list
   loaded when it is first opened (`web/src/lazy.tsx`); the first screen

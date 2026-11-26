@@ -83,9 +83,11 @@ exit 0
 PRE
 # After the files are gone: the rpcd plugin went with them, and a reload drops
 # the ubus object netryx, which rpcd would otherwise list until it restarts.
+# The fw4 include went too, and fw4 keeps its accept until it loads again.
 cat > "$WORK/post-deinstall" <<'POSTDEL'
 #!/bin/sh
 [ -x /etc/init.d/rpcd ] && /etc/init.d/rpcd reload 2>/dev/null
+command -v fw4 >/dev/null 2>&1 && fw4 -q reload 2>/dev/null
 exit 0
 POSTDEL
 chmod 0755 "$WORK/post-install" "$WORK/pre-deinstall" "$WORK/post-deinstall"

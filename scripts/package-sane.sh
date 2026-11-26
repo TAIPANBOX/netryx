@@ -107,6 +107,14 @@ for spec in "mkapk.sh WORK/post-install POST" "mkipk.sh CTRL/postinst POSTINST";
 	heredoc "$scripts/$1" "$2" "$3" | grep -q 'fw4 -q reload' ||
 		fail "$1: the install ($2) does not reload fw4, so the include is not in force"
 done
+# The removal takes the include file away, and fw4 keeps the line it read
+# until it loads again: the removal reloads fw4 once the files are gone, or the
+# accept stays in the router's firewall (found on beryl1).
+for spec in "mkapk.sh WORK/post-deinstall POSTDEL" "mkipk.sh CTRL/postrm POSTRM"; do
+	set -- $spec
+	heredoc "$scripts/$1" "$2" "$3" | grep -q 'fw4 -q reload' ||
+		fail "$1: the removal ($2) does not reload fw4, so the include's accept stays in force"
+done
 
 # Removal takes the safe resolver's section away without committing anybody
 # else's pending dhcp changes (adblock-fast keeps its own uncommitted): a copy
