@@ -12,7 +12,7 @@
 # oui.txt                 the IEEE Registration Authority's public MA-L listing:
 #                         hardware address prefixes to the maker that holds them.
 #
-# Run on forge or in the package build, never in the router's hot path. Each
+# Run in CI (cached a week) or in the package build, never in the router's hot path. Each
 # file is checked for being what it claims before it replaces the old one.
 set -eu
 

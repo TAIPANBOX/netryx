@@ -48,7 +48,11 @@ if [ ! -f "$ROOT/internal/web/dist/index.html" ]; then
 fi
 
 echo "building netryx $VERSION for $ARCH (GOARCH=$GOARCH${GOARM:+ GOARM=$GOARM})"
-CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH ${GOARM:+GOARM=$GOARM} \
+# GOARM is exported rather than written as ${GOARM:+GOARM=$GOARM} before the
+# command: a word that comes out of an expansion is never an assignment, so
+# dash ran "GOARM=7" as a command and every arm build failed.
+if [ -n "$GOARM" ]; then export GOARM; else unset GOARM; fi
+CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH \
 	go build -C "$ROOT" -trimpath -ldflags="-s -w -X main.version=$VERSION" \
 	-o "$TREE/usr/sbin/netryx" ./cmd/netryx
 

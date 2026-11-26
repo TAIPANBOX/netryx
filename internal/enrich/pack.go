@@ -52,7 +52,9 @@ func (g *GeoDB) MarshalPack() ([]byte, error) {
 	if g == nil || g.pk != nil {
 		return nil, errors.New("enrich: only a table loaded from the iptoasn file is written as a pack")
 	}
-	if g.skipped > math.MaxUint32 || len(g.infos) > math.MaxUint32 {
+	// Compared as uint64: on a 32-bit router an int cannot hold MaxUint32, and
+	// the constant alone would not compile there.
+	if uint64(g.skipped) > math.MaxUint32 || uint64(len(g.infos)) > math.MaxUint32 {
 		return nil, errors.New("enrich: the table is too large for a pack")
 	}
 	var blob []byte
@@ -67,7 +69,7 @@ func (g *GeoDB) MarshalPack() ([]byte, error) {
 		}
 		off, seen := orgAt[in.Org]
 		if !seen {
-			if len(blob)+len(in.Org) > math.MaxUint32 {
+			if uint64(len(blob))+uint64(len(in.Org)) > math.MaxUint32 {
 				return nil, errors.New("enrich: the organisation names are too large for a pack")
 			}
 			off = uint32(len(blob))

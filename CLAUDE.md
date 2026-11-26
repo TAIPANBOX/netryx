@@ -707,8 +707,8 @@ enforced, and that is a debt rather than a decision.
   sizing is decided on the real house's cardinality)
 - **The history store fits its memory budget**: under the heavy profile, with
   every ring full, its live heap stays under 24 MB (`NETRYX_HEAP_BUDGET_MB`).
-  (gate: `scripts/memory-budget.sh`, run on forge as
-  `scripts/forge.sh sh scripts/memory-budget.sh`; @measured that command
+  (gate: `scripts/memory-budget.sh`, run in CI by `scripts/gates-have-teeth.sh`;
+  @measured `scripts/forge.sh sh scripts/memory-budget.sh`
   2026-11-23 on forge: 17.9 MB with closed hours and days packed, against
   100.9 MB when they were maps, 3406 KB written a day, unchanged; the budget
   is 24 MB, under the 64 MB of resident memory set for a 256 MB router. The
@@ -989,9 +989,9 @@ enforced, and that is a debt rather than a decision.
   each append counted at 10 KiB (what one costs f2fs when it reaches the disk
   alone) and each rewrite at its size, it writes at most
   `NETRYX_JOURNAL_BUDGET_KB` (640) a day; it stays appended with no fsync and
-  no buffer (@decided 2026-11-23). (gate: `scripts/journal-budget.sh`, run as
-  `scripts/forge.sh sh scripts/journal-budget.sh`, with a case just under the
-  measured cost in `scripts/gates-have-teeth.sh`; @measured that command
+  no buffer (@decided 2026-11-23). (gate: `scripts/journal-budget.sh`, run in CI by
+  `scripts/gates-have-teeth.sh`, with a case there just under the measured
+  cost; @measured `scripts/forge.sh sh scripts/journal-budget.sh`
   2026-11-23 on forge: 500.7 KB a day; @measured
   `scripts/lab/journal-load -n 20 -every 35s -f2fs loop0` 2026-11-23 in
   netryx-lab on an f2fs image with OpenWrt's options, `lifetime_write_kbytes`:
@@ -1048,9 +1048,8 @@ enforced, and that is a debt rather than a decision.
 - **The daily file fits a small router**: under the profile of 64 busy
   devices a day's file is at most `NETRYX_DAILY_BUDGET_KB` (16) and the 30
   days loaded at most `NETRYX_DAILY_HEAP_BUDGET_KB` (1024) of heap.
-  (gate: `scripts/flash-budget.sh`, run as
-  `FORGE_DIR=netryx-daily scripts/forge.sh sh scripts/flash-budget.sh`;
-  @measured that command and
+  (gate: `scripts/flash-budget.sh`, run in CI by `scripts/gates-have-teeth.sh`;
+  @measured `FORGE_DIR=netryx-daily scripts/forge.sh sh scripts/flash-budget.sh` and
   `scripts/forge.sh go test -count=1 -tags heavyprofile -run '^TestDailyProfile$' -v ./internal/daily/`
   2026-11-23 on forge: 13305 bytes a day for 64 devices, 6573 for 30, 436.0 KB
   of heap for the 30 days loaded)
@@ -1462,6 +1461,15 @@ enforced, and that is a debt rather than a decision.
   console is English first, a second language may come later)
 
 ## How work is done here
+
+- **Everything that compiles in a loop runs in GitHub Actions**: the suite under
+  `-race`, the mutants, the console page, the package and the cross builds for
+  every architecture, and every gate with its teeth (`.github/workflows/ci.yml`,
+  on every push and pull request, standard hosted runners only). A laptop edits
+  and runs one quick test; forge keeps what needs a router, a lab VM or the house
+  network (`scripts/lab/`, through `scripts/forge.sh`). (@decided 2026-11-27:
+  the heavy gates of the public repositories moved from forge to Actions, to
+  keep forge light)
 
 - **A published screenshot never carries the lab line's private values**:
   `scripts/lab/console-shots.mjs` reads `~/netryx-shots.deny` (kept off the

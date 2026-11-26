@@ -2,9 +2,9 @@
 # The interventions journal has to fit a router's flash: under 50
 # interventions a day for 30 days, what it writes a day (each append at the
 # 10 KiB measured on f2fs, each rewrite its whole size) stays under a budget.
-# Run on forge:
+# Run in CI, by scripts/gates-have-teeth.sh:
 #
-#   scripts/forge.sh sh scripts/journal-budget.sh
+#   sh scripts/journal-budget.sh
 #
 # NETRYX_JOURNAL_BUDGET_KB sets the budget a day (640 KB by default); the test
 # decides, and this script refuses to call a run that measured nothing a pass.

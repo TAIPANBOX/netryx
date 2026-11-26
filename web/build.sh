@@ -1,9 +1,9 @@
 #!/bin/sh
 # Build the console page into internal/web/dist, where the Go binary embeds it.
 #
-#   scripts/forge.sh sh web/build.sh
+#   sh web/build.sh
 #
-# Runs on forge, never on the laptop. Also bundles src/*.test.ts for node, so
+# Runs in CI (.github/workflows/ci.yml), never on the laptop. Also bundles src/*.test.ts for node, so
 # `node --test web/dist-test/` runs them without a test framework.
 set -eu
 cd "$(dirname "$0")"

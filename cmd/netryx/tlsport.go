@@ -123,6 +123,9 @@ var peekTimeout = 5 * time.Second
 func splitTLS(ln net.Listener) (net.Listener, net.Listener) {
 	t := &chanListener{addr: ln.Addr(), c: make(chan net.Conn), done: make(chan struct{})}
 	p := &chanListener{addr: ln.Addr(), c: make(chan net.Conn), done: make(chan struct{})}
+	// Read once here: the goroutines below never touch the variable, so a
+	// test that shortens it and puts it back does not race them.
+	timeout := peekTimeout
 	go func() {
 		defer t.Close()
 		defer p.Close()
@@ -147,7 +150,7 @@ func splitTLS(ln net.Listener) (net.Listener, net.Listener) {
 			}
 			pause = 0
 			go func() {
-				conn.SetReadDeadline(time.Now().Add(peekTimeout))
+				conn.SetReadDeadline(time.Now().Add(timeout))
 				br := bufio.NewReader(conn)
 				first, err := br.Peek(1)
 				if err != nil {

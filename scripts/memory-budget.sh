@@ -1,9 +1,10 @@
 #!/bin/sh
 # The history store has to fit a router: with every ring full under the heavy
 # profile (30 busy devices, 31 days), its live heap stays under a budget. The
-# test builds the whole month in memory, so it runs on forge:
+# test builds the whole month in memory, so it runs in CI, by
+# scripts/gates-have-teeth.sh:
 #
-#   scripts/forge.sh sh scripts/memory-budget.sh
+#   sh scripts/memory-budget.sh
 #
 # NETRYX_HEAP_BUDGET_MB sets the budget (24 MB by default); the test itself
 # decides, and this script refuses to call a run that measured nothing a pass.

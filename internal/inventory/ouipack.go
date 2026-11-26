@@ -64,7 +64,7 @@ func MarshalOUIPack(m OUIMap) ([]byte, error) {
 	for _, r := range regs {
 		total += len(r.name)
 	}
-	if total > math.MaxUint32 {
+	if uint64(total) > math.MaxUint32 { // uint64: 32-bit targets cannot hold the constant in an int
 		return nil, errors.New("oui: the vendor names are too large for a pack")
 	}
 	body = binary.LittleEndian.AppendUint32(body, uint32(total))
