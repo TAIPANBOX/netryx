@@ -33,6 +33,7 @@ Feature: netryx on a router with 512 MB
     # -> TestTheMarginIsKeptOnBothSidesOfTheLine
     # -> TestTheRulesHeldAtStartAreReadFromRulesNft
     # -> TestMemAvailableIsReadFromMeminfo
+    # -> TestTheRoutersMeminfoIsRead
 
   Scenario: a router whose memory cannot be read applies as before
     Given a router without /proc/meminfo

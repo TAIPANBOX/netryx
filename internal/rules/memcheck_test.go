@@ -190,3 +190,17 @@ func TestMemAvailableIsReadFromMeminfo(t *testing.T) {
 		t.Error("a number that is not one is an error")
 	}
 }
+
+// On Linux the router's own meminfo is read; elsewhere there is none to read.
+func TestTheRoutersMeminfoIsRead(t *testing.T) {
+	got, err := ReadMemAvailable()
+	if _, statErr := os.Stat("/proc/meminfo"); statErr != nil {
+		if err == nil {
+			t.Fatal("no meminfo, yet a figure")
+		}
+		return
+	}
+	if err != nil || got == 0 {
+		t.Fatalf("%d %v", got, err)
+	}
+}
