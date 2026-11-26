@@ -1,10 +1,10 @@
 #!/bin/sh
 # The daily file has to fit a router's flash and memory: under the profile of
 # 64 busy devices, one day's file stays under a budget, and the 30 days kept
-# stay under a heap budget once loaded. The test writes 31 days, so it runs on
-# forge:
+# stay under a heap budget once loaded. The test writes 31 days, so it runs in
+# CI, by scripts/gates-have-teeth.sh:
 #
-#   scripts/forge.sh sh scripts/flash-budget.sh
+#   sh scripts/flash-budget.sh
 #
 # NETRYX_DAILY_BUDGET_KB sets the file budget (16 KB by default) and
 # NETRYX_DAILY_HEAP_BUDGET_KB the heap budget (1024 KB); the test itself

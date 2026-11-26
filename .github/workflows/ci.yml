@@ -1,0 +1,130 @@
+# Everything that compiles in a loop runs here, on GitHub's standard hosted
+# runners: the whole suite under -race, the mutants, the console page, the
+# packages for every architecture and every gate with its teeth. It used to run
+# on forge through scripts/forge.sh; forge is kept for what needs a router or
+# the house network (scripts/lab/), and a laptop only edits and runs one quick
+# test.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: go (gofmt, vet, race)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt'd: $unformatted" >&2
+            exit 1
+          fi
+      - name: vet
+        run: go vet ./...
+      - name: tests under the race detector
+        run: go test -race -count=1 ./...
+
+  mutants:
+    name: mutants (cmd/netryx)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: every planted fault is caught by a test
+        run: sh scripts/mutants-cmd.sh
+
+  package:
+    name: page, packages and gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # The data files are fetched once a week, not on every push: the address
+      # table changes daily and nothing here depends on its newest rows. A new
+      # pin in fetch-data.sh starts a new cache.
+      - name: the week the data is cached for
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >>"$GITHUB_OUTPUT"
+      - name: restore the data files
+        id: data
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data
+          key: netryx-data-${{ hashFiles('scripts/fetch-data.sh') }}-${{ steps.week.outputs.week }}
+      - name: fetch the data files
+        if: steps.data.outputs.cache-hit != 'true'
+        run: sh scripts/fetch-data.sh data
+      - name: the app table
+        run: |
+          go run ./tools/appmap -v2fly data/v2fly/data -catalog tools/appmap/catalog.tsv \
+            -brands data/simple-icons.json -o data/appmap.tsv -meta data/apps-meta.json
+      # mkapk.sh runs package/netryx/build.sh, which builds the page first
+      # (tsc, esbuild, bundle-budget.sh, login-assets.sh), then the binary,
+      # then writes the .apk with apk mkpkg in an alpine:edge container.
+      - name: the package for aarch64_cortex-a53
+        run: sh package/netryx/mkapk.sh aarch64_cortex-a53
+      - name: the page's own tests
+        run: node --test web/dist-test/*.mjs
+      - name: the page fetches nothing from outside the router
+        run: sh scripts/ui-offline.sh internal/web/dist
+      - name: the package is a package
+        run: |
+          pkg=$(ls -S build/aarch64_cortex-a53/*.apk | head -1)
+          sh scripts/package-sane.sh build/aarch64_cortex-a53/tree "$pkg"
+      - name: every architecture builds and is what it claims
+        run: |
+          for a in aarch64_cortex-a53 aarch64_generic x86_64 arm_cortex-a7 arm_cortex-a9 mips_24kc; do
+            case "$a" in
+              aarch64*) goarch=arm64 ;;
+              x86_64) goarch=amd64 ;;
+              arm_*) goarch=arm ;;
+              mips_*) goarch=mips ;;
+            esac
+            if [ "$a" != aarch64_cortex-a53 ]; then
+              OUT="$RUNNER_TEMP/build" sh package/netryx/build.sh "$a" >/dev/null
+              bin="$RUNNER_TEMP/build/$a/tree/usr/sbin/netryx"
+            else
+              bin=build/aarch64_cortex-a53/tree/usr/sbin/netryx
+            fi
+            sh scripts/elf-arch.sh "$bin" "$goarch"
+            echo "$a: $(du -h "$bin" | cut -f1)"
+          done
+      - name: every scenario names a test that exists
+        run: sh scripts/scenarios-bound.sh
+      - name: everything a person reads is English
+        run: sh scripts/english-only.sh
+      # Runs every gate red on its own planted fault and green on this tree,
+      # the memory, flash and journal budgets under their heavy profiles
+      # included.
+      - name: the gates have teeth
+        run: sh scripts/gates-have-teeth.sh

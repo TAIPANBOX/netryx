@@ -1,12 +1,13 @@
 #!/bin/sh
 # Run a command on forge against a copy of this tree.
 #
-#   scripts/forge.sh go test ./...
-#   scripts/forge.sh sh web/build.sh
+#   scripts/forge.sh sh scripts/lab/forge-small-router-memory.sh
 #
-# Anything that compiles in a loop (the whole suite, -race, mutants, cross
-# builds, the UI build) runs there, not on the laptop: its build cache once grew
-# to 84 GB. The tree is copied without .git, build output, node_modules or the
+# For the lab steps that need forge itself: an incus VM or container, the real
+# data kept there, the house network. Anything that compiles in a loop (the
+# whole suite, -race, mutants, cross builds, the UI build, the gates and their
+# teeth) runs in GitHub Actions (.github/workflows/ci.yml), not here and not on
+# the laptop. The tree is copied without .git, build output, node_modules or the
 # downloaded data, and the remote copies of those are kept between runs.
 #
 # On forge every command runs under forge-heavy when it is there: CPU held to
