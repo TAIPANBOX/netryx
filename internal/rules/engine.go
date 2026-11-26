@@ -50,6 +50,10 @@ type EngineOptions struct {
 	KernelEast func() (int, error)
 	Elapsed    func() time.Duration
 	Logf       func(string, ...any)
+	// MemAvailable is the memory the kernel can give without swapping
+	// (/proc/meminfo MemAvailable, in bytes); an apply that would not fit in
+	// it is refused before nft runs (nil: no check).
+	MemAvailable func() (uint64, error)
 	// IsLocal says whether an address is the house's own (its networks and
 	// the router's addresses); such an address never enters an app's set.
 	IsLocal func(netip.Addr) bool
@@ -291,6 +295,10 @@ type Engine struct {
 	elems   map[string]map[string]time.Time // set -> element -> last sent
 	dirty   bool
 	dropped int
+	// held is the size of the ruleset netryx applied last, which the kernel
+	// holds (heldKnown: since this process applied one).
+	held      int
+	heldKnown bool
 }
 
 // NewEngine builds an engine; Reload (or Run) applies the rules.
@@ -512,6 +520,17 @@ func (e *Engine) reload() error {
 	e.mu.Unlock()
 	delta, meta := compile(cfg, e.cat, e.o.Loc, now, east, fresh, reset, recut, x)
 	if delta != last || !present {
+		if msg := e.tooBig(present, delta, len(fresh)); msg != "" {
+			// Refused before nft runs: the kernel keeps its ruleset and
+			// rules.nft is not rewritten, as for a ruleset nft refuses.
+			e.mu.Lock()
+			e.shown, e.read = cfg, true
+			e.appliedOK = false
+			e.problem = msg
+			e.next = now.Add(retry)
+			e.mu.Unlock()
+			return fmt.Errorf("rules not applied: %s", msg)
+		}
 		if _, err := e.run([]string{"TZ=UTC"}, delta, "-f", "-"); err != nil {
 			msg := strings.TrimSpace(err.Error())
 			e.mu.Lock()
@@ -580,6 +599,9 @@ func (e *Engine) reload() error {
 	boot := x
 	boot.SafeDNS = false
 	full, _ := compile(cfg, e.cat, e.o.Loc, now, east, nil, nil, nil, boot)
+	e.mu.Lock()
+	e.held, e.heldKnown = len(full), true
+	e.mu.Unlock()
 	if err := e.writeRules(full); err != nil {
 		e.o.Logf("rules.nft not written (%v): after a reboot the rules wait for netryx", err)
 	}

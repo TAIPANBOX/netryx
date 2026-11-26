@@ -153,7 +153,7 @@ point, with a load average under 1.
 **nft costs more on aarch64.** Its peak per byte of ruleset was 22.0 for the
 ten countries (125.7 MB for 5.7 MB), against 16.1 on the x86-64 clone (169.8 MB
 for 10.5 MB). At 22 bytes a byte, every country's 10.5 MB ruleset would need
-about 230 MB for nft alone (an estimate, not run). Beside netryx's peak and the
+about 230 MB for nft alone, estimated from the ten-country figure. Beside netryx's peak and the
 sets, that does not fit in the Beryl's 334 MB, whatever the limit. Ten
 countries fit, with 81 MB left at the lowest sample.
 
@@ -202,16 +202,51 @@ in its VmHWM.
 - **Every country does not fit on a Beryl at any limit.** On aarch64, nft alone
   would need about 230 MB.
 
-The console cannot know any of this unaided today. The OOM killer settles it,
-and it takes the largest process. That was nft here, but it could be another
-service on a router that runs one.
+Left to itself, the OOM killer settles an apply that does not fit, and it takes
+the largest process: nft here, another service on a router that runs a larger
+one. The check below refuses such an apply first.
 
-The fix proposed is a check before `nft` runs: if the ruleset's expected nft
-peak is more than the memory available less a margin, the apply is refused with
-that reason, and the OOM killer is never reached. nft's peak per byte of
-ruleset is measured above:
-- 22 on the Beryl for ten countries;
-- 34 for the small typical set, where nft's own base weighs more;
-- 16 on the x86-64 clone.
+## The check before nft (r9)
 
-This is a proposal, not built.
+netryx now counts an apply that loads new country sets before nft runs:
+- nft over the ruleset the kernel holds and the script, at 22 bytes a byte
+  (16 on x86-64);
+- the kernel's new sets at 7 bytes a byte;
+- against MemAvailable, with 64 MiB kept free.
+
+The two factors are the ones measured above. The margin covers the 18 MB by
+which that count fell short of the ten-country apply on the Beryl, and the
+9 MB available at which the OOM killer was reached on the clone.
+
+**When the apply would not fit:**
+- nft is not run;
+- the kernel keeps its ruleset and rules.nft is not rewritten;
+- the rule says `not applied: too little memory to apply: ...` with the
+  figures, in the console and in the API's answer.
+
+**What is not checked:**
+- A change that loads no country set (a delete, an app rule) is never held
+  back. nft then holds no more than the router already held, and a starved
+  router can always shed rules.
+- A router whose memory cannot be read applies as before, and says so in the
+  log.
+
+The same four every-country writes on a 512MiB clone, with r9 built from this
+tree, at no limit:
+
+| write | r7 (above) | r9 |
+|---|---|---|
+| 1 and 2 | applied | applied |
+| 3 | applied | refused: needs about 132 MB, 171 MB available, 64 MiB kept free |
+| 4 | nft killed by the OOM killer, `exit status 137` | refused: needs about 207 MB, 178 MB available |
+| OOM kills | 1 | **0** |
+
+The kernel kept the two rules it held (264 sets). The third write would have
+fitted with 39 MB to spare, which is under the margin. The check errs on the
+side of the router.
+
+@measured the `answers` part of `scripts/lab/small-router-memory.sh` on a
+512MiB clone `nxguard` of `nxlab-golden` upgraded to
+`netryx-0.1.0-r9.apk` (`scripts/forge.sh sh -c 'sh package/netryx/build.sh x86_64 && PKGREL=9 sh scripts/lab/forge-mkapk.sh x86_64'`),
+2026-11-26 16:46-16:50 London. The figures in its answers were then printed in
+MB of 10^6 bytes; the console now prints MiB.
