@@ -1227,7 +1227,10 @@ enforced, and that is a debt rather than a decision.
   all-countries apply peaked at 241.9 MB without the limit and 158.0 MB with it;
   at five limits in a forge clone, docs/apply-memory-measured.md: 226.0 MB
   without, 184.4 at 160MiB, 153.5 at 128MiB, 129.6 at 96MiB, 121.2 at 64MiB
-  with the collector running without pause)
+  with the collector running without pause; on a 512MiB clone,
+  docs/small-router-memory-measured.md, every country at 160MiB had nft taken
+  by the OOM killer and the apply refused, and at 128MiB applied with 42 MB to
+  spare)
 - **Speed now is the line's average over the window** (1, 3 or 10 minutes),
   from every 10 s reading of the WAN counters (at most 64 kept, a clock set
   back or another device starting afresh), each weighted by the seconds it
